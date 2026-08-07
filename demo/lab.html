@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>Duck Lab</title>
+<style>
+  body { margin:0; background:#eaf3fb; font:13px/1.5 system-ui, sans-serif; color:#20303f; }
+  #stage { display:block; margin:0 auto; background:linear-gradient(#f6fbff 0 62%, #cfe6f7 62%, #a9d0ee 100%); }
+  #grid { display:block; margin:8px auto; background:#f2f8fd; }
+  h2 { text-align:center; margin:10px 0 2px; font-size:14px; color:#5a6f85; letter-spacing:.06em; text-transform:uppercase; }
+</style>
+</head>
+<body>
+<h2 id="cap">Pose</h2>
+<canvas id="stage" width="1200" height="560"></canvas>
+<h2>Alle Modelle</h2>
+<canvas id="grid" width="1200" height="1300"></canvas>
+
+<script src="../src/models.js"></script>
+<script src="../src/render.js"></script>
+<script src="../src/effects.js"></script>
+<script>
+var stage = document.getElementById('stage');
+var sctx = stage.getContext('2d');
+var grid = document.getElementById('grid');
+var gctx = grid.getContext('2d');
+
+window.lab = {
+  model: 'mallard',
+  pose: {},
+  t: 0,
+  caption: function (s) { document.getElementById('cap').textContent = s; },
+  set: function (modelId, pose, caption) {
+    if (modelId) this.model = modelId;
+    this.pose = pose || {};
+    if (caption) this.caption(caption);
+    this.draw();
+    return 'ok';
+  },
+  draw: function () {
+    var m = DuckModels.get(this.model);
+    sctx.clearRect(0, 0, stage.width, stage.height);
+    // Wasser
+    var g = sctx.createLinearGradient(0, 0, 0, stage.height);
+    g.addColorStop(0, '#f6fbff'); g.addColorStop(0.62, '#e3f1fb');
+    g.addColorStop(0.621, '#bcdcf3'); g.addColorStop(1, '#8fc2e8');
+    sctx.fillStyle = g; sctx.fillRect(0, 0, stage.width, stage.height);
+    var p = { x: stage.width / 2, y: stage.height * 0.62, r: 120, t: this.t, dir: 1, reflection: true };
+    for (var k in this.pose) p[k] = this.pose[k];
+    DuckRender.draw(sctx, m, p);
+    return 'drawn ' + this.model;
+  },
+  // Alle Modelle im Raster
+  drawGrid: function (pose) {
+    var list = DuckModels.list, cols = 4, cell = 290, r = 76;
+    grid.height = Math.ceil(list.length / cols) * cell + 20;
+    gctx.clearRect(0, 0, grid.width, grid.height);
+    gctx.fillStyle = '#eef7fd'; gctx.fillRect(0, 0, grid.width, grid.height);
+    for (var i = 0; i < list.length; i++) {
+      var cx = (i % cols) * cell + cell / 2;
+      var cy = Math.floor(i / cols) * cell + cell * 0.62;
+      gctx.save();
+      gctx.fillStyle = 'rgba(150,205,240,0.35)';
+      gctx.fillRect((i % cols) * cell + 6, cy - 4, cell - 12, cell * 0.36);
+      var p = { x: cx, y: cy, r: r, t: this.t + i, dir: 1, reflection: true };
+      for (var k in (pose || {})) p[k] = pose[k];
+      DuckRender.draw(gctx, list[i], p);
+      gctx.fillStyle = '#48607a';
+      gctx.font = '600 15px system-ui';
+      gctx.textAlign = 'center';
+      gctx.fillText(list[i].name, cx, cy + cell * 0.30);
+      gctx.restore();
+    }
+    return 'grid ' + list.length;
+  }
+};
+lab.draw();
+lab.drawGrid();
+</script>
+</body>
+</html>

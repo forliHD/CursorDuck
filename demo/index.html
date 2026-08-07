@@ -1,0 +1,250 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Cursor Duck — Testwiese 🦆</title>
+<style>
+  :root {
+    --bg: #eef4fb;
+    --ink: #1d2b3a;
+    --muted: #63758a;
+    --card: #ffffff;
+    --line: #d9e3f0;
+    --accent: #2f7fd6;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; min-height: 100vh;
+    font: 15px/1.6 ui-rounded, -apple-system, "Segoe UI", system-ui, sans-serif;
+    color: var(--ink);
+    background:
+      radial-gradient(1200px 700px at 15% -10%, #dcecff 0%, transparent 60%),
+      radial-gradient(900px 600px at 110% 20%, #e6fbff 0%, transparent 55%),
+      var(--bg);
+  }
+  header { padding: 48px 32px 16px; text-align: center; }
+  h1 { font-size: 38px; margin: 0 0 6px; letter-spacing: -0.5px; }
+  .sub { color: var(--muted); margin: 0; }
+  main { max-width: 780px; margin: 0 auto; padding: 24px 32px 120px; }
+  .card {
+    background: var(--card); border: 1px solid var(--line); border-radius: 16px;
+    padding: 20px 24px; margin: 16px 0; box-shadow: 0 6px 24px rgba(31,60,95,0.06);
+  }
+  h2 { font-size: 19px; margin: 0 0 8px; }
+  p { margin: 8px 0; color: #35485e; }
+  code { background: #eef3fa; padding: 2px 6px; border-radius: 6px; font-size: 13px; }
+
+  /* Steuerpult */
+  #panel {
+    position: fixed; top: 14px; right: 14px; width: 268px; z-index: 10;
+    background: rgba(255,255,255,0.94); backdrop-filter: blur(8px);
+    border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px;
+    box-shadow: 0 10px 34px rgba(31,60,95,0.14); font-size: 12.5px;
+    max-height: calc(100vh - 28px); overflow: auto;
+  }
+  #panel h3 { margin: 0 0 8px; font-size: 13px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
+  #panel label { display: block; margin: 9px 0 3px; color: var(--muted); }
+  #panel select, #panel input[type=range] { width: 100%; }
+  #panel select { padding: 5px; border-radius: 8px; border: 1px solid var(--line); background: #fff; }
+  .row { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+  .row button {
+    flex: 1 1 auto; padding: 5px 8px; border-radius: 8px; border: 1px solid var(--line);
+    background: #f7fafd; cursor: pointer; font-size: 11.5px; font-family: inherit;
+  }
+  .row button:hover { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .chk { display: flex; align-items: center; gap: 6px; margin-top: 8px; }
+  .val { float: right; color: var(--ink); font-variant-numeric: tabular-nums; }
+
+  /* Galerie */
+  #gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(128px, 1fr)); gap: 10px; }
+  .g-item {
+    background: linear-gradient(#f4fbff, #dfeefc);
+    border: 1px solid var(--line); border-radius: 12px; padding: 6px 4px 8px;
+    text-align: center; cursor: pointer;
+  }
+  .g-item:hover { border-color: var(--accent); }
+  .g-item canvas { display: block; margin: 0 auto; }
+  .g-item span { font-size: 11px; color: var(--muted); display: block; margin-top: 2px; }
+  .tier-rare span { color: #2f7fd6; }
+  .tier-epic span { color: #8a4fd6; }
+  .tier-legendary span { color: #d68a1f; font-weight: 700; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Cursor Duck 🦆</h1>
+  <p class="sub">Beweg die Maus. Die Ente schwimmt hinterher.</p>
+</header>
+
+<main>
+  <div class="card">
+    <h2>Was du ausprobieren kannst</h2>
+    <p><b>Hinterherschwimmen:</b> Maus bewegen — je weiter weg, desto schneller paddelt sie (mit Bugwelle und Kielwasser).</p>
+    <p><b>Streicheln:</b> Cursor über die Ente bewegen und hin&#8209;und&#8209;her wackeln → Herzchen, Blush, glückliches Quaken.</p>
+    <p><b>Picken:</b> Maus still halten — sie holt auf und pickt ab und zu den Cursor an.</p>
+    <p><b>Erschrecken:</b> Ganz schnell durch die Ente durchwischen → Federn fliegen.</p>
+    <p><b>Nickerchen:</b> 15&nbsp;Sekunden nichts tun → sie pennt ein (Zzz).</p>
+    <p><b>Klicken:</b> Auf die Ente klicken → sie quakt zurück. Doppelklick → Flügelschlagen.</p>
+  </div>
+
+  <div class="card">
+    <h2>Alle Entenmodelle</h2>
+    <p class="sub" style="margin-top:0">Klick eine Ente an, um sie zu übernehmen.</p>
+    <div id="gallery"></div>
+  </div>
+
+  <div class="card">
+    <h2>Textblock zum Drüberschwimmen</h2>
+    <p>Die Ente lebt in einem <code>&lt;canvas&gt;</code> im Shadow&nbsp;DOM, ganz oben im Stapel, mit
+    <code>pointer-events: none</code>. Sie stört also weder Klicks noch Textauswahl —
+    du kannst diesen Absatz ganz normal markieren, während sie darüber paddelt.</p>
+    <p>Gerendert wird alles prozedural: kein einziges Bild-Asset, dadurch ist jede Ente bei
+    jeder Größe scharf und jedes Modell nur ein paar Zeilen Farbwerte.</p>
+  </div>
+</main>
+
+<div id="panel">
+  <h3>Steuerpult</h3>
+  <label>Modell</label>
+  <select id="model"></select>
+
+  <label>Größe <span class="val" id="sizeV">1.0</span></label>
+  <input type="range" id="size" min="0.5" max="2.2" step="0.05" value="1">
+
+  <label>Tempo <span class="val" id="speedV">1.0</span></label>
+  <input type="range" id="speed" min="0.4" max="2.2" step="0.05" value="1">
+
+  <label>Küken <span class="val" id="ducklingsV">0</span></label>
+  <input type="range" id="ducklings" min="0" max="6" step="1" value="0">
+
+  <label>Verspieltheit <span class="val" id="playV">1.0</span></label>
+  <input type="range" id="playfulness" min="0.2" max="3" step="0.1" value="1">
+
+  <div class="chk"><input type="checkbox" id="sound"><label for="sound" style="margin:0">Quaken (Ton)</label></div>
+  <div class="chk"><input type="checkbox" id="effects" checked><label for="effects" style="margin:0">Wasser-Effekte</label></div>
+  <div class="chk"><input type="checkbox" id="reflection" checked><label for="reflection" style="margin:0">Spiegelung</label></div>
+  <div class="chk"><input type="checkbox" id="peck" checked><label for="peck" style="margin:0">Cursor picken</label></div>
+
+  <label style="margin-top:10px">Animation testen</label>
+  <div class="row" id="actions"></div>
+  <div class="row"><button id="randomModel">🎲 Zufallsente</button></div>
+  <p style="margin:8px 0 0;color:var(--muted)" id="stats">🫶 0 &nbsp; 🐦 0</p>
+</div>
+
+<script src="../src/models.js"></script>
+<script src="../src/render.js"></script>
+<script src="../src/effects.js"></script>
+<script src="../src/engine.js"></script>
+<script>
+(function () {
+  var engine = new CursorDuckEngine({ model: 'mallard', sound: false });
+  engine.mount(document.body);
+  engine.start();
+  window.__duck = engine;   // Test-Handle
+
+  // Modell-Dropdown
+  var sel = document.getElementById('model');
+  DuckModels.list.forEach(function (m) {
+    var o = document.createElement('option');
+    o.value = m.id; o.textContent = m.emoji + '  ' + m.name;
+    sel.appendChild(o);
+  });
+  sel.value = engine.modelId;
+  sel.onchange = function () { engine.apply({ model: sel.value }); renderGallerySelection(); };
+
+  // Slider
+  [['size', 1], ['speed', 1], ['ducklings', 0], ['playfulness', 1]].forEach(function (pair) {
+    var id = pair[0], el = document.getElementById(id), out = document.getElementById(id + 'V');
+    if (!out) out = document.getElementById(id.slice(0, 5) + 'V');
+    el.oninput = function () {
+      var v = parseFloat(el.value);
+      var patch = {}; patch[id] = v;
+      engine.apply(patch);
+      var o = document.getElementById(id + 'V') || document.getElementById('playV');
+      if (o) o.textContent = id === 'ducklings' ? v : v.toFixed(1);
+    };
+  });
+
+  ['sound', 'effects', 'reflection', 'peck'].forEach(function (id) {
+    var el = document.getElementById(id);
+    el.onchange = function () { var p = {}; p[id] = el.checked; engine.apply(p); };
+  });
+
+  // Aktions-Buttons
+  var ACTIONS = [
+    ['quack', 'Quaken'], ['flap', 'Flattern'], ['preen', 'Putzen'], ['shake', 'Schütteln'],
+    ['dabble', 'Gründeln'], ['dive', 'Tauchen'], ['spin', 'Drehen'], ['bathe', 'Baden'],
+    ['look', 'Umschauen'], ['bob', 'Wippen'], ['sleep', 'Schlafen'], ['peck', 'Picken'],
+    ['startle', 'Schreck'], ['pet', 'Streicheln']
+  ];
+  var rowEl = document.getElementById('actions');
+  ACTIONS.forEach(function (a) {
+    var b = document.createElement('button');
+    b.textContent = a[1];
+    b.dataset.action = a[0];
+    b.onclick = function () { engine.trigger(a[0], a[0] === 'sleep' ? 99 : 2.2); };
+    rowEl.appendChild(b);
+  });
+  document.getElementById('randomModel').onclick = function () {
+    var id = DuckModels.randomId();
+    sel.value = id; engine.apply({ model: id });
+  };
+
+  // Statistik
+  setInterval(function () {
+    document.getElementById('stats').textContent = '🫶 ' + engine.stats.pets + '   🐦 ' + engine.stats.pecks;
+  }, 500);
+
+  // ── Galerie: jedes Modell mit eigener kleiner Animation ──────
+  var gal = document.getElementById('gallery');
+  var items = [];
+  DuckModels.list.forEach(function (m) {
+    var d = document.createElement('div');
+    d.className = 'g-item tier-' + m.tier;
+    var c = document.createElement('canvas');
+    var W = 118, H = 104, dpr = Math.min(2, devicePixelRatio || 1);
+    c.width = W * dpr; c.height = H * dpr;
+    c.style.width = W + 'px'; c.style.height = H + 'px';
+    var s = document.createElement('span');
+    s.textContent = m.name;
+    d.appendChild(c); d.appendChild(s);
+    d.onclick = function () { sel.value = m.id; engine.apply({ model: m.id }); };
+    d.title = m.name + ' (' + m.tier + ')';
+    gal.appendChild(d);
+    items.push({ m: m, ctx: c.getContext('2d'), dpr: dpr, W: W, H: H, ph: Math.random() * 6.28 });
+  });
+
+  function renderGallerySelection() {}
+
+  var t0 = performance.now();
+  (function galLoop(ts) {
+    requestAnimationFrame(galLoop);
+    var t = (ts - t0) / 1000;
+    for (var i = 0; i < items.length; i++) {
+      var it = items[i], ctx = it.ctx;
+      ctx.setTransform(it.dpr, 0, 0, it.dpr, 0, 0);
+      ctx.clearRect(0, 0, it.W, it.H);
+      // kleines Wasserbecken
+      var g = ctx.createLinearGradient(0, it.H * 0.62, 0, it.H);
+      g.addColorStop(0, 'rgba(120,190,235,0.35)');
+      g.addColorStop(1, 'rgba(90,160,215,0.55)');
+      ctx.fillStyle = g;
+      ctx.fillRect(0, it.H * 0.66, it.W, it.H);
+      var cyc = (t * 0.55 + i * 0.7) % 6;
+      DuckRender.draw(ctx, it.m, {
+        x: it.W / 2, y: it.H * 0.74, r: 21, dir: 1, t: t + it.ph,
+        bob: Math.sin(t * 2.2 + it.ph) * 1.6,
+        wingFlap: cyc > 5.4 ? Math.abs(Math.sin(t * 14)) : 0,
+        headRot: Math.sin(t * 1.1 + it.ph) * 0.12,
+        beakOpen: cyc > 2.6 && cyc < 2.95 ? 0.7 : 0,
+        eyeOpen: (cyc > 4.2 && cyc < 4.32) ? 0.05 : 1,
+        paddle: t * 3 + it.ph,
+        reflection: true
+      });
+    }
+  })(t0);
+})();
+</script>
+</body>
+</html>

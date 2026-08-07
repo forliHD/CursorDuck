@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="de">
+<head><meta charset="utf-8"><title>Duck Grid</title>
+<style>body{margin:0;background:#eaf3fb;font:13px system-ui;overflow:hidden}canvas{display:block;margin:0 auto}</style>
+</head>
+<body>
+<canvas id="c" width="1000" height="880"></canvas>
+<script src="../src/models.js"></script>
+<script src="../src/render.js"></script>
+<script>
+var c = document.getElementById('c'), ctx = c.getContext('2d');
+window.grid = {
+  page: 0, perPage: 6, cols: 3, t: 0, pose: {},
+  draw: function () {
+    var list = DuckModels.list, cell = 333, cellH = 430, r = 92;
+    var start = this.page * this.perPage;
+    ctx.clearRect(0, 0, c.width, c.height);
+    ctx.fillStyle = '#eef7fd'; ctx.fillRect(0, 0, c.width, c.height);
+    for (var i = 0; i < this.perPage; i++) {
+      var m = list[start + i];
+      if (!m) break;
+      var col = i % this.cols, row = Math.floor(i / this.cols);
+      var cx = col * cell + cell / 2, cy = row * cellH + cellH * 0.66;
+      // Wasserfläche
+      var g = ctx.createLinearGradient(0, cy - 4, 0, cy + 96);
+      g.addColorStop(0, 'rgba(150,205,240,0.55)'); g.addColorStop(1, 'rgba(120,180,225,0.75)');
+      ctx.fillStyle = g;
+      ctx.fillRect(col * cell + 10, cy - 2, cell - 20, 100);
+      var p = { x: cx, y: cy, r: r, t: this.t + i * 0.7, dir: 1, reflection: true };
+      for (var k in this.pose) p[k] = this.pose[k];
+      DuckRender.draw(ctx, m, p);
+      ctx.fillStyle = '#3d5772'; ctx.font = '700 16px system-ui'; ctx.textAlign = 'center';
+      ctx.fillText(m.name, cx, cy + 118);
+      ctx.fillStyle = '#8fa4bb'; ctx.font = '12px system-ui';
+      ctx.fillText(m.id + ' · ' + m.tier, cx, cy + 136);
+    }
+    return 'page ' + this.page + '/' + Math.ceil(list.length / this.perPage);
+  },
+  set: function (page, pose, t) {
+    this.page = page || 0;
+    this.pose = pose || {};
+    if (t !== undefined) this.t = t;
+    return this.draw();
+  }
+};
+grid.draw();
+</script>
+</body>
+</html>

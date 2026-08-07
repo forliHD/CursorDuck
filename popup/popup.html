@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="popup.css">
+<title>Cursor Duck</title>
+</head>
+<body>
+  <header>
+    <canvas id="hero" width="620" height="200"></canvas>
+    <div class="head-row">
+      <div>
+        <h1>Cursor&nbsp;Duck</h1>
+        <p id="modelName">Stockente</p>
+      </div>
+      <label class="switch" title="Ente an/aus">
+        <input type="checkbox" id="enabled" checked>
+        <span class="track"><span class="knob"></span></span>
+      </label>
+    </div>
+  </header>
+
+  <main>
+    <section>
+      <div class="sec-head">
+        <h2>Entenmodell</h2>
+        <button id="randomBtn" class="ghost">🎲 Zufall</button>
+      </div>
+      <div id="models" class="models"></div>
+    </section>
+
+    <section>
+      <h2>Einstellungen</h2>
+      <label class="slider">
+        <span>Größe <b id="sizeV">1.0×</b></span>
+        <input type="range" id="size" min="0.5" max="2.2" step="0.05">
+      </label>
+      <label class="slider">
+        <span>Tempo <b id="speedV">1.0×</b></span>
+        <input type="range" id="speed" min="0.4" max="2.2" step="0.05">
+      </label>
+      <label class="slider">
+        <span>Küken <b id="ducklingsV">0</b></span>
+        <input type="range" id="ducklings" min="0" max="6" step="1">
+      </label>
+      <label class="slider">
+        <span>Verspieltheit <b id="playfulnessV">1.0×</b></span>
+        <input type="range" id="playfulness" min="0.2" max="3" step="0.1">
+      </label>
+      <label class="slider">
+        <span>Sichtbarkeit <b id="opacityV">100 %</b></span>
+        <input type="range" id="opacity" min="0.2" max="1" step="0.05">
+      </label>
+    </section>
+
+    <section class="checks">
+      <label><input type="checkbox" id="peck"> <span>Pickt den Cursor an</span></label>
+      <label><input type="checkbox" id="effects"> <span>Wasser-Effekte &amp; Splashes</span></label>
+      <label><input type="checkbox" id="reflection"> <span>Spiegelung im Wasser</span></label>
+      <label><input type="checkbox" id="sound"> <span>Quaken hörbar 🔊</span></label>
+    </section>
+
+    <section>
+      <h2>Kunststückchen</h2>
+      <div class="tricks" id="tricks"></div>
+    </section>
+
+    <section class="site">
+      <label><input type="checkbox" id="siteOff"> <span>Auf <b id="host">dieser Seite</b> pausieren</span></label>
+    </section>
+
+    <footer>
+      <div class="stats"><b id="pets">0</b> Streicheleinheiten · <b id="pecks">0</b> Pickser</div>
+      <div class="hint">Alt+Shift+D: an/aus · Alt+Shift+N: nächstes Modell</div>
+    </footer>
+  </main>
+
+  <script src="../src/models.js"></script>
+  <script src="../src/render.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>

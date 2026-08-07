@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="de">
+<head><meta charset="utf-8"><title>Icons bauen</title>
+<style>
+ body{margin:0;padding:24px;background:#eef4fb;font:14px system-ui;color:#20303f}
+ #out{display:flex;gap:26px;align-items:flex-end;margin:20px 0}
+ figure{margin:0;text-align:center}
+ figcaption{font-size:12px;color:#6b8098;margin-top:6px}
+ button{font:inherit;padding:8px 14px;border-radius:9px;border:1px solid #cbd9e8;background:#fff;cursor:pointer}
+ #log{font:12px ui-monospace,monospace;color:#456;white-space:pre-line;margin-top:12px}
+</style>
+</head>
+<body>
+<h2>Cursor-Duck-Symbole</h2>
+<p>Rendert die Symbole mit derselben Canvas-Engine und speichert sie nach <code>icons/</code>.<br>
+Dazu vorher <code>python3 tools/iconserver.py</code> starten.</p>
+<div id="out"></div>
+<button id="save">In icons/ speichern</button>
+<div id="log"></div>
+
+<script src="../src/models.js"></script>
+<script src="../src/render.js"></script>
+<script>
+var SIZES = [16, 32, 48, 128];
+
+function icon(size) {
+  var c = document.createElement('canvas'); c.width = c.height = size;
+  var x = c.getContext('2d');
+  // abgerundetes Quadrat mit Wasserverlauf
+  var g = x.createLinearGradient(0, 0, 0, size);
+  g.addColorStop(0, '#7cc4f0'); g.addColorStop(0.55, '#3f93d8'); g.addColorStop(1, '#2b6fb5');
+  var k = size * 0.235;
+  x.beginPath();
+  x.moveTo(k, 0); x.lineTo(size - k, 0); x.quadraticCurveTo(size, 0, size, k);
+  x.lineTo(size, size - k); x.quadraticCurveTo(size, size, size - k, size);
+  x.lineTo(k, size); x.quadraticCurveTo(0, size, 0, size - k);
+  x.lineTo(0, k); x.quadraticCurveTo(0, 0, k, 0);
+  x.closePath(); x.fillStyle = g; x.fill();
+  x.save(); x.clip();
+  var hl = x.createLinearGradient(0, 0, 0, size * 0.5);
+  hl.addColorStop(0, 'rgba(255,255,255,0.35)'); hl.addColorStop(1, 'rgba(255,255,255,0)');
+  x.fillStyle = hl; x.fillRect(0, 0, size, size * 0.5);
+  DuckRender.draw(x, DuckModels.get('rubber'), {
+    x: size * 0.455, y: size * 0.775, r: size * 0.30, t: 1.2, dir: 1,
+    reflection: false, water: true, headRot: -0.06
+  });
+  x.restore();
+  return c;
+}
+
+var made = {};
+var out = document.getElementById('out');
+SIZES.forEach(function (s) {
+  var c = icon(s);
+  made[s] = c;
+  var f = document.createElement('figure');
+  f.appendChild(c);
+  var cap = document.createElement('figcaption');
+  cap.textContent = s + '×' + s;
+  f.appendChild(cap);
+  out.appendChild(f);
+});
+
+document.getElementById('save').onclick = function () {
+  var log = document.getElementById('log');
+  log.textContent = '';
+  SIZES.forEach(function (s) {
+    var data = made[s].toDataURL('image/png');
+    fetch('http://127.0.0.1:8778/save?name=icon' + s + '.png', { method: 'POST', body: data })
+      .then(function (r) { return r.text(); })
+      .then(function (t) { log.textContent += t + '\n'; })
+      .catch(function (e) { log.textContent += 'Fehler ' + s + ': ' + e.message + '\n'; });
+  });
+};
+</script>
+</body>
+</html>

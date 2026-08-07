@@ -1,0 +1,949 @@
+/*
+ * CursorDuck — Engine 🦆
+ * Schwimmphysik, Verhaltens-Automat, Streicheln, Picken, Küken, Sound.
+ */
+(function (root) {
+  'use strict';
+
+  var TAU = Math.PI * 2;
+  var clamp = function (v, a, b) { return v < a ? a : v > b ? b : v; };
+  var rand = function (a, b) { return a + Math.random() * (b - a); };
+  var pick = function (arr) { return arr[Math.floor(Math.random() * arr.length)]; };
+  // Frameraten-unabhängiges Annähern
+  function approach(cur, tgt, rate, dt) {
+    return cur + (tgt - cur) * (1 - Math.exp(-rate * dt));
+  }
+
+  var DEFAULTS = {
+    enabled: true,
+    model: 'mallard',
+    size: 1.0,          // 0.5 – 2.0
+    speed: 1.0,         // 0.4 – 2.0
+    ducklings: 0,       // 0 – 6
+    playfulness: 1.0,   // wie oft Idle-Aktionen kommen
+    sound: false,
+    volume: 0.35,
+    effects: true,
+    reflection: true,
+    opacity: 1.0,
+    peck: true,
+    sleepAfter: 15      // Sekunden Cursor-Stillstand bis zum Nickerchen
+  };
+
+  // ── Sound (komplett synthetisch, keine Assets) ────────────────
+  function Sound() { this.ac = null; this.vol = 0.35; this.on = false; }
+  Sound.prototype.unlock = function () {
+    if (this.ac || !this.on) return;
+    try {
+      var AC = root.AudioContext || root.webkitAudioContext;
+      if (AC) this.ac = new AC();
+    } catch (e) { /* egal */ }
+  };
+  Sound.prototype._env = function (g, t0, peak, dur, attack) {
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(Math.max(0.0002, peak), t0 + (attack || 0.008));
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+  };
+  Sound.prototype.quack = function (pitch, joy) {
+    if (!this.on) return;
+    this.unlock();
+    var ac = this.ac; if (!ac || ac.state === 'closed') return;
+    if (ac.state === 'suspended') ac.resume();
+    var t0 = ac.currentTime, p = pitch || 1;
+    var out = ac.createGain();
+    this._env(out, t0, this.vol * 0.9, 0.22);
+    out.connect(ac.destination);
+    var bp = ac.createBiquadFilter();
+    bp.type = 'bandpass'; bp.Q.value = 5;
+    bp.frequency.setValueAtTime(1500 * p, t0);
+    bp.frequency.exponentialRampToValueAtTime(620 * p, t0 + 0.18);
+    bp.connect(out);
+    for (var i = 0; i < 2; i++) {
+      var o = ac.createOscillator();
+      o.type = i ? 'square' : 'sawtooth';
+      var f0 = (joy ? 620 : 500) * p * (i ? 1.005 : 1);
+      o.frequency.setValueAtTime(f0, t0);
+      o.frequency.exponentialRampToValueAtTime((joy ? 260 : 190) * p, t0 + 0.19);
+      var g = ac.createGain(); g.gain.value = i ? 0.25 : 0.6;
+      o.connect(g); g.connect(bp);
+      o.start(t0); o.stop(t0 + 0.26);
+    }
+  };
+  Sound.prototype.splash = function (power) {
+    if (!this.on) return;
+    this.unlock();
+    var ac = this.ac; if (!ac || ac.state === 'closed') return;
+    if (ac.state === 'suspended') ac.resume();
+    var t0 = ac.currentTime, dur = 0.28;
+    var len = Math.floor(ac.sampleRate * dur);
+    var buf = ac.createBuffer(1, len, ac.sampleRate);
+    var d = buf.getChannelData(0);
+    for (var i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 2.2);
+    var src = ac.createBufferSource(); src.buffer = buf;
+    var hp = ac.createBiquadFilter(); hp.type = 'bandpass';
+    hp.frequency.setValueAtTime(1800, t0);
+    hp.frequency.exponentialRampToValueAtTime(600, t0 + dur);
+    hp.Q.value = 0.8;
+    var g2 = ac.createGain(); g2.gain.value = this.vol * 0.5 * (power || 1);
+    src.connect(hp); hp.connect(g2); g2.connect(ac.destination);
+    src.start(t0);
+  };
+  Sound.prototype.peck = function () {
+    if (!this.on) return;
+    this.unlock();
+    var ac = this.ac; if (!ac || ac.state === 'closed') return;
+    if (ac.state === 'suspended') ac.resume();
+    var t0 = ac.currentTime;
+    var o = ac.createOscillator(); o.type = 'triangle';
+    o.frequency.setValueAtTime(1700, t0);
+    o.frequency.exponentialRampToValueAtTime(700, t0 + 0.05);
+    var g = ac.createGain();
+    this._env(g, t0, this.vol * 0.5, 0.07, 0.004);
+    o.connect(g); g.connect(ac.destination);
+    o.start(t0); o.stop(t0 + 0.09);
+  };
+
+  // ── Verhaltens-Katalog ────────────────────────────────────────
+  // w = Gewicht in der Zufallsauswahl
+  var IDLE_ACTIONS = [
+    { id: 'look', w: 3.0, dur: [1.4, 2.4] },
+    { id: 'preen', w: 2.6, dur: [1.8, 3.0] },
+    { id: 'flap', w: 2.2, dur: [1.1, 1.5] },
+    { id: 'shake', w: 1.8, dur: [0.9, 1.2] },
+    { id: 'quack', w: 2.0, dur: [0.9, 1.3] },
+    { id: 'dabble', w: 2.0, dur: [2.0, 3.2] },
+    { id: 'dive', w: 1.1, dur: [2.4, 3.0] },
+    { id: 'spin', w: 1.2, dur: [2.0, 2.8] },
+    { id: 'bathe', w: 1.2, dur: [2.2, 3.0] },
+    { id: 'bob', w: 2.4, dur: [1.2, 2.2] }
+  ];
+
+  function weightedAction() {
+    var total = 0, i;
+    for (i = 0; i < IDLE_ACTIONS.length; i++) total += IDLE_ACTIONS[i].w;
+    var r = Math.random() * total;
+    for (i = 0; i < IDLE_ACTIONS.length; i++) {
+      r -= IDLE_ACTIONS[i].w;
+      if (r <= 0) return IDLE_ACTIONS[i];
+    }
+    return IDLE_ACTIONS[0];
+  }
+
+  // ── Ente ──────────────────────────────────────────────────────
+  function Duck(engine, model, isBaby) {
+    this.e = engine;
+    this.model = model;
+    this.baby = !!isBaby;
+    this.x = 0; this.y = 0; this.vx = 0; this.vy = 0;
+    this.dirF = 1;            // -1..1 → x-Skalierung, erlaubt echtes Drehen
+    this.face = 1;            // Zielrichtung
+    this.state = 'swim'; this.stTime = 0; this.stDur = 0;
+    this.phase = Math.random() * TAU;
+    this.paddle = Math.random() * TAU;
+    this.a = {                // Animationswerte
+      headDip: 0, headSide: 0, headRot: 0, eyeOpen: 1, eyeHappy: 0,
+      wingFlap: 0, wingLift: 0, lean: 0, squash: 1, submerge: 0,
+      blush: 0, sleep: 0, wobble: 0, beakOpen: 0
+    };
+    this.tgt = {};
+    for (var k in this.a) this.tgt[k] = this.a[k];
+    this.pet = 0;
+    this.petHold = 0;
+    this.blinkIn = rand(1.5, 5);
+    this.nextIdle = rand(1.5, 4);
+    this.peckCd = rand(3, 7);
+    this.rippleCd = 0;
+    this.actionTick = 0;
+    this.trail = [];
+  }
+
+  Duck.prototype.radius = function () {
+    return 26 * this.e.cfg.size * (this.baby ? 0.55 : 1);
+  };
+
+  Duck.prototype.setState = function (s, dur) {
+    if (this.state === s) return;
+    this.state = s;
+    this.stTime = 0;
+    this.stDur = dur || 1;
+    this.actionTick = 0;
+  };
+
+  Duck.prototype.say = function (txt, color) {
+    var h = this.headWorld();
+    this.e.fx.exclaim(h.x, h.y - this.radius() * 0.9, txt, color);
+  };
+
+  Duck.prototype.headWorld = function () {
+    return DuckRender.headWorld(this.model, this.pose());
+  };
+
+  Duck.prototype.pose = function () {
+    var a = this.a;
+    var speed = Math.sqrt(this.vx * this.vx + this.vy * this.vy);
+    var bobAmp = this.radius() * (0.055 + Math.min(0.05, speed * 0.00016));
+    var dir = this.dirF >= 0 ? Math.max(0.14, this.dirF) : Math.min(-0.14, this.dirF);
+    return {
+      x: this.x, y: this.y, r: this.radius(), dir: dir, t: this.e.time,
+      bob: Math.sin(this.e.time * 2.4 + this.phase) * bobAmp + (a.squash - 1) * this.radius() * 0.3,
+      lean: a.lean + Math.sin(this.e.time * 1.9 + this.phase) * 0.018,
+      headDip: a.headDip, headSide: a.headSide, headRot: a.headRot,
+      eyeOpen: a.eyeOpen, eyeHappy: a.eyeHappy,
+      wingFlap: a.wingFlap, wingLift: a.wingLift,
+      paddle: this.paddle, squash: a.squash, submerge: a.submerge,
+      alpha: this.e.cfg.opacity, blush: a.blush, sleep: a.sleep,
+      wobble: a.wobble, beakOpen: a.beakOpen,
+      reflection: this.e.cfg.reflection && !this.baby
+    };
+  };
+
+  // Trefferfläche zum Streicheln
+  Duck.prototype.hit = function (px, py) {
+    var r = this.radius() * (this.model.scale || 1);
+    var cx = this.x, cy = this.y - r * 0.75;
+    var rx = r * 1.35, ry = r * 1.25;
+    var dx = (px - cx) / rx, dy = (py - cy) / ry;
+    return dx * dx + dy * dy <= 1;
+  };
+
+  // ── Bewegung ──────────────────────────────────────────────────
+  Duck.prototype.swim = function (dt, tx, ty, stopDist, boost) {
+    var dx = tx - this.x, dy = ty - this.y;
+    var dist = Math.sqrt(dx * dx + dy * dy) || 0.0001;
+    var cfg = this.e.cfg;
+    var maxSpeed = (this.baby ? 520 : 430) * cfg.speed * (boost || 1);
+    if (dist > stopDist) {
+      var want = clamp((dist - stopDist) * 3.4, 0, maxSpeed);
+      // Sprint, wenn die Ente weit abgehängt wurde
+      if (dist > 420) want = Math.min(maxSpeed * 1.9, want * 1.5);
+      var ux = dx / dist, uy = dy / dist;
+      // Enten schlängeln beim Paddeln leicht seitlich
+      var wob = Math.sin(this.e.time * 5.5 + this.phase) * 0.10 * Math.min(1, dist / 220);
+      var wx = ux * Math.cos(wob) - uy * Math.sin(wob);
+      var wy = ux * Math.sin(wob) + uy * Math.cos(wob);
+      this.vx = approach(this.vx, wx * want, 5.5, dt);
+      this.vy = approach(this.vy, wy * want, 5.5, dt);
+    } else {
+      this.vx = approach(this.vx, 0, 3.2, dt);
+      this.vy = approach(this.vy, 0, 3.2, dt);
+    }
+  };
+
+  Duck.prototype.integrate = function (dt) {
+    this.x += this.vx * dt;
+    this.y += this.vy * dt;
+    var speed = Math.sqrt(this.vx * this.vx + this.vy * this.vy);
+
+    // Blickrichtung (kontinuierliches Drehen statt Umklappen)
+    if (Math.abs(this.vx) > 16) this.face = this.vx > 0 ? 1 : -1;
+    this.dirF = approach(this.dirF, this.face, 9, dt);
+
+    // Paddeln schneller bei Tempo
+    this.paddle += dt * (2.2 + speed * 0.022);
+
+    // Am Rand bleiben
+    var m = this.radius() * 1.2;
+    this.x = clamp(this.x, -m, this.e.w + m);
+    this.y = clamp(this.y, m * 0.6, this.e.h + m);
+    return speed;
+  };
+
+  // ── Verhalten ─────────────────────────────────────────────────
+  Duck.prototype.update = function (dt) {
+    var e = this.e, cfg = e.cfg, a = this.a, t = this.tgt;
+    var px = e.px, py = e.py;
+    this.stTime += dt;
+
+    // Zielwerte je Frame neu setzen (Standard = entspannt schwimmen)
+    t.headDip = 0; t.headSide = 0; t.headRot = 0; t.eyeHappy = 0;
+    t.wingFlap = 0; t.wingLift = 0; t.lean = 0; t.squash = 1;
+    t.submerge = 0; t.blush = 0; t.sleep = 0; t.wobble = 0;
+    t.beakOpen = 0; t.eyeOpen = 1;
+
+    var dx = px - this.x, dy = py - this.y;
+    var dist = Math.sqrt(dx * dx + dy * dy);
+    var r = this.radius();
+    var stopDist = r * 1.9;
+    var st = this.state;
+
+    // ── Streicheln erkennen ─────────────────────────────────
+    var inside = this.hit(px, py);
+    var petting = inside && e.pointerSpeed > 55 && st !== 'dive';
+    if (petting) {
+      if (e.pointerSpeed > 2100 && this.pet < 0.15 && st !== 'startle') {
+        this.setState('startle', 0.8);
+        this.vx += (this.x - px) * 2.4; this.vy += (this.y - py) * 2.4 - 60;
+        e.fx.feather(this.x, this.y - r, this.model.belly);
+        e.fx.feather(this.x + 6, this.y - r * 1.2, this.model.body);
+        e.fx.splash(this.x, this.y, 0.7);
+        this.say('!', '#ff6b4a');
+        e.sound.quack(this.model.quackPitch * 1.5);
+      } else if (st !== 'startle') {
+        this.setState('pet', 99);
+        this.pet = clamp(this.pet + dt * 0.85, 0, 1.0001);
+        this.petHold = 0.35;
+        if (Math.random() < dt * 2.2) {
+          e.fx.heart(this.x + rand(-r * 0.7, r * 0.7), this.y - r * 1.6, rand(4.5, 7) * cfg.size);
+        }
+        if (this.pet >= 1) {
+          this.pet = 0.25;
+          e.stats.pets++;
+          e.saveStats();
+          for (var i = 0; i < 5; i++) e.fx.heart(this.x + rand(-r, r), this.y - r * 1.4, rand(6, 9) * cfg.size);
+          e.fx.sparkle(this.x, this.y - r * 1.4, '#ffd6e4', 8);
+          e.sound.quack(this.model.quackPitch * 1.15, true);
+          if (this.model.confetti) e.fx.confetti(this.x, this.y - r * 1.5);
+        }
+      }
+    } else {
+      this.petHold -= dt;
+      this.pet = Math.max(0, this.pet - dt * (this.petHold > 0 ? 0.12 : 0.7));
+      if (st === 'pet' && this.petHold <= 0) this.setState(dist > stopDist * 1.4 ? 'swim' : 'idle', 1);
+    }
+
+    // ── Zustandsautomat ─────────────────────────────────────
+    st = this.state;
+    switch (st) {
+      case 'pet':
+        t.eyeHappy = 1; t.blush = clamp(this.pet * 1.6, 0, 1);
+        t.wobble = Math.sin(e.time * 15) * 0.55 * clamp(this.pet * 2, 0, 1);
+        t.squash = 1 + Math.sin(e.time * 15) * 0.05;
+        t.wingLift = 0.25 + this.pet * 0.35;
+        t.headRot = -0.18;
+        this.swim(dt, px, py, r * 1.2, 0.35);
+        break;
+
+      case 'startle':
+        t.eyeOpen = 1; t.wingFlap = 1 - this.stTime / this.stDur;
+        t.headRot = -0.45; t.beakOpen = clamp(1 - this.stTime * 2.2, 0, 1);
+        t.squash = 1 + Math.max(0, 0.16 - this.stTime * 0.3);
+        this.vx = approach(this.vx, 0, 2.2, dt);
+        this.vy = approach(this.vy, 0, 2.2, dt);
+        if (this.stTime > this.stDur) this.setState('swim', 1);
+        break;
+
+      case 'peck':
+        // Kopf schnellt zum Cursor
+        var k = this.stTime / this.stDur;
+        var dip = k < 0.28 ? (k / 0.28) : k < 0.5 ? 1 : clamp(1 - (k - 0.5) / 0.5, 0, 1);
+        t.headDip = dip;
+        t.lean = dip * 0.13;
+        t.beakOpen = k < 0.3 ? 0.5 * (k / 0.3) : 0.1;
+        if (!this.peckDone && k >= 0.28) {
+          this.peckDone = true;
+          var h = this.headWorld();
+          e.fx.ripple(px, py + 2, 3, 26, 0.6, 'rgba(255,255,255,0.7)', 2);
+          for (var s = 0; s < 4; s++) e.fx.sparkle(px + rand(-6, 6), py + rand(-6, 6), '#fff3b0', rand(3, 6));
+          e.fx.droplet(h.x, h.y, rand(-40, 40), -rand(40, 90), 2, 'rgba(200,235,255,0.9)');
+          e.sound.peck();
+          e.stats.pecks++;
+          e.saveStats();
+          if (Math.random() < 0.25) this.say(pick(['nom', 'quak', '♪']), '#4a90d9');
+        }
+        this.swim(dt, px, py, r * 1.5, 0.5);
+        if (this.stTime > this.stDur) { this.setState('idle', 1); this.peckCd = rand(4, 9) / cfg.playfulness; }
+        break;
+
+      case 'sleep':
+        t.sleep = 1; t.eyeOpen = 0; t.headRot = 0.12;
+        t.squash = 1 + Math.sin(e.time * 1.2) * 0.03;
+        this.actionTick -= dt;
+        if (this.actionTick <= 0) {
+          this.actionTick = 1.6;
+          var hz = this.headWorld();
+          e.fx.zzz(hz.x + r * 0.3, hz.y - r * 0.5);
+        }
+        this.vx = approach(this.vx, 0, 1.5, dt);
+        this.vy = approach(this.vy, 0, 1.5, dt);
+        if (e.pointerIdle < 0.2 || dist > r * 4) {
+          this.setState('wake', 0.7);
+          this.say('!', '#ffb03d');
+          e.sound.quack(this.model.quackPitch * 0.9);
+        }
+        break;
+
+      case 'wake':
+        t.eyeOpen = 1; t.wingFlap = clamp(1 - this.stTime * 2, 0, 1);
+        t.beakOpen = clamp(0.7 - this.stTime * 1.6, 0, 1);
+        t.squash = 1 + Math.max(0, 0.12 - this.stTime * 0.4);
+        if (this.stTime > this.stDur) this.setState('swim', 1);
+        break;
+
+      // ── Idle-Aktionen ────────────────────────────────────
+      case 'look':
+        t.headRot = Math.sin(this.stTime * 2.6) * 0.36;
+        t.eyeOpen = 1;
+        if (this.stTime > this.stDur) this.setState('idle', 1);
+        break;
+
+      case 'preen':
+        var pk = this.stTime / this.stDur;
+        t.headSide = Math.sin(clamp(pk, 0, 1) * Math.PI) * (0.75 + Math.sin(this.stTime * 9) * 0.2);
+        t.eyeOpen = 0.25;
+        t.wingLift = 0.3;
+        this.actionTick -= dt;
+        if (this.actionTick <= 0 && pk > 0.15 && pk < 0.9) {
+          this.actionTick = 0.42;
+          var hp = this.headWorld();
+          e.fx.droplet(hp.x, hp.y, rand(-50, 50), -rand(20, 70), rand(0.9, 1.7));
+          if (Math.random() < 0.4) e.fx.feather(hp.x, hp.y, this.model.belly);
+        }
+        if (this.stTime > this.stDur) this.setState('idle', 1);
+        break;
+
+      case 'flap':
+      case 'bathe':
+        var fk = this.stTime / this.stDur;
+        var beat = Math.sin(this.stTime * (st === 'bathe' ? 16 : 12));
+        t.wingFlap = clamp(Math.abs(beat) * (1 - Math.pow(fk, 3)), 0, 1);
+        t.squash = 1 + beat * 0.06;
+        t.headRot = -0.2;
+        t.beakOpen = st === 'bathe' ? 0.25 + beat * 0.2 : 0;
+        this.actionTick -= dt;
+        if (this.actionTick <= 0 && fk < 0.85) {
+          this.actionTick = st === 'bathe' ? 0.06 : 0.1;
+          var n = st === 'bathe' ? 3 : 2;
+          for (var f = 0; f < n; f++) {
+            e.fx.droplet(this.x + rand(-r, r), this.y - r * rand(0.2, 1.2),
+              rand(-190, 190), -rand(60, 230), rand(1.0, 2.1));
+          }
+          if (Math.random() < 0.35) e.fx.ripple(this.x, this.y, 6, 40 + Math.random() * 30, 0.9, 'rgba(255,255,255,0.45)', 1.8);
+        }
+        if (!this.splashed && st === 'bathe' && fk > 0.1) { this.splashed = true; e.sound.splash(0.8); }
+        if (this.stTime > this.stDur) { this.splashed = false; this.setState('idle', 1); }
+        break;
+
+      case 'shake':
+        var sk = this.stTime / this.stDur;
+        var amp = Math.sin(clamp(sk, 0, 1) * Math.PI);
+        t.wobble = Math.sin(this.stTime * 34) * amp * 1.1;
+        t.squash = 1 + Math.sin(this.stTime * 34) * 0.05 * amp;
+        t.wingLift = amp * 0.5;
+        this.actionTick -= dt;
+        if (this.actionTick <= 0 && amp > 0.3) {
+          this.actionTick = 0.05;
+          e.fx.droplet(this.x + rand(-r * 0.8, r * 0.8), this.y - r * rand(0.4, 1.4),
+            rand(-230, 230), -rand(30, 150), rand(0.9, 1.7));
+        }
+        if (this.stTime > this.stDur) this.setState('idle', 1);
+        break;
+
+      case 'quack':
+        var qk = this.stTime / this.stDur;
+        t.beakOpen = Math.max(0, Math.sin(qk * Math.PI * 2.4)) * 0.9;
+        t.headRot = -0.28 - Math.max(0, Math.sin(qk * Math.PI * 2.4)) * 0.2;
+        t.squash = 1 + Math.max(0, Math.sin(qk * Math.PI * 2.4)) * 0.05;
+        if (!this.quacked) {
+          this.quacked = true;
+          e.sound.quack(this.model.quackPitch);
+          var hq = this.headWorld();
+          for (var q = 0; q < 3; q++) e.fx.note(hq.x + r * 0.5, hq.y - r * 0.2 - q * 6);
+          e.fx.ripple(this.x, this.y, 8, 60, 1.0, 'rgba(255,255,255,0.4)', 1.6);
+          if (this.model.confetti) e.fx.confetti(hq.x, hq.y);
+        }
+        if (this.stTime > this.stDur) { this.quacked = false; this.setState('idle', 1); }
+        break;
+
+      case 'dabble':  // Gründeln: Kopf ins Wasser, Popo hoch
+        var dk = this.stTime / this.stDur;
+        var inW = clamp(dk * 4, 0, 1) * clamp((1 - dk) * 4, 0, 1);
+        t.lean = inW * 0.92;
+        t.headDip = inW * 0.42;
+        t.submerge = inW * 0.10;
+        t.wobble = Math.sin(this.stTime * 11) * 0.3 * inW;
+        this.actionTick -= dt;
+        if (this.actionTick <= 0 && inW > 0.6) {
+          this.actionTick = 0.18;
+          e.fx.bubble(this.x + r * this.dirF * 0.9 + rand(-6, 6), this.y + rand(2, 10));
+          e.fx.ripple(this.x + r * this.dirF * 0.8, this.y, 4, 22, 0.7, 'rgba(255,255,255,0.4)', 1.4);
+        }
+        if (dk > 0.86 && !this.dabbleUp) {
+          this.dabbleUp = true;
+          e.fx.splash(this.x + r * this.dirF * 0.7, this.y, 0.7);
+          e.sound.splash(0.5);
+        }
+        if (this.stTime > this.stDur) { this.dabbleUp = false; this.setState('shake', 1.0); }
+        break;
+
+      case 'dive':
+        var vk = this.stTime / this.stDur;
+        t.submerge = clamp(vk * 3.2, 0, 1) * clamp((1 - vk) * 3.2, 0, 1);
+        t.lean = t.submerge * 0.5;
+        if (!this.dove && vk > 0.08) {
+          this.dove = true;
+          e.fx.splash(this.x, this.y, 1.1);
+          e.sound.splash(0.9);
+        }
+        this.actionTick -= dt;
+        if (this.actionTick <= 0 && t.submerge > 0.7) {
+          this.actionTick = 0.14;
+          e.fx.bubble(this.x + rand(-r * 0.6, r * 0.6), this.y - rand(0, 6));
+        }
+        // Unterwasser bewegt sie sich Richtung Cursor
+        if (t.submerge > 0.6) this.swim(dt, px, py, r, 0.9);
+        if (vk > 0.78 && !this.surfaced) {
+          this.surfaced = true;
+          e.fx.splash(this.x, this.y, 1.4);
+          e.sound.splash(1.1);
+          for (var b = 0; b < 5; b++) e.fx.droplet(this.x + rand(-r, r), this.y - r, rand(-160, 160), -rand(120, 260), rand(1.3, 2.4));
+        }
+        if (this.stTime > this.stDur) { this.dove = false; this.surfaced = false; this.setState('shake', 1.0); }
+        break;
+
+      case 'spin':
+        var spk = this.stTime / this.stDur;
+        this.face = Math.cos(this.stTime * 3.4) > 0 ? 1 : -1;
+        this.dirF = Math.cos(this.stTime * 3.4);
+        t.headRot = -0.15;
+        t.wingLift = 0.4;
+        this.actionTick -= dt;
+        if (this.actionTick <= 0 && spk < 0.9) {
+          this.actionTick = 0.16;
+          e.fx.ripple(this.x, this.y, 5, 34, 0.8, 'rgba(255,255,255,0.4)', 1.5);
+        }
+        if (this.stTime > this.stDur) this.setState('idle', 1);
+        break;
+
+      case 'bob':
+        t.squash = 1 + Math.sin(this.stTime * 4.2) * 0.05;
+        t.headRot = Math.sin(this.stTime * 4.2) * 0.12;
+        if (this.stTime > this.stDur) this.setState('idle', 1);
+        break;
+
+      case 'idle':
+        // Zum Cursor schauen
+        t.headRot = clamp((this.y - py) * 0.0016, -0.34, 0.3) * (this.dirF >= 0 ? 1 : 1);
+        this.swim(dt, px, py, stopDist, 0.6);
+        this.nextIdle -= dt * cfg.playfulness;
+        this.peckCd -= dt;
+
+        if (dist > stopDist * 1.6) { this.setState('swim', 1); break; }
+        if (e.pointerIdle > cfg.sleepAfter) { this.setState('sleep', 99); break; }
+        if (cfg.peck && this.peckCd <= 0 && dist < r * 3.4 && e.pointerIdle > 0.6) {
+          this.peckDone = false;
+          this.setState('peck', 0.62);
+          break;
+        }
+        if (this.nextIdle <= 0) {
+          var act = weightedAction();
+          this.nextIdle = rand(2.2, 6.5) / cfg.playfulness;
+          this.setState(act.id, rand(act.dur[0], act.dur[1]));
+        }
+        break;
+
+      case 'swim':
+      default:
+        this.swim(dt, px, py, stopDist, 1);
+        var spd0 = Math.sqrt(this.vx * this.vx + this.vy * this.vy);
+        t.lean = clamp(-spd0 * 0.00022 - (dist > 420 ? 0.06 : 0), -0.14, 0);
+        t.headRot = clamp(-spd0 * 0.0004, -0.22, 0);
+        t.wingLift = clamp((spd0 - 300) / 500, 0, 0.5);
+        if (dist < stopDist * 1.15) this.setState('idle', 1);
+        break;
+    }
+
+    // ── Physik & Animation ──────────────────────────────────
+    var speed = this.integrate(dt);
+
+    // Blinzeln
+    this.blinkIn -= dt;
+    if (this.blinkIn <= 0) { this.blinkIn = rand(2.2, 6.5); this.blinkT = 0.16; }
+    if (this.blinkT > 0) { this.blinkT -= dt; t.eyeOpen = Math.min(t.eyeOpen, 0.05); }
+
+    var rate = 12;
+    a.headDip = approach(a.headDip, t.headDip, 22, dt);
+    a.headSide = approach(a.headSide, t.headSide, 10, dt);
+    a.headRot = approach(a.headRot, t.headRot, 8, dt);
+    a.eyeOpen = approach(a.eyeOpen, t.eyeOpen, 26, dt);
+    a.eyeHappy = approach(a.eyeHappy, t.eyeHappy, 14, dt);
+    a.wingFlap = approach(a.wingFlap, t.wingFlap, 20, dt);
+    a.wingLift = approach(a.wingLift, t.wingLift, 8, dt);
+    a.lean = approach(a.lean, t.lean, 7, dt);
+    a.squash = approach(a.squash, t.squash, rate, dt);
+    a.submerge = approach(a.submerge, t.submerge, 7, dt);
+    a.blush = approach(a.blush, t.blush, 6, dt);
+    a.sleep = approach(a.sleep, t.sleep, 4, dt);
+    a.wobble = approach(a.wobble, t.wobble, 26, dt);
+    a.beakOpen = approach(a.beakOpen, t.beakOpen, 24, dt);
+
+    // ── Wasserspur ──────────────────────────────────────────
+    if (cfg.effects && a.submerge < 0.7) {
+      this.rippleCd -= dt;
+      if (this.rippleCd <= 0 && speed > 26) {
+        this.rippleCd = clamp(0.36 - speed * 0.00035, 0.08, 0.36);
+        var back = -this.dirF;
+        e.fx.ripple(this.x + back * r * 0.5, this.y + rand(-2, 3),
+          r * 0.25, r * (1.1 + speed * 0.0016), 1.3,
+          'rgba(255,255,255,' + clamp(0.22 + speed * 0.0007, 0.22, 0.55).toFixed(2) + ')',
+          1.4);
+        if (speed > 240 && Math.random() < 0.5) {
+          e.fx.droplet(this.x + this.dirF * r * 0.9, this.y - r * 0.1,
+            this.vx * 0.12 + rand(-30, 30), -rand(40, 110), rand(0.9, 1.6));
+        }
+        if (this.model.trail) {
+          e.fx.ripple(this.x, this.y, r * 0.2, r * 1.6, 1.1, this.model.trail, 3);
+        }
+      }
+      // Funkel-Modelle
+      if (this.model.sparkle && Math.random() < dt * 6 * this.model.sparkle) {
+        e.fx.sparkle(this.x + rand(-r, r), this.y - r * rand(0.2, 2.0),
+          this.model.glow || '#fff3b0', rand(3, 7) * cfg.size);
+      }
+    }
+
+    // Trail-Punkte für die Küken
+    if (!this.baby) {
+      var last = this.trail[0];
+      if (!last || Math.abs(last.x - this.x) + Math.abs(last.y - this.y) > 3) {
+        this.trail.unshift({ x: this.x, y: this.y });
+        if (this.trail.length > 400) this.trail.pop();
+      }
+    }
+  };
+
+  // Position entlang der Spur (Bogenlänge) – für die Küken-Reihe
+  Duck.prototype.sampleTrail = function (distWanted) {
+    var tr = this.trail;
+    if (!tr.length) return { x: this.x, y: this.y };
+    var acc = 0;
+    for (var i = 1; i < tr.length; i++) {
+      var dx = tr[i].x - tr[i - 1].x, dy = tr[i].y - tr[i - 1].y;
+      var seg = Math.sqrt(dx * dx + dy * dy);
+      if (acc + seg >= distWanted) {
+        var f = seg ? (distWanted - acc) / seg : 0;
+        return { x: tr[i - 1].x + dx * f, y: tr[i - 1].y + dy * f };
+      }
+      acc += seg;
+    }
+    var lastP = tr[tr.length - 1];
+    return { x: lastP.x, y: lastP.y };
+  };
+
+  // ── Küken ─────────────────────────────────────────────────────
+  var babyOf = DuckRender.babyOf;   // Modell-Variante lebt im Renderer
+
+  // ── Engine ────────────────────────────────────────────────────
+  function Engine(opts) {
+    this.cfg = {};
+    for (var k in DEFAULTS) this.cfg[k] = DEFAULTS[k];
+    if (opts) for (var k2 in opts) this.cfg[k2] = opts[k2];
+
+    this.time = 0;
+    this.w = root.innerWidth; this.h = root.innerHeight;
+    this.px = this.w * 0.5; this.py = this.h * 0.5;
+    this.ppx = this.px; this.ppy = this.py;
+    this.pointerSpeed = 0;
+    this.pointerIdle = 0;
+    this.fx = new DuckFX();
+    this.sound = new Sound();
+    this.sound.on = !!this.cfg.sound;
+    this.sound.vol = this.cfg.volume;
+    this.stats = { pets: 0, pecks: 0 };
+    this.running = false;
+    this.babies = [];
+    this._bound = {};
+    this.setModel(this.cfg.model);
+  }
+
+  Engine.prototype.setModel = function (id) {
+    var mid = (id === 'random' || !id) ? DuckModels.randomId() : id;
+    this.modelId = mid;
+    var m = DuckModels.get(mid);
+    if (this.duck) {
+      this.duck.model = m;
+    } else {
+      this.duck = new Duck(this, m, false);
+      this.duck.x = this.px - 80;
+      this.duck.y = this.py + 40;
+    }
+    this.rebuildBabies();
+  };
+
+  Engine.prototype.rebuildBabies = function () {
+    var want = Math.max(0, Math.min(8, this.cfg.ducklings | 0));
+    var bm = babyOf(this.duck.model);
+    this.babies.length = 0;
+    for (var i = 0; i < want; i++) {
+      var b = new Duck(this, bm, true);
+      b.x = this.duck.x - (i + 1) * 24;
+      b.y = this.duck.y + 6;
+      b.gap = 34 * this.cfg.size * (i + 1);
+      this.babies.push(b);
+    }
+  };
+
+  Engine.prototype.apply = function (cfg) {
+    var modelChanged = cfg.model !== undefined && cfg.model !== this.cfg.model;
+    for (var k in cfg) if (cfg[k] !== undefined) this.cfg[k] = cfg[k];
+    this.sound.on = !!this.cfg.sound;
+    this.sound.vol = this.cfg.volume;
+    if (modelChanged) this.setModel(this.cfg.model);
+    else this.rebuildBabies();
+    if (!this.cfg.enabled) this.stop(); else this.start();
+  };
+
+  Engine.prototype.saveStats = function () {
+    if (this.onStats) this.onStats(this.stats);
+  };
+
+  // ── Canvas ────────────────────────────────────────────────────
+  Engine.prototype.mount = function (parent) {
+    var host = document.createElement('div');
+    host.setAttribute('data-cursor-duck', '');
+    var s = host.style;
+    s.setProperty('position', 'fixed', 'important');
+    s.setProperty('inset', '0', 'important');
+    s.setProperty('left', '0', 'important');
+    s.setProperty('top', '0', 'important');
+    s.setProperty('width', '100%', 'important');
+    s.setProperty('height', '100%', 'important');
+    s.setProperty('pointer-events', 'none', 'important');
+    s.setProperty('z-index', '2147483647', 'important');
+    s.setProperty('border', '0', 'important');
+    s.setProperty('margin', '0', 'important');
+    s.setProperty('padding', '0', 'important');
+    s.setProperty('background', 'transparent', 'important');
+
+    var shadow = host.attachShadow ? host.attachShadow({ mode: 'open' }) : host;
+    var canvas = document.createElement('canvas');
+    canvas.style.cssText = 'position:absolute;left:0;top:0;width:100%;height:100%;display:block;pointer-events:none;';
+    shadow.appendChild(canvas);
+    (parent || document.documentElement).appendChild(host);
+
+    this.host = host;
+    this.canvas = canvas;
+    this.ctx = canvas.getContext('2d');
+    this.resize();
+    this.bindInput();
+    return this;
+  };
+
+  Engine.prototype.resize = function () {
+    // Die echte Host-Größe nehmen, sonst verzerrt eine Scrollbar das Canvas
+    var rect = this.host && this.host.getBoundingClientRect();
+    this.w = rect && rect.width ? rect.width : root.innerWidth;
+    this.h = rect && rect.height ? rect.height : root.innerHeight;
+    var dpr = Math.min(2, root.devicePixelRatio || 1);
+    this.dpr = dpr;
+    if (this.canvas) {
+      this.canvas.width = Math.round(this.w * dpr);
+      this.canvas.height = Math.round(this.h * dpr);
+    }
+  };
+
+  Engine.prototype.setPointer = function (x, y) {
+    this.px = x; this.py = y;
+    this.pointerIdle = 0;
+  };
+
+  Engine.prototype.bindInput = function () {
+    var self = this;
+    var b = this._bound;
+
+    b.move = function (ev) {
+      if (ev.clientX === undefined) return;
+      self.setPointer(ev.clientX, ev.clientY);
+    };
+    b.resize = function () { self.resize(); };
+    b.down = function (ev) {
+      self.sound.unlock();
+      var d = self.duck;
+      if (!d) return;
+      var dist = Math.hypot(ev.clientX - d.x, ev.clientY - d.y);
+      if (self.cfg.effects) self.fx.ripple(ev.clientX, ev.clientY, 4, 34, 0.7, 'rgba(255,255,255,0.5)', 2);
+      if (dist < d.radius() * 2.6 && d.state !== 'dive') {
+        // Ente direkt angeklickt → sie quakt zurück
+        d.setState('quack', 1.0);
+        d.quacked = false;
+      }
+    };
+    b.dbl = function () {
+      var d = self.duck;
+      if (d && d.state !== 'dive') d.setState('flap', 1.3);
+    };
+    b.vis = function () {
+      if (document.hidden) self.pause(); else self.resume();
+    };
+    // Cursor-Position aus iframes einsammeln
+    b.msg = function (ev) {
+      var data = ev.data;
+      if (!data || data.__cursorDuck !== 1) return;
+      var frames = document.getElementsByTagName('iframe');
+      for (var i = 0; i < frames.length; i++) {
+        if (frames[i].contentWindow === ev.source) {
+          var r = frames[i].getBoundingClientRect();
+          self.setPointer(r.left + data.x, r.top + data.y);
+          return;
+        }
+      }
+    };
+
+    root.addEventListener('mousemove', b.move, { passive: true, capture: true });
+    root.addEventListener('pointermove', b.move, { passive: true, capture: true });
+    root.addEventListener('mousedown', b.down, { passive: true, capture: true });
+    root.addEventListener('dblclick', b.dbl, { passive: true, capture: true });
+    root.addEventListener('resize', b.resize, { passive: true });
+    root.addEventListener('message', b.msg, false);
+    document.addEventListener('visibilitychange', b.vis, false);
+    root.addEventListener('keydown', function () { self.sound.unlock(); }, { passive: true, once: true });
+  };
+
+  Engine.prototype.unbindInput = function () {
+    var b = this._bound;
+    if (!b.move) return;
+    root.removeEventListener('mousemove', b.move, true);
+    root.removeEventListener('pointermove', b.move, true);
+    root.removeEventListener('mousedown', b.down, true);
+    root.removeEventListener('dblclick', b.dbl, true);
+    root.removeEventListener('resize', b.resize);
+    root.removeEventListener('message', b.msg);
+    document.removeEventListener('visibilitychange', b.vis);
+  };
+
+  // ── Loop ──────────────────────────────────────────────────────
+  Engine.prototype.start = function () {
+    if (this.running) return;
+    if (this.host) this.host.style.setProperty('display', 'block', 'important');
+    this.running = true;
+    this.last = 0;
+    var self = this;
+    var loop = function (ts) {
+      if (!self.running) return;
+      self.raf = requestAnimationFrame(loop);
+      if (!self.last) { self.last = ts; return; }
+      var dt = Math.min(0.05, (ts - self.last) / 1000);
+      self.last = ts;
+      self.step(dt);
+      self.render();
+    };
+    this.raf = requestAnimationFrame(loop);
+  };
+
+  Engine.prototype.pause = function () { this.running = false; if (this.raf) cancelAnimationFrame(this.raf); };
+  Engine.prototype.resume = function () { if (this.cfg.enabled) { this.last = 0; this.start(); } };
+  Engine.prototype.stop = function () {
+    this.pause();
+    if (this.host) this.host.style.setProperty('display', 'none', 'important');
+  };
+  Engine.prototype.destroy = function () {
+    this.stop();
+    this.unbindInput();
+    if (this.host && this.host.parentNode) this.host.parentNode.removeChild(this.host);
+  };
+
+  Engine.prototype.step = function (dt) {
+    this.time += dt;
+
+    // Größe gelegentlich nachziehen: Seiten, die im Hintergrund ohne Layout
+    // laden, oder Scrollbars, die auftauchen, lösen kein resize-Event aus.
+    this.sizeCheck = (this.sizeCheck || 0) + 1;
+    if (this.sizeCheck >= 30) {
+      this.sizeCheck = 0;
+      var cw = this.host ? this.host.clientWidth : root.innerWidth;
+      var ch = this.host ? this.host.clientHeight : root.innerHeight;
+      if (cw && ch && (Math.abs(cw - this.w) > 1 || Math.abs(ch - this.h) > 1)) this.resize();
+    }
+
+    // Zeigergeschwindigkeit
+    var dx = this.px - this.ppx, dy = this.py - this.ppy;
+    var inst = Math.sqrt(dx * dx + dy * dy) / Math.max(0.001, dt);
+    this.pointerSpeed = this.pointerSpeed * 0.6 + inst * 0.4;
+    this.ppx = this.px; this.ppy = this.py;
+    if (inst < 6) this.pointerIdle += dt; else this.pointerIdle = 0;
+
+    this.duck.update(dt);
+
+    // Küken folgen der Spur der Mama
+    for (var i = 0; i < this.babies.length; i++) {
+      var b = this.babies[i];
+      var p = this.duck.sampleTrail(b.gap);
+      var side = Math.sin(this.time * 2.4 + i * 1.7) * 5;
+      b.swim(dt, p.x, p.y + side, 3, 1.15);
+      b.updateBaby(dt);
+    }
+
+    this.fx.update(dt);
+  };
+
+  // Küken: einfache Version des Verhaltens
+  Duck.prototype.updateBaby = function (dt) {
+    var a = this.a, t = this.tgt, e = this.e;
+    this.stTime += dt;
+    t.wingFlap = 0; t.squash = 1; t.eyeOpen = 1; t.beakOpen = 0; t.headRot = 0;
+
+    this.actionTick -= dt;
+    if (this.actionTick <= 0) {
+      this.actionTick = rand(2.5, 7);
+      this.babyAct = pick(['flap', 'bob', 'quack', 'look', 'none']);
+      this.babyActT = rand(0.7, 1.3);
+      if (this.babyAct === 'quack') {
+        e.sound.quack(this.model.quackPitch);
+        var hb = this.headWorld();
+        e.fx.note(hb.x, hb.y - 4, 'rgba(90,110,150,0.6)');
+      }
+    }
+    if (this.babyActT > 0) {
+      this.babyActT -= dt;
+      var k = this.babyActT;
+      if (this.babyAct === 'flap') { t.wingFlap = Math.abs(Math.sin(e.time * 16)); t.squash = 1 + Math.sin(e.time * 16) * 0.05; }
+      else if (this.babyAct === 'bob') { t.squash = 1 + Math.sin(e.time * 6) * 0.06; }
+      else if (this.babyAct === 'quack') { t.beakOpen = Math.max(0, Math.sin(k * 12)) * 0.8; }
+      else if (this.babyAct === 'look') { t.headRot = Math.sin(e.time * 3) * 0.3; }
+    }
+
+    this.blinkIn -= dt;
+    if (this.blinkIn <= 0) { this.blinkIn = rand(2, 6); this.blinkT = 0.14; }
+    if (this.blinkT > 0) { this.blinkT -= dt; t.eyeOpen = 0.05; }
+
+    a.wingFlap = approach(a.wingFlap, t.wingFlap, 20, dt);
+    a.squash = approach(a.squash, t.squash, 12, dt);
+    a.eyeOpen = approach(a.eyeOpen, t.eyeOpen, 24, dt);
+    a.beakOpen = approach(a.beakOpen, t.beakOpen, 22, dt);
+    a.headRot = approach(a.headRot, t.headRot, 8, dt);
+
+    var speed = this.integrate(dt);
+    if (e.cfg.effects) {
+      this.rippleCd -= dt;
+      if (this.rippleCd <= 0 && speed > 24) {
+        this.rippleCd = 0.34;
+        e.fx.ripple(this.x, this.y, this.radius() * 0.2, this.radius() * 1.2, 1.0, 'rgba(255,255,255,0.28)', 1.1);
+      }
+    }
+  };
+
+  Engine.prototype.render = function () {
+    var ctx = this.ctx;
+    if (!ctx) return;
+    ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+    ctx.clearRect(0, 0, this.w, this.h);
+
+    // Küken zuerst (hinten), dann die große Ente
+    for (var i = this.babies.length - 1; i >= 0; i--) {
+      var b = this.babies[i];
+      DuckRender.draw(ctx, b.model, b.pose());
+    }
+    DuckRender.draw(ctx, this.duck.model, this.duck.pose());
+    if (this.cfg.effects) this.fx.draw(ctx);
+  };
+
+  // ── Debug/Steuer-API ──────────────────────────────────────────
+  // Deterministisch weiterrechnen (für Tests/Screenshots, unabhängig von rAF)
+  Engine.prototype.simulate = function (seconds, dt) {
+    dt = dt || 1 / 60;
+    var n = Math.max(1, Math.round(seconds / dt));
+    for (var i = 0; i < n; i++) this.step(dt);
+    this.render();
+    return { time: this.time, state: this.duck.state, x: this.duck.x, y: this.duck.y };
+  };
+
+  Engine.prototype.trigger = function (action, dur) {
+    this.duck.setState(action, dur || 1.6);
+    this.duck.quacked = false; this.duck.peckDone = false;
+    this.duck.dove = false; this.duck.surfaced = false; this.duck.dabbleUp = false;
+    return action;
+  };
+
+  root.CursorDuckEngine = Engine;
+  root.CursorDuckDefaults = DEFAULTS;
+  root.CursorDuckIdleActions = IDLE_ACTIONS;
+})(typeof window !== 'undefined' ? window : this);

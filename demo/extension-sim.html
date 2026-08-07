@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>Extension-Simulation</title>
+<style>
+ body{margin:0;padding:30px;font:15px/1.6 system-ui;background:#f2f7fc;color:#1d2b3a}
+ h1{font-size:22px;margin:0 0 6px}
+ p{color:#5d7590;max-width:640px}
+ #log{font:12px/1.7 ui-monospace,monospace;background:#fff;border:1px solid #d8e6f3;border-radius:10px;padding:12px 14px;margin-top:16px;white-space:pre-line;max-width:640px}
+ .ok{color:#1f8a4c}.bad{color:#c0392b}
+ button{font:inherit;padding:6px 12px;margin:4px 6px 0 0;border-radius:8px;border:1px solid #cbd9e8;background:#fff;cursor:pointer}
+</style>
+</head>
+<body>
+<h1>Extension-Simulation</h1>
+<p>Lädt exakt die Content-Skripte aus <code>manifest.json</code> gegen eine nachgebaute
+<code>chrome.*</code>-API. Damit lässt sich der Extension-Pfad (Storage, Live-Updates,
+Popup-Nachrichten) ohne Installation prüfen.</p>
+<div>
+  <button onclick="setCfg({model:'neon'})">Modell → Cyber-Ente</button>
+  <button onclick="setCfg({ducklings:4})">4 Küken</button>
+  <button onclick="setCfg({size:1.8})">Größe 1.8</button>
+  <button onclick="setCfg({enabled:false})">Aus</button>
+  <button onclick="setCfg({enabled:true})">An</button>
+  <button onclick="msg({type:'duck:trigger',action:'quack',dur:2})">Quaken (Popup-Nachricht)</button>
+</div>
+<div id="log"></div>
+
+<script>
+// ── chrome.* Nachbau ─────────────────────────────────────────
+var LOG = [];
+function log(s, cls) {
+  LOG.push('<span class="' + (cls || '') + '">' + s + '</span>');
+  document.getElementById('log').innerHTML = LOG.join('\n');
+}
+var store = { sync: {}, local: {} };
+var changeListeners = [], msgListeners = [];
+
+window.chrome = {
+  runtime: {
+    id: 'sim-extension-id',
+    lastError: null,
+    onMessage: { addListener: function (fn) { msgListeners.push(fn); } }
+  },
+  storage: {
+    sync: {
+      get: function (defaults, cb) {
+        var out = {};
+        for (var k in defaults) out[k] = (k in store.sync) ? store.sync[k] : defaults[k];
+        setTimeout(function () { cb(out); }, 0);
+      },
+      set: function (patch, cb) {
+        var changes = {};
+        for (var k in patch) { changes[k] = { oldValue: store.sync[k], newValue: patch[k] }; store.sync[k] = patch[k]; }
+        setTimeout(function () {
+          changeListeners.forEach(function (fn) { fn(changes, 'sync'); });
+          if (cb) cb();
+        }, 0);
+      }
+    },
+    local: {
+      get: function (defaults, cb) {
+        var out = {};
+        for (var k in defaults) out[k] = (k in store.local) ? store.local[k] : defaults[k];
+        setTimeout(function () { cb(out); }, 0);
+      },
+      set: function (patch) { for (var k in patch) store.local[k] = patch[k]; }
+    },
+    onChanged: { addListener: function (fn) { changeListeners.push(fn); } }
+  }
+};
+function setCfg(patch) { chrome.storage.sync.set(patch); log('→ storage.sync.set ' + JSON.stringify(patch)); }
+function msg(m) { msgListeners.forEach(function (fn) { fn(m, {}, function () {}); }); log('→ Nachricht ' + JSON.stringify(m)); }
+
+window.onerror = function (m, src, line) { log('FEHLER: ' + m + ' (' + String(src).split('/').pop() + ':' + line + ')', 'bad'); };
+</script>
+
+<!-- exakt die Reihenfolge aus manifest.json -->
+<script src="../src/models.js"></script>
+<script src="../src/render.js"></script>
+<script src="../src/effects.js"></script>
+<script src="../src/engine.js"></script>
+<script src="../src/content.js"></script>
+
+<script>
+setTimeout(function () {
+  var e = window.__cursorDuck;
+  if (!e) { log('✗ Engine wurde nicht gestartet', 'bad'); return; }
+  log('✓ Content-Script gebootet', 'ok');
+  log('  Modell: ' + e.modelId + ', läuft: ' + e.running + ', Modelle gesamt: ' + DuckModels.list.length);
+  log('  Canvas: ' + e.canvas.width + '×' + e.canvas.height + ' (dpr ' + e.dpr + ')');
+  log('  Host im Shadow-DOM: ' + !!e.host.shadowRoot);
+  // Live-Update prüfen
+  chrome.storage.sync.set({ model: 'golden', ducklings: 2 });
+  setTimeout(function () {
+    log((e.modelId === 'golden' ? '✓' : '✗') + ' Live-Update Modell → ' + e.modelId, e.modelId === 'golden' ? 'ok' : 'bad');
+    log((e.babies.length === 2 ? '✓' : '✗') + ' Live-Update Küken → ' + e.babies.length, e.babies.length === 2 ? 'ok' : 'bad');
+    chrome.storage.sync.set({ model: 'mallard', ducklings: 0 });
+    // Verhaltensdurchlauf über alle Zustände
+    var states = ['swim','idle','peck','pet','startle','look','preen','flap','shake','quack','dabble','dive','spin','bathe','bob','sleep','wake'];
+    var bad = [];
+    states.forEach(function (s) {
+      try {
+        e.trigger(s, 1.2);
+        for (var i = 0; i < 130; i++) e.step(1 / 60);
+        e.render();
+      } catch (err) { bad.push(s + ': ' + err.message); }
+    });
+    log(bad.length ? '✗ Fehler in Zuständen:\n  ' + bad.join('\n  ') : '✓ alle ' + states.length + ' Zustände laufen fehlerfrei durch', bad.length ? 'bad' : 'ok');
+    log('  Partikel aktiv: ' + e.fx.parts.length + ', Zeit simuliert: ' + e.time.toFixed(1) + 's');
+  }, 60);
+}, 300);
+</script>
+</body>
+</html>

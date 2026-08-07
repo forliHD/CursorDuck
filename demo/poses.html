@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="de">
+<head><meta charset="utf-8"><title>Duck Poses</title>
+<style>body{margin:0;background:#eaf3fb;font:13px system-ui;overflow:hidden}canvas{display:block;margin:0 auto}</style>
+</head>
+<body>
+<canvas id="c" width="1000" height="880"></canvas>
+<script src="../src/models.js"></script>
+<script src="../src/render.js"></script>
+<script>
+var c = document.getElementById('c'), ctx = c.getContext('2d');
+var POSES = [
+  ['normal',   {}],
+  ['quaken',   { beakOpen: 0.9, headRot: -0.42 }],
+  ['flattern', { wingFlap: 1, squash: 1.06, headRot: -0.2 }],
+  ['putzen',   { headSide: 0.8, eyeOpen: 0.25, wingLift: 0.3 }],
+  ['picken',   { headDip: 1, lean: 0.13, beakOpen: 0.35 }],
+  ['gründeln', { lean: 0.92, headDip: 0.42, submerge: 0.1 }],
+  ['tauchen',  { submerge: 0.72, lean: 0.4 }],
+  ['schlafen', { sleep: 1, eyeOpen: 0, headRot: 0.12 }],
+  ['streicheln', { eyeHappy: 1, blush: 1, wobble: 0.5, wingLift: 0.5, headRot: -0.18 }],
+  ['schreck',  { wingFlap: 1, beakOpen: 1, headRot: -0.45, squash: 1.14, eyeOpen: 1 }],
+  ['blinzeln', { eyeOpen: 0.04 }],
+  ['nach links', { dir: -1 }]
+];
+window.poses = {
+  model: 'mallard', t: 1.2,
+  draw: function () {
+    var cols = 3, cell = 333, cellH = 430, r = 84, per = 6;
+    var m = DuckModels.get(this.model);
+    ctx.clearRect(0, 0, c.width, c.height);
+    ctx.fillStyle = '#eef7fd'; ctx.fillRect(0, 0, c.width, c.height);
+    for (var i = 0; i < per; i++) {
+      var idx = i + (this.page || 0) * per;
+      if (!POSES[idx]) break;
+      var col = i % cols, row = Math.floor(i / cols);
+      var cx = col * cell + cell / 2, cy = row * cellH + cellH * 0.62;
+      var g = ctx.createLinearGradient(0, cy - 4, 0, cy + 96);
+      g.addColorStop(0, 'rgba(150,205,240,0.55)'); g.addColorStop(1, 'rgba(120,180,225,0.75)');
+      ctx.fillStyle = g;
+      ctx.fillRect(col * cell + 10, cy - 2, cell - 20, 110);
+      var p = { x: cx, y: cy, r: r, t: this.t, dir: 1, reflection: true };
+      var src = POSES[idx][1];
+      for (var k in src) p[k] = src[k];
+      DuckRender.draw(ctx, m, p);
+      ctx.fillStyle = '#3d5772'; ctx.font = '700 16px system-ui'; ctx.textAlign = 'center';
+      ctx.fillText(POSES[idx][0], cx, cy + 128);
+    }
+    return 'poses ' + this.model + ' page ' + (this.page || 0);
+  },
+  set: function (model, page) { if (model) this.model = model; this.page = page || 0; return this.draw(); }
+};
+poses.draw();
+</script>
+</body>
+</html>

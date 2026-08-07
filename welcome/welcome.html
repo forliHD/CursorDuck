@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Cursor Duck ist da 🦆</title>
+<style>
+  :root { --ink:#16283a; --muted:#5d7590; --line:#d8e6f3; --card:#fff; --accent:#2f86d6; }
+  @media (prefers-color-scheme: dark) {
+    :root { --ink:#e9f1f8; --muted:#93aac1; --line:#2a3949; --card:#182430; --accent:#57a8ec; }
+  }
+  * { box-sizing:border-box; }
+  body {
+    margin:0; min-height:100vh; color:var(--ink);
+    font:16px/1.65 ui-rounded,-apple-system,"Segoe UI",system-ui,sans-serif;
+    background:
+      radial-gradient(1100px 600px at 20% -10%, rgba(140,200,245,.45), transparent 60%),
+      radial-gradient(900px 500px at 100% 10%, rgba(160,225,240,.35), transparent 55%),
+      #eef5fc;
+  }
+  @media (prefers-color-scheme: dark) {
+    body { background:
+      radial-gradient(1100px 600px at 20% -10%, rgba(30,70,110,.55), transparent 60%),
+      radial-gradient(900px 500px at 100% 10%, rgba(24,80,95,.4), transparent 55%),
+      #101922; }
+  }
+  .wrap { max-width:780px; margin:0 auto; padding:56px 28px 120px; }
+  h1 { font-size:42px; margin:0 0 6px; letter-spacing:-1px; }
+  .lead { font-size:19px; color:var(--muted); margin:0 0 34px; }
+  .card {
+    background:var(--card); border:1px solid var(--line); border-radius:18px;
+    padding:22px 26px; margin:14px 0; box-shadow:0 8px 30px rgba(25,60,100,.07);
+  }
+  h2 { font-size:19px; margin:0 0 10px; }
+  ul { margin:0; padding-left:20px; }
+  li { margin:7px 0; }
+  b { color:var(--accent); }
+  kbd {
+    font:600 12.5px ui-monospace,monospace; background:rgba(120,160,200,.16);
+    border:1px solid var(--line); border-bottom-width:2px; border-radius:6px; padding:1px 6px;
+  }
+  .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(96px,1fr)); gap:8px; margin-top:6px; }
+  .g { background:linear-gradient(#eaf6ff,#d3e9fa); border:1px solid var(--line); border-radius:12px; text-align:center; padding:3px 2px 4px; }
+  @media (prefers-color-scheme: dark) { .g { background:linear-gradient(#20303e,#1a2734); } }
+  .g canvas { display:block; margin:0 auto; }
+  .g span { font-size:10px; color:var(--muted); display:block; }
+  .tip { color:var(--muted); font-size:14px; margin-top:26px; text-align:center; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Deine Ente ist eingezogen 🦆</h1>
+  <p class="lead">Sie schwimmt ab jetzt auf jeder Website hinter deinem Mauszeiger her. Probier sie gleich hier aus.</p>
+
+  <div class="card">
+    <h2>Was sie kann</h2>
+    <ul>
+      <li><b>Hinterherschwimmen:</b> Je weiter weg dein Cursor, desto schneller paddelt sie — mit Kielwasser und Bugwelle.</li>
+      <li><b>Streicheln:</b> Hol sie ein und wackel mit dem Cursor über ihr — Herzchen inklusive.</li>
+      <li><b>Picken:</b> Halt die Maus still. Wenn sie aufgeholt hat, pickt sie deinen Cursor an.</li>
+      <li><b>Erschrecken:</b> Wisch ganz schnell durch sie durch — Federn fliegen.</li>
+      <li><b>Nickerchen:</b> Nach 15 Sekunden Ruhe schläft sie ein. Zzz.</li>
+      <li><b>Nebenbei:</b> Gründeln, tauchen, Gefieder putzen, baden, Pirouetten, quaken.</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h2>Steuerung</h2>
+    <ul>
+      <li>Klick auf das Enten-Symbol in der Symbolleiste: Modell wählen, Größe, Tempo, Küken, Ton.</li>
+      <li><kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>D</kbd> — Ente an/aus</li>
+      <li><kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>N</kbd> — nächstes Entenmodell</li>
+      <li>Auf einzelnen Seiten stört sie? Im Popup „Auf dieser Seite pausieren“.</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h2>Alle Modelle</h2>
+    <div class="grid" id="grid"></div>
+  </div>
+
+  <p class="tip">Sie liegt über der Seite, nimmt aber keine Klicks entgegen — Links, Text und Buttons funktionieren ganz normal.</p>
+</div>
+
+<script src="../src/models.js"></script>
+<script src="../src/render.js"></script>
+<script src="../src/effects.js"></script>
+<script src="../src/engine.js"></script>
+<script src="welcome.js"></script>
+</body>
+</html>
