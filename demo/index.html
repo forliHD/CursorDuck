@@ -85,7 +85,10 @@
     <p><b>Picken:</b> Maus still halten — sie holt auf und pickt ab und zu den Cursor an.</p>
     <p><b>Erschrecken:</b> Ganz schnell durch die Ente durchwischen → Federn fliegen.</p>
     <p><b>Nickerchen:</b> 15&nbsp;Sekunden nichts tun → sie pennt ein (Zzz).</p>
-    <p><b>Klicken:</b> Auf die Ente klicken → sie quakt zurück. Doppelklick → Flügelschlagen.</p>
+    <p><b>Klicken:</b> Auf die Ente klicken → sie quakt zurück. Doppelklick auf die Ente → Flügelschlagen.</p>
+    <p><b>Füttern:</b> Doppelklick irgendwo ins „Wasser" → Brotkrumen. Sie schwimmt hin und pickt sie einzeln auf.</p>
+    <p><b>Fisch-Jagd:</b> Ab und zu zieht ein Fischschatten vorbei — sie jagt ihn und schnappt zu (klappt nicht immer).</p>
+    <p><b>Schwindel:</b> Den Cursor ein paarmal schnell um die Ente kreisen lassen → ihr wird schwummrig 😵.</p>
   </div>
 
   <div class="card">
@@ -125,6 +128,7 @@
   <div class="chk"><input type="checkbox" id="effects" checked><label for="effects" style="margin:0">Wasser-Effekte</label></div>
   <div class="chk"><input type="checkbox" id="reflection" checked><label for="reflection" style="margin:0">Spiegelung</label></div>
   <div class="chk"><input type="checkbox" id="peck" checked><label for="peck" style="margin:0">Cursor picken</label></div>
+  <div class="chk"><input type="checkbox" id="feed" checked><label for="feed" style="margin:0">Brotkrumen (Doppelklick)</label></div>
 
   <label style="margin-top:10px">Animation testen</label>
   <div class="row" id="actions"></div>
@@ -166,7 +170,7 @@
     };
   });
 
-  ['sound', 'effects', 'reflection', 'peck'].forEach(function (id) {
+  ['sound', 'effects', 'reflection', 'peck', 'feed'].forEach(function (id) {
     var el = document.getElementById(id);
     el.onchange = function () { var p = {}; p[id] = el.checked; engine.apply(p); };
   });
@@ -176,7 +180,8 @@
     ['quack', 'Quaken'], ['flap', 'Flattern'], ['preen', 'Putzen'], ['shake', 'Schütteln'],
     ['dabble', 'Gründeln'], ['dive', 'Tauchen'], ['spin', 'Drehen'], ['bathe', 'Baden'],
     ['look', 'Umschauen'], ['bob', 'Wippen'], ['sleep', 'Schlafen'], ['peck', 'Picken'],
-    ['startle', 'Schreck'], ['pet', 'Streicheln']
+    ['startle', 'Schreck'], ['pet', 'Streicheln'],
+    ['crumbs', 'Füttern 🍞'], ['fish', 'Fisch 🐟'], ['dizzy', 'Schwindel 😵']
   ];
   var rowEl = document.getElementById('actions');
   ACTIONS.forEach(function (a) {

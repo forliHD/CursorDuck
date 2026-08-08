@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Cursor Duck 🦆",
   "version": "1.0.0",
-  "description": "Eine süße Ente schwimmt deinem Mauszeiger hinterher, pickt ihn an und lässt sich streicheln. Mit Küken, Splashes und 30 Entenmodellen.",
+  "description": "Eine süße Ente schwimmt deinem Mauszeiger hinterher, lässt sich streicheln und füttern, jagt Fische. Mit Küken und 31 Entenmodellen.",
   "icons": {
     "16": "icons/icon16.png",
     "32": "icons/icon32.png",

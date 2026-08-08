@@ -1,6 +1,7 @@
 /*
  * CursorDuck — Engine 🦆
- * Schwimmphysik, Verhaltens-Automat, Streicheln, Picken, Küken, Sound.
+ * Schwimmphysik, Verhaltens-Automat, Streicheln, Picken, Füttern,
+ * Fisch-Jagd, Schwindel, Küken, Sound.
  */
 (function (root) {
   'use strict';
@@ -27,6 +28,7 @@
     reflection: true,
     opacity: 1.0,
     peck: true,
+    feed: true,         // Brotkrumen per Doppelklick
     sleepAfter: 15      // Sekunden Cursor-Stillstand bis zum Nickerchen
   };
 
@@ -129,6 +131,13 @@
     return IDLE_ACTIONS[0];
   }
 
+  // Diese Zustände darf ein davonziehender Cursor sofort abbrechen —
+  // sonst putzt sie sich seelenruhig fertig und wirkt abgehängt.
+  var INTERRUPTIBLE = {
+    look: 1, preen: 1, flap: 1, shake: 1, quack: 1,
+    dabble: 1, spin: 1, bathe: 1, bob: 1
+  };
+
   // ── Ente ──────────────────────────────────────────────────────
   function Duck(engine, model, isBaby) {
     this.e = engine;
@@ -136,7 +145,10 @@
     this.baby = !!isBaby;
     this.x = 0; this.y = 0; this.vx = 0; this.vy = 0;
     this.dirF = 1;            // -1..1 → x-Skalierung, erlaubt echtes Drehen
-    this.face = 1;            // Zielrichtung
+    this.face = 1;            // Zielrichtung (Vorzeichen + Verkürzung bei steilem Kurs)
+    this.tilt = 0;            // Neigung des Rumpfs in Schwimmrichtung
+    this.spinAcc = 0;         // Cursor-Umkreisungen (Schwindel)
+    this.lastAng = null;
     this.state = 'swim'; this.stTime = 0; this.stDur = 0;
     this.phase = Math.random() * TAU;
     this.paddle = Math.random() * TAU;
@@ -186,7 +198,7 @@
     return {
       x: this.x, y: this.y, r: this.radius(), dir: dir, t: this.e.time,
       bob: Math.sin(this.e.time * 2.4 + this.phase) * bobAmp + (a.squash - 1) * this.radius() * 0.3,
-      lean: a.lean + Math.sin(this.e.time * 1.9 + this.phase) * 0.018,
+      lean: a.lean + this.tilt + Math.sin(this.e.time * 1.9 + this.phase) * 0.018,
       headDip: a.headDip, headSide: a.headSide, headRot: a.headRot,
       eyeOpen: a.eyeOpen, eyeHappy: a.eyeHappy,
       wingFlap: a.wingFlap, wingLift: a.wingLift,
@@ -211,7 +223,9 @@
     var dx = tx - this.x, dy = ty - this.y;
     var dist = Math.sqrt(dx * dx + dy * dy) || 0.0001;
     var cfg = this.e.cfg;
-    var maxSpeed = (this.baby ? 520 : 430) * cfg.speed * (boost || 1);
+    // Nach einem Cursor-Sprung (Fenster/iframe gewechselt) kurz extra flott
+    var alert = this.e.alertT > 0 ? 1.3 : 1;
+    var maxSpeed = (this.baby ? 520 : 430) * cfg.speed * (boost || 1) * alert;
     if (dist > stopDist) {
       var want = clamp((dist - stopDist) * 3.4, 0, maxSpeed);
       // Sprint, wenn die Ente weit abgehängt wurde
@@ -221,8 +235,8 @@
       var wob = Math.sin(this.e.time * 5.5 + this.phase) * 0.10 * Math.min(1, dist / 220);
       var wx = ux * Math.cos(wob) - uy * Math.sin(wob);
       var wy = ux * Math.sin(wob) + uy * Math.cos(wob);
-      this.vx = approach(this.vx, wx * want, 5.5, dt);
-      this.vy = approach(this.vy, wy * want, 5.5, dt);
+      this.vx = approach(this.vx, wx * want, 5.5 * alert, dt);
+      this.vy = approach(this.vy, wy * want, 5.5 * alert, dt);
     } else {
       this.vx = approach(this.vx, 0, 3.2, dt);
       this.vy = approach(this.vy, 0, 3.2, dt);
@@ -234,9 +248,39 @@
     this.y += this.vy * dt;
     var speed = Math.sqrt(this.vx * this.vx + this.vy * this.vy);
 
-    // Blickrichtung (kontinuierliches Drehen statt Umklappen)
-    if (Math.abs(this.vx) > 16) this.face = this.vx > 0 ? 1 : -1;
-    this.dirF = approach(this.dirF, this.face, 9, dt);
+    // Blickrichtung: die Ente richtet sich nach ihrem echten Kurs.
+    // Bei steilem Kurs (fast senkrecht) wird der Körper leicht verkürzt,
+    // als sähe man sie von vorn/hinten — wirkt wie echtes Eindrehen.
+    if (Math.abs(this.vx) > 16 && speed > 24) {
+      var horiz = Math.abs(this.vx) / speed;
+      this.face = (this.vx > 0 ? 1 : -1) * (0.55 + 0.45 * Math.min(1, horiz * 1.2));
+    } else if (speed < 30) {
+      this.face = this.face >= 0 ? 1 : -1;   // im Stand zurück ins volle Profil
+    }
+    // Bei Tempo dreht sie schneller ein
+    this.dirF = approach(this.dirF, this.face, 8 + Math.min(6, speed * 0.01), dt);
+
+    // Kehrtwende bei Fahrt → kleiner Drift-Schwall
+    var sgn = this.face >= 0 ? 1 : -1;
+    if (this._faceSgn === undefined) this._faceSgn = sgn;
+    if (sgn !== this._faceSgn) {
+      this._faceSgn = sgn;
+      if (speed > 170 && this.e.cfg.effects && !this.baby) {
+        var r0 = this.radius();
+        this.e.fx.ripple(this.x, this.y, r0 * 0.3, r0 * 1.7, 1.0, 'rgba(255,255,255,0.5)', 1.8);
+        for (var wd = 0; wd < 3; wd++) {
+          this.e.fx.droplet(this.x - sgn * r0 * 0.6, this.y - 2,
+            -sgn * rand(40, 140), -rand(40, 120), rand(1.0, 1.8));
+        }
+      }
+    }
+
+    // Rumpf neigt sich in die Schwimmrichtung (Bug zeigt zum Kurs)
+    var tgtTilt = 0;
+    if (speed > 40) {
+      tgtTilt = Math.atan2(this.vy, Math.abs(this.vx)) * 0.5 * Math.min(1, (speed - 40) / 240);
+    }
+    this.tilt = approach(this.tilt, clamp(tgtTilt, -0.5, 0.5), 6, dt);
 
     // Paddeln schneller bei Tempo
     this.paddle += dt * (2.2 + speed * 0.022);
@@ -301,8 +345,43 @@
       if (st === 'pet' && this.petHold <= 0) this.setState(dist > stopDist * 1.4 ? 'swim' : 'idle', 1);
     }
 
-    // ── Zustandsautomat ─────────────────────────────────────
+    // ── Abgehängt? Spielerei abbrechen und hinterher ───────
     st = this.state;
+    if (INTERRUPTIBLE[st] && dist > stopDist * 3 && e.pointerSpeed > 60) {
+      this.quacked = false; this.peckDone = false; this.dove = false;
+      this.surfaced = false; this.dabbleUp = false; this.splashed = false;
+      this.setState('swim', 1);
+      st = 'swim';
+    }
+    // Cursor macht einen großen Sprung (Fenster/iframe gewechselt) → kurz aufmerken
+    if (!this.baby && e.alertPing && dist > 260 && st !== 'sleep' && st !== 'pet' && st !== 'startle') {
+      this.say('!', '#4a90d9');
+    }
+
+    // ── Schwindel: Cursor kreist um die Ente ───────────────
+    if (!this.baby) {
+      var circleable = st === 'idle' || st === 'swim' || st === 'bob' || st === 'look';
+      if (circleable && dist > r * 0.8 && dist < r * 7 && e.pointerSpeed > 140) {
+        var ang = Math.atan2(dy, dx);
+        if (this.lastAng != null) {
+          var dAng = ang - this.lastAng;
+          if (dAng > Math.PI) dAng -= TAU; else if (dAng < -Math.PI) dAng += TAU;
+          if (Math.abs(dAng) < 1.0) this.spinAcc += dAng;
+        }
+        this.lastAng = ang;
+      } else {
+        this.lastAng = null;
+      }
+      this.spinAcc *= Math.max(0, 1 - dt * 0.55);   // verklingt von selbst
+      if (circleable && Math.abs(this.spinAcc) > TAU * 2.1) {
+        this.dizzyDir = this.spinAcc >= 0 ? 1 : -1;
+        this.spinAcc = 0;
+        this.setState('dizzy', 2.4);
+        e.sound.quack(this.model.quackPitch * 0.75);
+        st = 'dizzy';
+      }
+    }
+
     switch (st) {
       case 'pet':
         t.eyeHappy = 1; t.blush = clamp(this.pet * 1.6, 0, 1);
@@ -510,6 +589,119 @@
         if (this.stTime > this.stDur) this.setState('idle', 1);
         break;
 
+      case 'dizzy': {
+        // Taumeln nach zu viel Cursor-Karussell: dreht sich immer langsamer aus
+        var zk = this.stTime / this.stDur;
+        var slow = 1 - zk;
+        this.dirF = Math.cos(this.stTime * (9 - zk * 6)) * (0.2 + slow * 0.8) * (this.dizzyDir || 1);
+        this.face = this.dirF >= 0 ? 1 : -1;
+        t.wobble = Math.sin(this.stTime * 12) * 0.7 * slow;
+        t.eyeOpen = 0.35;
+        t.headRot = Math.sin(this.stTime * 8) * 0.32 * slow;
+        t.squash = 1 + Math.sin(this.stTime * 12) * 0.04 * slow;
+        this.vx = approach(this.vx, 0, 3, dt);
+        this.vy = approach(this.vy, 0, 3, dt);
+        this.actionTick -= dt;
+        if (this.actionTick <= 0) {
+          this.actionTick = 0.22;
+          var hd = this.headWorld();
+          var oa = this.stTime * 7;
+          e.fx.sparkle(hd.x + Math.cos(oa) * r * 0.95, hd.y - r * 0.35 + Math.sin(oa) * r * 0.3, '#ffd23d', 4.5);
+        }
+        if (this.stTime > this.stDur) this.setState('shake', 0.9);
+        break;
+      }
+
+      case 'hunt': {
+        // Fisch jagen: hinterher, und wenn er nah genug ist → zuschnappen
+        var f = e.fish;
+        if (!f) { this.setState('look', 1.0); break; }
+        var hdx = f.x - this.x, hdy = f.y - this.y;
+        var hdist = Math.sqrt(hdx * hdx + hdy * hdy);
+        t.headRot = clamp(hdy * 0.002, -0.3, 0.35);
+        t.eyeOpen = 1;
+        this.swim(dt, f.x + f.vx * 0.22, f.y + f.vy * 0.22, r * 0.55, 1.35);
+        this.snapCd = Math.max(0, (this.snapCd || 0) - dt);
+        if (hdist < r * 1.25 && this.snapCd <= 0 && this.stTime > 0.3) {
+          this.snapCd = 0.75;
+          a.headDip = 0.9; a.beakOpen = 0.9;   // Schnapp-Ruck ohne Einblenden
+          e.fx.splash(f.x, f.y, 0.8);
+          e.sound.splash(0.6);
+          if (Math.random() < 0.65) {
+            e.fish = null;
+            e.stats.fish = (e.stats.fish || 0) + 1;
+            e.saveStats();
+            e.fx.sparkle(this.x + this.dirF * r, this.y - r, '#ffe066', 6);
+            this.say('nom', '#4a90d9');
+            e.sound.peck();
+            this.gulped = false;
+            this.setState('gulp', 1.15);
+          } else {
+            f.scared = 2.2;
+            if (Math.random() < 0.5) this.say('!', '#ff9d2e');
+          }
+        }
+        if (this.stTime > 8) this.setState('shake', 1.0);   // irgendwann aufgeben
+        break;
+      }
+
+      case 'gulp':
+        // Fisch runterschlucken: Kopf in den Nacken
+        var gk = this.stTime / this.stDur;
+        t.headRot = gk < 0.4 ? -0.55 : -0.15;
+        t.beakOpen = gk < 0.35 ? 0.7 : 0;
+        t.squash = 1 + Math.sin(gk * Math.PI) * 0.06;
+        this.vx = approach(this.vx, 0, 3, dt);
+        this.vy = approach(this.vy, 0, 3, dt);
+        if (!this.gulped && gk > 0.5) {
+          this.gulped = true;
+          e.fx.heart(this.x, this.y - r * 1.7, 6 * cfg.size);
+          e.sound.quack(this.model.quackPitch * 1.1, true);
+        }
+        if (this.stTime > this.stDur) { this.gulped = false; this.setState('idle', 1); }
+        break;
+
+      case 'feed': {
+        // Brotkrumen aufsammeln, eine nach der anderen
+        var crumbs = e.crumbs;
+        if (!crumbs.length) { this.setState('idle', 1); break; }
+        var best = null, bd = 1e18;
+        for (var ci = 0; ci < crumbs.length; ci++) {
+          var cdx = crumbs[ci].x - this.x, cdy = crumbs[ci].y - this.y;
+          var cd = cdx * cdx + cdy * cdy;
+          if (cd < bd) { bd = cd; best = crumbs[ci]; }
+        }
+        bd = Math.sqrt(bd);
+        this.swim(dt, best.x, best.y, r * 0.85, 1.15);
+        if (bd < r * 1.5) {
+          var nib = Math.sin(e.time * 13);
+          t.headDip = 0.55 + nib * 0.3;
+          t.headRot = 0.1;
+          t.beakOpen = Math.max(0, nib) * 0.5;
+          t.lean = 0.14;
+          this.actionTick -= dt;
+          if (this.actionTick <= 0) {
+            this.actionTick = 0.34;
+            best.size -= 1.1;
+            e.fx.ripple(best.x, best.y, 2, 16, 0.6, 'rgba(255,255,255,0.5)', 1.4);
+            e.sound.peck();
+            if (best.size <= 1.2) {
+              crumbs.splice(crumbs.indexOf(best), 1);
+              e.fx.sparkle(best.x, best.y - 6, '#ffe9b8', 5);
+              e.stats.crumbs = (e.stats.crumbs || 0) + 1;
+              e.saveStats();
+              if (Math.random() < 0.4) this.say('nom', '#c98a2e');
+              if (!crumbs.length) {
+                e.fx.heart(this.x, this.y - r * 1.8, 6 * cfg.size);
+                e.sound.quack(this.model.quackPitch * 1.1, true);
+                this.setState('idle', 1);
+              }
+            }
+          }
+        }
+        break;
+      }
+
       case 'idle':
         // Zum Cursor schauen
         t.headRot = clamp((this.y - py) * 0.0016, -0.34, 0.3) * (this.dirF >= 0 ? 1 : 1);
@@ -517,6 +709,17 @@
         this.nextIdle -= dt * cfg.playfulness;
         this.peckCd -= dt;
 
+        // Brotkrumen schlagen alles
+        if (cfg.feed && e.crumbs.length) { this.setState('feed', 99); break; }
+        // Fisch entdeckt?
+        if (e.fish && e.fish.alpha > 0.5 && !e.fish.caught) {
+          var fdx0 = e.fish.x - this.x, fdy0 = e.fish.y - this.y;
+          if (fdx0 * fdx0 + fdy0 * fdy0 < 320 * 320) {
+            this.say('!', '#4a90d9');
+            this.setState('hunt', 99);
+            break;
+          }
+        }
         if (dist > stopDist * 1.6) { this.setState('swim', 1); break; }
         if (e.pointerIdle > cfg.sleepAfter) { this.setState('sleep', 99); break; }
         if (cfg.peck && this.peckCd <= 0 && dist < r * 3.4 && e.pointerIdle > 0.6) {
@@ -533,6 +736,7 @@
 
       case 'swim':
       default:
+        if (cfg.feed && e.crumbs.length && !this.baby) { this.setState('feed', 99); break; }
         this.swim(dt, px, py, stopDist, 1);
         var spd0 = Math.sqrt(this.vx * this.vx + this.vy * this.vy);
         t.lean = clamp(-spd0 * 0.00022 - (dist > 420 ? 0.06 : 0), -0.14, 0);
@@ -629,11 +833,13 @@
     if (opts) for (var k2 in opts) this.cfg[k2] = opts[k2];
 
     this.time = 0;
-    this.w = root.innerWidth; this.h = root.innerHeight;
+    this.w = root.innerWidth || 800; this.h = root.innerHeight || 600;
     this.px = this.w * 0.5; this.py = this.h * 0.5;
     this.ppx = this.px; this.ppy = this.py;
     this.pointerSpeed = 0;
     this.pointerIdle = 0;
+    this.alertT = 0;          // kurz erhöhtes Tempo nach Cursor-Sprung
+    this.alertPing = false;   // Ein-Frame-Signal für die "!"-Reaktion
     this.fx = new DuckFX();
     this.sound = new Sound();
     this.sound.on = !!this.cfg.sound;
@@ -641,6 +847,9 @@
     this.stats = { pets: 0, pecks: 0 };
     this.running = false;
     this.babies = [];
+    this.crumbs = [];         // Brotkrumen auf dem Wasser
+    this.fish = null;         // höchstens ein Fisch zur Zeit
+    this.fishCd = rand(20, 45);
     this._bound = {};
     this.setModel(this.cfg.model);
   }
@@ -686,6 +895,155 @@
     if (this.onStats) this.onStats(this.stats);
   };
 
+  // ── Fisch ─────────────────────────────────────────────────────
+  Engine.prototype.spawnFish = function () {
+    var d = this.duck;
+    var side = Math.random() < 0.5 ? -1 : 1;
+    var y = clamp(d.y + rand(-120, 160), 40, this.h - 30);
+    var x = clamp(d.x + side * rand(240, 400), -40, this.w + 40);
+    this.fish = {
+      x: x, y: y,
+      vx: -side * rand(45, 75) * this.cfg.speed,   // zieht gemütlich an der Ente vorbei
+      vy: 0,
+      phase: Math.random() * TAU,
+      scared: 0, life: 22, alpha: 0
+    };
+    return this.fish;
+  };
+
+  Engine.prototype.updateFish = function (dt) {
+    var f = this.fish;
+    if (!f) {
+      // Nur nachlegen, wenn die Ente gerade Muße hat
+      var st = this.duck.state;
+      var calm = st === 'idle' || st === 'swim' || st === 'bob' || st === 'look';
+      if (calm && this.cfg.playfulness > 0.25) {
+        this.fishCd -= dt * this.cfg.playfulness;
+        if (this.fishCd <= 0) { this.fishCd = rand(26, 55); this.spawnFish(); }
+      }
+      return;
+    }
+
+    f.life -= dt;
+    f.alpha = Math.min(1, f.alpha + dt * 2);
+    f.scared = Math.max(0, f.scared - dt);
+    var d = this.duck;
+    var fdx = f.x - d.x, fdy = f.y - d.y;
+    var fdist = Math.sqrt(fdx * fdx + fdy * fdy) || 0.001;
+    var hunted = d.state === 'hunt';
+
+    if ((hunted && fdist < 190) || f.scared > 0) {
+      // Flucht: weg von der Ente, aber langsamer als eine sprintende Ente
+      var fmax = (f.scared > 0 ? 340 : 300) * this.cfg.speed;
+      f.vx = approach(f.vx, fdx / fdist * fmax, 3.5, dt);
+      f.vy = approach(f.vy, fdy / fdist * fmax * 0.6, 3.5, dt);
+    } else {
+      f.vy = Math.sin(this.time * 1.7 + f.phase) * 26;
+    }
+    f.x += f.vx * dt;
+    f.y += f.vy * dt;
+    f.y = clamp(f.y, 30, this.h - 20);
+    if (this.cfg.effects && Math.random() < dt * 1.3) {
+      this.fx.ripple(f.x, f.y, 2, 15, 0.8, 'rgba(255,255,255,0.30)', 1.2);
+    }
+
+    var out = f.x < -60 || f.x > this.w + 60;
+    if (out || f.life <= 0) {
+      if (!out) {
+        // taucht ab statt zu verpuffen
+        if (this.cfg.effects) this.fx.splash(f.x, f.y, 0.5);
+        for (var b = 0; b < 3; b++) this.fx.bubble(f.x + rand(-8, 8), f.y + rand(0, 6));
+      }
+      this.fish = null;
+      if (hunted) { d.say('?', '#4a90d9'); d.setState('look', 1.2); }
+    }
+  };
+
+  // ── Brotkrumen ────────────────────────────────────────────────
+  Engine.prototype.throwCrumbs = function (x, y) {
+    var n = 3 + Math.floor(Math.random() * 3);
+    for (var i = 0; i < n && this.crumbs.length < 14; i++) {
+      var cx = clamp(x + rand(-26, 26), 10, this.w - 10);
+      var cy = clamp(y + rand(-16, 16), 10, this.h - 10);
+      this.crumbs.push({ x: cx, y: cy, size: rand(3.4, 5.4), phase: Math.random() * TAU });
+      if (this.cfg.effects) {
+        this.fx.ripple(cx, cy, 2, 18, 0.7, 'rgba(255,255,255,0.55)', 1.6);
+        this.fx.droplet(cx, cy - 4, rand(-20, 20), -rand(30, 70), 1.2);
+      }
+    }
+    this.sound.splash(0.35);
+  };
+
+  // Fisch & Krumen liegen "im Wasser" — also unter den Enten zeichnen
+  Engine.prototype.drawExtras = function (ctx) {
+    var t = this.time, i;
+
+    if (this.fish) {
+      var f = this.fish;
+      var fr = 12 * clamp(this.cfg.size, 0.7, 1.6);
+      var ang = Math.atan2(f.vy, f.vx);
+      var wig = Math.sin(t * 9 + f.phase) * 0.35;
+      ctx.save();
+      ctx.globalAlpha = 0.5 * f.alpha;
+      ctx.translate(f.x, f.y + 6);   // knapp unter der Oberfläche
+      ctx.rotate(ang * 0.8);
+      ctx.fillStyle = 'rgba(38,86,128,0.85)';
+      // Körper
+      ctx.beginPath();
+      ctx.ellipse(0, 0, fr, fr * 0.42, 0, 0, TAU);
+      ctx.fill();
+      // Schwanzflosse wedelt
+      ctx.save();
+      ctx.translate(-fr * 0.9, 0);
+      ctx.rotate(wig);
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.lineTo(-fr * 0.62, -fr * 0.42);
+      ctx.lineTo(-fr * 0.62, fr * 0.42);
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+      // Rückenflosse
+      ctx.beginPath();
+      ctx.moveTo(-fr * 0.15, -fr * 0.36);
+      ctx.quadraticCurveTo(fr * 0.12, -fr * 0.85, fr * 0.34, -fr * 0.34);
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+    }
+
+    for (i = 0; i < this.crumbs.length; i++) {
+      var c = this.crumbs[i];
+      var bob = Math.sin(t * 2.1 + c.phase) * 1.3;
+      ctx.save();
+      // kleiner Kontaktring auf dem Wasser
+      ctx.strokeStyle = 'rgba(255,255,255,0.38)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.ellipse(c.x, c.y + c.size * 0.55, c.size * 1.7, c.size * 0.55, 0, 0, TAU);
+      ctx.stroke();
+      // die Krume selbst: unregelmäßiger Brocken
+      ctx.fillStyle = '#e0b073';
+      ctx.strokeStyle = 'rgba(140,95,45,0.75)';
+      ctx.lineWidth = 1.1;
+      ctx.beginPath();
+      ctx.moveTo(c.x + c.size, c.y + bob * 0.3);
+      for (var k2 = 1; k2 <= 6; k2++) {
+        var ca = k2 / 6 * TAU;
+        var cr = c.size * (0.82 + 0.24 * Math.sin(c.phase * 3 + k2 * 2.4));
+        ctx.lineTo(c.x + Math.cos(ca) * cr, c.y + bob * 0.3 + Math.sin(ca) * cr * 0.8);
+      }
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = 'rgba(255,238,200,0.8)';
+      ctx.beginPath();
+      ctx.arc(c.x - c.size * 0.3, c.y + bob * 0.3 - c.size * 0.3, c.size * 0.32, 0, TAU);
+      ctx.fill();
+      ctx.restore();
+    }
+  };
+
   // ── Canvas ────────────────────────────────────────────────────
   Engine.prototype.mount = function (parent) {
     var host = document.createElement('div');
@@ -721,8 +1079,13 @@
   Engine.prototype.resize = function () {
     // Die echte Host-Größe nehmen, sonst verzerrt eine Scrollbar das Canvas
     var rect = this.host && this.host.getBoundingClientRect();
-    this.w = rect && rect.width ? rect.width : root.innerWidth;
-    this.h = rect && rect.height ? rect.height : root.innerHeight;
+    var w = rect && rect.width ? rect.width : root.innerWidth;
+    var h = rect && rect.height ? rect.height : root.innerHeight;
+    // Hintergrund-Tabs/Prerender melden gern 0×0 — das würde die Ente in die
+    // Ecke klemmen. Dann lieber die letzte bekannte Größe behalten.
+    if (!w || !h) { w = this.w || 800; h = this.h || 600; }
+    this.w = w;
+    this.h = h;
     var dpr = Math.min(2, root.devicePixelRatio || 1);
     this.dpr = dpr;
     if (this.canvas) {
@@ -757,9 +1120,17 @@
         d.quacked = false;
       }
     };
-    b.dbl = function () {
+    b.dbl = function (ev) {
       var d = self.duck;
-      if (d && d.state !== 'dive') d.setState('flap', 1.3);
+      if (!d) return;
+      var dist = ev.clientX !== undefined ? Math.hypot(ev.clientX - d.x, ev.clientY - d.y) : 0;
+      if (dist < d.radius() * 2.6) {
+        // Doppelklick auf die Ente → Flügelschlagen (wie gehabt)
+        if (d.state !== 'dive') d.setState('flap', 1.3);
+      } else if (self.cfg.feed) {
+        // Doppelklick ins Wasser → Brotkrumen werfen
+        self.throwCrumbs(ev.clientX, ev.clientY);
+      }
     };
     b.vis = function () {
       if (document.hidden) self.pause(); else self.resume();
@@ -846,11 +1217,18 @@
 
     // Zeigergeschwindigkeit
     var dx = this.px - this.ppx, dy = this.py - this.ppy;
-    var inst = Math.sqrt(dx * dx + dy * dy) / Math.max(0.001, dt);
+    var jump = Math.sqrt(dx * dx + dy * dy);
+    var inst = jump / Math.max(0.001, dt);
     this.pointerSpeed = this.pointerSpeed * 0.6 + inst * 0.4;
     this.ppx = this.px; this.ppy = this.py;
     if (inst < 6) this.pointerIdle += dt; else this.pointerIdle = 0;
 
+    // Cursor teleportiert (anderes Fenster, unskriptbares iframe, Randwechsel):
+    // kurz "Alert" — die Ente merkt auf und holt schneller auf.
+    this.alertPing = jump > 260 && this.alertT <= 0;
+    this.alertT = jump > 260 ? 1.5 : Math.max(0, this.alertT - dt);
+
+    this.updateFish(dt);
     this.duck.update(dt);
 
     // Küken folgen der Spur der Mama
@@ -917,6 +1295,9 @@
     ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
     ctx.clearRect(0, 0, this.w, this.h);
 
+    // Fisch & Brotkrumen liegen im/auf dem Wasser → unter die Enten
+    if (this.fish || this.crumbs.length) this.drawExtras(ctx);
+
     // Küken zuerst (hinten), dann die große Ente
     for (var i = this.babies.length - 1; i >= 0; i--) {
       var b = this.babies[i];
@@ -937,8 +1318,26 @@
   };
 
   Engine.prototype.trigger = function (action, dur) {
+    if (action === 'fish') {
+      if (!this.fish) this.spawnFish();
+      this.fish.alpha = 1;
+      this.duck.setState('hunt', 99);
+      return action;
+    }
+    if (action === 'crumbs') {
+      var d = this.duck;
+      this.throwCrumbs(
+        clamp(d.x + rand(-1, 1) * 220, 40, this.w - 40),
+        clamp(d.y + rand(-120, 120), 40, this.h - 40));
+      return action;
+    }
+    if (action === 'dizzy') {
+      this.duck.dizzyDir = Math.random() < 0.5 ? -1 : 1;
+      this.duck.setState('dizzy', dur || 2.4);
+      return action;
+    }
     this.duck.setState(action, dur || 1.6);
-    this.duck.quacked = false; this.duck.peckDone = false;
+    this.duck.quacked = false; this.duck.peckDone = false; this.duck.gulped = false;
     this.duck.dove = false; this.duck.surfaced = false; this.duck.dabbleUp = false;
     return action;
   };
