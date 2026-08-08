@@ -27,6 +27,9 @@ Fertig — die Ente schwimmt los, und eine Willkommensseite erklärt kurz die Ku
 | **Füttern** | Doppelklick irgendwo auf die Seite wirft Brotkrumen ins Wasser — sie schwimmt hin und pickt sie einzeln auf, mit Häppchen-Ripples und zufriedenem Quaken. |
 | **Fisch-Jagd** | Ab und zu zieht ein Fischschatten unter der Oberfläche vorbei. Sie entdeckt ihn („!“), jagt ihn, schnappt zu — und erwischt ihn nicht immer. Gefangene Fische zählt das Popup mit. |
 | **Schwindel** | Den Cursor ein paarmal schnell um sie kreisen lassen → ihr wird schwummrig: sie taumelt, Sternchen kreisen, dann schüttelt sie sich. |
+| **Tänzchen** | Den Cursor neben ihr schnell hin- und herwackeln → sie legt ein Tänzchen hin: wippen, Flügel schwingen, Notenwölkchen, im Takt umdrehen. |
+| **Kuckuck** | Den Cursor ruhig auf ihr ablegen → sie taucht verschmitzt ab und ploppt daneben wieder auf. |
+| **Hingucken** | Der Kopf folgt dem Cursor deutlich sichtbar — beim Schwimmen wie im Stand, auf beiden Blickseiten. |
 | **Erschrecken** | Ganz schnell durch sie durchwischen → sie fährt hoch, Federn fliegen, empörtes Quaken. |
 | **Nickerchen** | 15 Sekunden Ruhe → Kopf ins Gefieder, Zzz. Wacht mit „!“ wieder auf. |
 | **Idle-Animationen** | Gründeln (Popo hoch, Kopf unter Wasser), Tauchen mit Blasen und Auftauch-Splash, Gefieder putzen, Flügelschlagen, Schütteln, Baden, Pirouetten, Umschauen, Wippen, Quaken mit Notenwölkchen. |

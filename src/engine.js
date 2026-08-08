@@ -117,7 +117,8 @@
     { id: 'dive', w: 1.1, dur: [2.4, 3.0] },
     { id: 'spin', w: 1.2, dur: [2.0, 2.8] },
     { id: 'bathe', w: 1.2, dur: [2.2, 3.0] },
-    { id: 'bob', w: 2.4, dur: [1.2, 2.2] }
+    { id: 'bob', w: 2.4, dur: [1.2, 2.2] },
+    { id: 'dance', w: 0.8, dur: [2.6, 3.4] }
   ];
 
   function weightedAction() {
@@ -135,7 +136,7 @@
   // sonst putzt sie sich seelenruhig fertig und wirkt abgehängt.
   var INTERRUPTIBLE = {
     look: 1, preen: 1, flap: 1, shake: 1, quack: 1,
-    dabble: 1, spin: 1, bathe: 1, bob: 1
+    dabble: 1, spin: 1, bathe: 1, bob: 1, dance: 1
   };
 
   // ── Ente ──────────────────────────────────────────────────────
@@ -223,6 +224,12 @@
     var dx = tx - this.x, dy = ty - this.y;
     var dist = Math.sqrt(dx * dx + dy * dy) || 0.0001;
     var cfg = this.e.cfg;
+    // Zuschau-Modus: wackelnder Cursor → stehenbleiben und gucken
+    if (this.watchT > 0 && !this.baby) {
+      this.vx = approach(this.vx, 0, 6, dt);
+      this.vy = approach(this.vy, 0, 6, dt);
+      return;
+    }
     // Nach einem Cursor-Sprung (Fenster/iframe gewechselt) kurz extra flott
     var alert = this.e.alertT > 0 ? 1.3 : 1;
     var maxSpeed = (this.baby ? 520 : 430) * cfg.speed * (boost || 1) * alert;
@@ -345,8 +352,20 @@
       if (st === 'pet' && this.petHold <= 0) this.setState(dist > stopDist * 1.4 ? 'swim' : 'idle', 1);
     }
 
+    // ── Aufmerksamer Blick: Kopfwinkel zum Cursor ──────────
+    // Im lokalen Rahmen der Ente (+x = Blickrichtung): deutlich sichtbare
+    // Kopfneigung zum Cursor. Zustände dürfen das überschreiben.
+    var lookX = (px - this.x) * (this.dirF >= 0 ? 1 : -1);
+    var lookY = py - (this.y - r * 1.55);
+    this.lookAng = clamp(Math.atan2(lookY, Math.max(lookX, r * 0.8)), -0.55, 0.6);
+
     // ── Abgehängt? Spielerei abbrechen und hinterher ───────
     st = this.state;
+    // In aufmerksamen Zuständen dreht sie sich immer zum Cursor
+    if ((st === 'idle' || st === 'look' || st === 'bob' || st === 'quack') &&
+        Math.abs(dx) > r * 0.55) {
+      this.face = dx > 0 ? 1 : -1;
+    }
     if (INTERRUPTIBLE[st] && dist > stopDist * 3 && e.pointerSpeed > 60) {
       this.quacked = false; this.peckDone = false; this.dove = false;
       this.surfaced = false; this.dabbleUp = false; this.splashed = false;
@@ -379,6 +398,33 @@
         this.setState('dizzy', 2.4);
         e.sound.quack(this.model.quackPitch * 0.75);
         st = 'dizzy';
+      }
+
+      var attentive = st === 'idle' || st === 'swim' || st === 'bob' || st === 'look' || st === 'quack';
+      // Wackelnder Cursor: erst mal innehalten und zuschauen (Vorfreude) —
+      // sonst schwimmt sie mitten ins Gewackel und landet beim Streicheln.
+      if ((st === 'idle' || st === 'swim') && e.wiggleN >= 2 && !inside && dist < 340) {
+        this.watchT = 0.45;
+      }
+      this.watchT = Math.max(0, (this.watchT || 0) - dt);
+      // Tanz-Aufforderung: Cursor wackelt schnell hin und her in ihrer Nähe
+      if (attentive && e.wiggleN >= 5 && !inside && dist < 340) {
+        e.wiggleN = 0;
+        this.setState('dance', rand(2.6, 3.4));
+        e.sound.quack(this.model.quackPitch * 1.2, true);
+        st = 'dance';
+      }
+      // Kuckuck: Cursor ruht auf ihr (ohne Streichel-Gewackel) → kurz abtauchen
+      if (inside && e.pointerSpeed < 40 && attentive) {
+        this.hoverT = (this.hoverT || 0) + dt;
+      } else {
+        this.hoverT = 0;
+      }
+      if (this.hoverT > 1.6 && attentive) {
+        this.hoverT = 0;
+        this.pkbDove = false; this.pkbUp = false;
+        this.setState('peekaboo', 2.4);
+        st = 'peekaboo';
       }
     }
 
@@ -614,6 +660,61 @@
         break;
       }
 
+      case 'dance': {
+        // Tänzchen: wippen, wackeln, Nötchen — und im Takt umdrehen
+        var dbeat = this.stTime * 7.5;
+        var denv = Math.min(1, this.stTime * 3) * clamp((this.stDur - this.stTime) * 2, 0, 1);
+        t.squash = 1 + Math.sin(dbeat) * 0.07 * denv;
+        t.wobble = Math.sin(dbeat * 0.5) * 0.55 * denv;
+        t.wingLift = 0.3 + Math.max(0, Math.sin(dbeat)) * 0.4 * denv;
+        t.headRot = -0.12 + Math.sin(dbeat + 1.2) * 0.16 * denv;
+        t.beakOpen = Math.max(0, Math.sin(dbeat)) * 0.2 * denv;
+        t.eyeHappy = 1;
+        this.face = Math.sin(this.stTime * 2.6) >= 0 ? 1 : -1;
+        this.vx = approach(this.vx, 0, 3, dt);
+        this.vy = approach(this.vy, 0, 3, dt);
+        this.actionTick -= dt;
+        if (this.actionTick <= 0) {
+          this.actionTick = 0.42;
+          var hn = this.headWorld();
+          e.fx.note(hn.x + rand(-r * 0.4, r * 0.4), hn.y - r * 0.5);
+          if (Math.random() < 0.4) e.fx.ripple(this.x, this.y, 4, 30, 0.8, 'rgba(255,255,255,0.4)', 1.5);
+        }
+        if (this.stTime > this.stDur) {
+          e.sound.quack(this.model.quackPitch * 1.15, true);
+          this.setState('idle', 1);
+        }
+        break;
+      }
+
+      case 'peekaboo': {
+        // Kuckuck! Kurz abtauchen und neben dem Cursor wieder auftauchen
+        var bk = this.stTime / this.stDur;
+        t.submerge = clamp(bk * 3.6, 0, 1) * clamp((1 - bk) * 3.6, 0, 1);
+        t.eyeHappy = 1;
+        if (!this.pkbDove && bk > 0.05) {
+          this.pkbDove = true;
+          this.pkbSide = this.x < 200 ? 1 : this.x > e.w - 200 ? -1 : (Math.random() < 0.5 ? -1 : 1);
+          e.fx.splash(this.x, this.y, 0.8);
+          e.sound.splash(0.6);
+        }
+        this.actionTick -= dt;
+        if (this.actionTick <= 0 && t.submerge > 0.5) {
+          this.actionTick = 0.15;
+          e.fx.bubble(this.x + rand(-r * 0.5, r * 0.5), this.y - rand(0, 6));
+        }
+        if (t.submerge > 0.5) this.swim(dt, px + this.pkbSide * 130, py + 26, r * 0.5, 1.2);
+        if (bk > 0.8 && !this.pkbUp) {
+          this.pkbUp = true;
+          e.fx.splash(this.x, this.y, 1.1);
+          e.sound.splash(0.9);
+          this.say('!', '#59b6f7');
+          e.sound.quack(this.model.quackPitch * 1.25, true);
+        }
+        if (this.stTime > this.stDur) { this.pkbDove = false; this.pkbUp = false; this.setState('shake', 0.8); }
+        break;
+      }
+
       case 'hunt': {
         // Fisch jagen: hinterher, und wenn er nah genug ist → zuschnappen
         var f = e.fish;
@@ -705,13 +806,8 @@
       }
 
       case 'idle':
-        // Zum Cursor drehen (Totzone, damit sie direkt darunter nicht flattert) …
-        if (Math.abs(dx) > r * 0.55) this.face = dx > 0 ? 1 : -1;
-        // … und zum Cursor schauen: Cursor über ihr → Schnabel hebt sich
-        // (negatives headRot). Der Kopf rotiert im gespiegelten Körperraum —
-        // nach links blickend muss das Vorzeichen kippen, damit die Neigung
-        // auf dem Bildschirm dieselbe bleibt.
-        t.headRot = clamp((py - this.y) * 0.0016, -0.34, 0.3) * (this.dirF >= 0 ? 1 : -1);
+        // Kopf folgt dem Cursor (Drehen übernimmt der Block vor dem Automaten)
+        t.headRot = this.lookAng;
         this.swim(dt, px, py, stopDist, 0.6);
         this.nextIdle -= dt * cfg.playfulness;
         this.peckCd -= dt;
@@ -749,7 +845,8 @@
         this.swim(dt, px, py, stopDist, 1);
         var spd0 = Math.sqrt(this.vx * this.vx + this.vy * this.vy);
         t.lean = clamp(-spd0 * 0.00022 - (dist > 420 ? 0.06 : 0), -0.14, 0);
-        t.headRot = clamp(-spd0 * 0.0004, -0.22, 0);
+        // Blick zum Ziel, überlagert vom Planing-Nicken bei Tempo
+        t.headRot = clamp(this.lookAng * 0.55 - spd0 * 0.00025, -0.5, 0.45);
         t.wingLift = clamp((spd0 - 300) / 500, 0, 0.5);
         if (dist < stopDist * 1.15) this.setState('idle', 1);
         break;
@@ -1237,6 +1334,16 @@
     this.alertPing = jump > 260 && this.alertT <= 0;
     this.alertT = jump > 260 ? 1.5 : Math.max(0, this.alertT - dt);
 
+    // Wackel-Erkennung: schnelle Links-Rechts-Wechsel = Tanz-Aufforderung
+    var mvSgn = dx > 2 ? 1 : dx < -2 ? -1 : 0;
+    if (mvSgn && this._mvSgn && mvSgn !== this._mvSgn) {
+      this.wiggleN = (this.wiggleN || 0) + 1;
+      this.wiggleT = 1.1;
+    }
+    if (mvSgn) this._mvSgn = mvSgn;
+    this.wiggleT = Math.max(0, (this.wiggleT || 0) - dt);
+    if (!this.wiggleT) this.wiggleN = 0;
+
     this.updateFish(dt);
     this.duck.update(dt);
 
@@ -1348,6 +1455,7 @@
     this.duck.setState(action, dur || 1.6);
     this.duck.quacked = false; this.duck.peckDone = false; this.duck.gulped = false;
     this.duck.dove = false; this.duck.surfaced = false; this.duck.dabbleUp = false;
+    this.duck.pkbDove = false; this.duck.pkbUp = false;
     return action;
   };
 

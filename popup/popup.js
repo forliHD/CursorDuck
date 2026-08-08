@@ -43,7 +43,8 @@
     ['quack', 'Quaken'], ['flap', 'Flattern'], ['preen', 'Putzen'],
     ['dabble', 'Gründeln'], ['dive', 'Tauchen'], ['spin', 'Pirouette'],
     ['bathe', 'Baden'], ['shake', 'Schütteln'], ['sleep', 'Nickerchen'],
-    ['crumbs', 'Füttern'], ['fish', 'Fisch-Jagd'], ['dizzy', 'Schwindel']
+    ['crumbs', 'Füttern'], ['fish', 'Fisch-Jagd'], ['dizzy', 'Schwindel'],
+    ['dance', 'Tänzchen'], ['peekaboo', 'Kuckuck']
   ];
 
   function save(patch) {
