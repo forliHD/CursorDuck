@@ -15,10 +15,19 @@
 
   var TAU = Math.PI * 2;
 
+  // Blickrichtung: kontinuierlich -1..1 (x-Skalierung). Werte nahe 0 werden
+  // weggeklemmt, sonst kollabiert die Ente beim Wenden zur Linie.
+  function normDir(d) {
+    if (d == null || d !== d) return 1;
+    d = Math.max(-1, Math.min(1, d));
+    if (d >= 0) return Math.max(0.08, d);
+    return Math.min(-0.08, d);
+  }
+
   function defaultPose(p) {
     p = p || {};
     return {
-      x: p.x || 0, y: p.y || 0, r: p.r || 26, dir: p.dir === -1 ? -1 : 1,
+      x: p.x || 0, y: p.y || 0, r: p.r || 26, dir: normDir(p.dir),
       t: p.t || 0, bob: p.bob || 0, lean: p.lean || 0,
       headDip: p.headDip || 0, headSide: p.headSide || 0, headRot: p.headRot || 0,
       eyeOpen: p.eyeOpen == null ? 1 : p.eyeOpen, eyeHappy: p.eyeHappy || 0,
