@@ -402,6 +402,8 @@
         break;
 
       case 'peck':
+        // Erst zum Cursor hindrehen, sonst pickt sie ins Leere
+        if (Math.abs(dx) > r * 0.4) this.face = dx > 0 ? 1 : -1;
         // Kopf schnellt zum Cursor
         var k = this.stTime / this.stDur;
         var dip = k < 0.28 ? (k / 0.28) : k < 0.5 ? 1 : clamp(1 - (k - 0.5) / 0.5, 0, 1);
@@ -703,7 +705,9 @@
       }
 
       case 'idle':
-        // Zum Cursor schauen
+        // Zum Cursor drehen (Totzone, damit sie direkt darunter nicht flattert) …
+        if (Math.abs(dx) > r * 0.55) this.face = dx > 0 ? 1 : -1;
+        // … und zum Cursor schauen
         t.headRot = clamp((this.y - py) * 0.0016, -0.34, 0.3) * (this.dirF >= 0 ? 1 : 1);
         this.swim(dt, px, py, stopDist, 0.6);
         this.nextIdle -= dt * cfg.playfulness;
