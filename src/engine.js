@@ -707,14 +707,19 @@
       case 'idle':
         // Zum Cursor drehen (Totzone, damit sie direkt darunter nicht flattert) …
         if (Math.abs(dx) > r * 0.55) this.face = dx > 0 ? 1 : -1;
-        // … und zum Cursor schauen
-        t.headRot = clamp((this.y - py) * 0.0016, -0.34, 0.3) * (this.dirF >= 0 ? 1 : 1);
+        // … und zum Cursor schauen: Cursor über ihr → Schnabel hebt sich
+        // (negatives headRot). Der Kopf rotiert im gespiegelten Körperraum —
+        // nach links blickend muss das Vorzeichen kippen, damit die Neigung
+        // auf dem Bildschirm dieselbe bleibt.
+        t.headRot = clamp((py - this.y) * 0.0016, -0.34, 0.3) * (this.dirF >= 0 ? 1 : -1);
         this.swim(dt, px, py, stopDist, 0.6);
         this.nextIdle -= dt * cfg.playfulness;
         this.peckCd -= dt;
 
-        // Brotkrumen schlagen alles
-        if (cfg.feed && e.crumbs.length) { this.setState('feed', 99); break; }
+        // Brotkrumen schlagen alles. (Bewusst ohne cfg.feed-Check: das Setting
+        // gated nur das Werfen per Doppelklick — liegen Krumen da, etwa vom
+        // Popup-Knopf, werden sie immer gefressen, sonst verwaisen sie.)
+        if (e.crumbs.length) { this.setState('feed', 99); break; }
         // Fisch entdeckt?
         if (e.fish && e.fish.alpha > 0.5 && !e.fish.caught) {
           var fdx0 = e.fish.x - this.x, fdy0 = e.fish.y - this.y;
@@ -740,7 +745,7 @@
 
       case 'swim':
       default:
-        if (cfg.feed && e.crumbs.length && !this.baby) { this.setState('feed', 99); break; }
+        if (e.crumbs.length && !this.baby) { this.setState('feed', 99); break; }
         this.swim(dt, px, py, stopDist, 1);
         var spd0 = Math.sqrt(this.vx * this.vx + this.vy * this.vy);
         t.lean = clamp(-spd0 * 0.00022 - (dist > 420 ? 0.06 : 0), -0.14, 0);
