@@ -260,7 +260,8 @@
     // als sähe man sie von vorn/hinten — wirkt wie echtes Eindrehen.
     if (Math.abs(this.vx) > 16 && speed > 24) {
       var horiz = Math.abs(this.vx) / speed;
-      this.face = (this.vx > 0 ? 1 : -1) * (0.55 + 0.45 * Math.min(1, horiz * 1.2));
+      // Nur milde Verkürzung — die Richtung erzählt jetzt die Rumpf-Rotation
+      this.face = (this.vx > 0 ? 1 : -1) * (0.72 + 0.28 * Math.min(1, horiz * 1.2));
     } else if (speed < 30) {
       this.face = this.face >= 0 ? 1 : -1;   // im Stand zurück ins volle Profil
     }
@@ -282,12 +283,14 @@
       }
     }
 
-    // Rumpf neigt sich in die Schwimmrichtung (Bug zeigt zum Kurs)
+    // Voller Kurs: der ganze Rumpf dreht sich in die Schwimmrichtung.
+    // Senkrecht nach oben/unten = Schnabel voraus (bis ~72°), im Stand
+    // pendelt sie zurück in die Waagerechte.
     var tgtTilt = 0;
-    if (speed > 40) {
-      tgtTilt = Math.atan2(this.vy, Math.abs(this.vx)) * 0.5 * Math.min(1, (speed - 40) / 240);
+    if (speed > 26) {
+      tgtTilt = Math.atan2(this.vy, Math.abs(this.vx)) * clamp((speed - 26) / 110, 0, 1);
     }
-    this.tilt = approach(this.tilt, clamp(tgtTilt, -0.5, 0.5), 6, dt);
+    this.tilt = approach(this.tilt, clamp(tgtTilt, -1.25, 1.25), 8, dt);
 
     // Paddeln schneller bei Tempo
     this.paddle += dt * (2.2 + speed * 0.022);
@@ -392,7 +395,7 @@
         this.lastAng = null;
       }
       this.spinAcc *= Math.max(0, 1 - dt * 0.55);   // verklingt von selbst
-      if (circleable && Math.abs(this.spinAcc) > TAU * 2.1) {
+      if (circleable && Math.abs(this.spinAcc) > TAU * 1.7) {
         this.dizzyDir = this.spinAcc >= 0 ? 1 : -1;
         this.spinAcc = 0;
         this.setState('dizzy', 2.4);
@@ -407,20 +410,23 @@
         this.watchT = 0.45;
       }
       this.watchT = Math.max(0, (this.watchT || 0) - dt);
-      // Tanz-Aufforderung: Cursor wackelt schnell hin und her in ihrer Nähe
-      if (attentive && e.wiggleN >= 5 && !inside && dist < 340) {
+      // Tanz-Aufforderung: Cursor wackelt schnell hin und her in ihrer Nähe.
+      // spinAcc-Guard: wer kreist, will den Schwindel, kein Tänzchen.
+      if (attentive && e.wiggleN >= 4 && !inside && dist < 420 &&
+          Math.abs(this.spinAcc) < TAU * 0.5) {
         e.wiggleN = 0;
         this.setState('dance', rand(2.6, 3.4));
         e.sound.quack(this.model.quackPitch * 1.2, true);
         st = 'dance';
       }
-      // Kuckuck: Cursor ruht auf ihr (ohne Streichel-Gewackel) → kurz abtauchen
-      if (inside && e.pointerSpeed < 40 && attentive) {
+      // Kuckuck: Cursor ruht auf ihr (ohne Streichel-Gewackel) → kurz abtauchen.
+      // Ein zwischenzeitliches Picken setzt den Zähler nicht zurück.
+      if (inside && e.pointerSpeed < 40 && (attentive || st === 'peck')) {
         this.hoverT = (this.hoverT || 0) + dt;
       } else {
         this.hoverT = 0;
       }
-      if (this.hoverT > 1.6 && attentive) {
+      if (this.hoverT > 1.2 && attentive) {
         this.hoverT = 0;
         this.pkbDove = false; this.pkbUp = false;
         this.setState('peekaboo', 2.4);
@@ -1334,13 +1340,19 @@
     this.alertPing = jump > 260 && this.alertT <= 0;
     this.alertT = jump > 260 ? 1.5 : Math.max(0, this.alertT - dt);
 
-    // Wackel-Erkennung: schnelle Links-Rechts-Wechsel = Tanz-Aufforderung
-    var mvSgn = dx > 2 ? 1 : dx < -2 ? -1 : 0;
-    if (mvSgn && this._mvSgn && mvSgn !== this._mvSgn) {
+    // Wackel-Erkennung: schnelle Richtungswechsel (egal welche Achse)
+    // = Tanz-Aufforderung. Kreisende Bewegungen zählen nicht — die gehören
+    // dem Schwindel (dizzy) und flippen die Achsen nur langsam.
+    var mvSgnX = dx > 2 ? 1 : dx < -2 ? -1 : 0;
+    var mvSgnY = dy > 2 ? 1 : dy < -2 ? -1 : 0;
+    var flipped = (mvSgnX && this._mvSgnX && mvSgnX !== this._mvSgnX) ||
+                  (mvSgnY && this._mvSgnY && mvSgnY !== this._mvSgnY);
+    if (flipped) {
       this.wiggleN = (this.wiggleN || 0) + 1;
-      this.wiggleT = 1.1;
+      this.wiggleT = 1.4;
     }
-    if (mvSgn) this._mvSgn = mvSgn;
+    if (mvSgnX) this._mvSgnX = mvSgnX;
+    if (mvSgnY) this._mvSgnY = mvSgnY;
     this.wiggleT = Math.max(0, (this.wiggleT || 0) - dt);
     if (!this.wiggleT) this.wiggleN = 0;
 

@@ -848,11 +848,15 @@
     ctx.translate(p.x, p.y + p.submerge * r * 1.35);
     ctx.globalAlpha *= p.alpha * (1 - (m.ghost || 0) * 0.45);
 
+    // Bei steiler Rumpf-Rotation (schwimmt senkrecht) treten Wasserlinie und
+    // Spiegelung zurück — sie schneidet dann durchs Wasser statt zu gleiten.
+    var steep = Math.min(1, Math.abs(p.lean) * 0.75);
+
     // 1) Spiegelung — nur als weiche Silhouette, sonst wirkt sie wie ein zweites Tier
-    if (p.reflection && p.submerge < 0.45) {
+    if (p.reflection && p.submerge < 0.45 && steep < 0.95) {
       ctx.save();
       clipBelow(ctx, r);
-      ctx.globalAlpha *= 0.15 * (1 - p.submerge * 2.2);
+      ctx.globalAlpha *= 0.15 * (1 - p.submerge * 2.2) * (1 - steep);
       ctx.translate(Math.sin(p.t * 1.7) * r * 0.05, 0);
       ctx.scale(1, -0.42);
       ctx.translate(0, p.bob * 0.6);
@@ -871,9 +875,9 @@
     ctx.restore();
 
     // 3) Wasserlinie / Kontaktschatten
-    if (p.water && p.submerge < 0.9) {
+    if (p.water && p.submerge < 0.9 && steep < 0.95) {
       ctx.save();
-      ctx.globalAlpha *= (1 - p.submerge);
+      ctx.globalAlpha *= (1 - p.submerge) * (1 - steep);
       bodyTransform(ctx, p, function () { drawWaterline(ctx, m, g, p); });
       ctx.restore();
     }
