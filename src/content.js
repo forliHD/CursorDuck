@@ -58,7 +58,12 @@
       engine = new window.CursorDuckEngine(opts);
       engine.stats = stats || { pets: 0, pecks: 0 };
       engine.onStats = throttle(function (s) {
-        try { chrome.storage.local.set({ stats: { pets: s.pets, pecks: s.pecks } }); } catch (e) {}
+        try {
+          chrome.storage.local.set({ stats: {
+            pets: s.pets || 0, pecks: s.pecks || 0,
+            fish: s.fish || 0, crumbs: s.crumbs || 0
+          } });
+        } catch (e) {}
       }, 2000);
       engine.mount(document.documentElement);
       window.__cursorDuck = engine;   // Debug-Handle

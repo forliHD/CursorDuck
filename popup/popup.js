@@ -5,7 +5,7 @@
   var DEFAULTS = {
     enabled: true, model: 'mallard', size: 1.0, speed: 1.0, ducklings: 0,
     playfulness: 1.0, sound: false, volume: 0.35, effects: true,
-    reflection: true, opacity: 1.0, peck: true, sleepAfter: 15,
+    reflection: true, opacity: 1.0, peck: true, feed: true, sleepAfter: 15,
     disabledHosts: []
   };
 
@@ -38,11 +38,12 @@
     ['playfulness', function (v) { return v.toFixed(1) + '×'; }],
     ['opacity', function (v) { return Math.round(v * 100) + ' %'; }]
   ];
-  var CHECKS = ['peck', 'effects', 'reflection', 'sound'];
+  var CHECKS = ['peck', 'feed', 'effects', 'reflection', 'sound'];
   var TRICKS = [
     ['quack', 'Quaken'], ['flap', 'Flattern'], ['preen', 'Putzen'],
     ['dabble', 'Gründeln'], ['dive', 'Tauchen'], ['spin', 'Pirouette'],
-    ['bathe', 'Baden'], ['shake', 'Schütteln'], ['sleep', 'Nickerchen']
+    ['bathe', 'Baden'], ['shake', 'Schütteln'], ['sleep', 'Nickerchen'],
+    ['crumbs', 'Füttern'], ['fish', 'Fisch-Jagd'], ['dizzy', 'Schwindel']
   ];
 
   function save(patch) {
@@ -189,9 +190,10 @@
     bind();
   });
 
-  chrome.storage.local.get({ stats: { pets: 0, pecks: 0 } }, function (o) {
+  chrome.storage.local.get({ stats: { pets: 0, pecks: 0, fish: 0 } }, function (o) {
     document.getElementById('pets').textContent = o.stats.pets || 0;
     document.getElementById('pecks').textContent = o.stats.pecks || 0;
+    document.getElementById('fishN').textContent = o.stats.fish || 0;
   });
 
   chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {

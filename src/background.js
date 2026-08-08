@@ -16,6 +16,7 @@ const DEFAULTS = {
   reflection: true,
   opacity: 1.0,
   peck: true,
+  feed: true,
   sleepAfter: 15,
   disabledHosts: []
 };
