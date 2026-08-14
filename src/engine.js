@@ -1,4 +1,6 @@
 /*
+ * (c) 2026 Lucas Reiser (forliHD) — Alle Rechte vorbehalten. Siehe LICENSE.
+ *
  * CursorDuck — Engine 🦆
  * Schwimmphysik, Verhaltens-Automat, Streicheln, Picken, Füttern,
  * Fisch-Jagd, Schwindel, Küken, Sound.

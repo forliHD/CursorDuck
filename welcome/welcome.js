@@ -1,9 +1,34 @@
 /* Willkommensseite: echte Ente zum Ausprobieren + Modellgalerie */
+/* (c) 2026 Lucas Reiser (forliHD) — Alle Rechte vorbehalten. Siehe LICENSE. */
 (function () {
   'use strict';
 
   var isExt = typeof chrome !== 'undefined' && chrome.storage && chrome.runtime && chrome.runtime.id;
   var cfg = { model: 'mallard', size: 1.1, ducklings: 2, sound: false };
+
+  // ── i18n: Texte aus _locales/, das deutsche HTML bleibt der Fallback ──
+  function MSG(key) {
+    try {
+      if (isExt && chrome.i18n && chrome.i18n.getMessage) return chrome.i18n.getMessage(key) || '';
+    } catch (e) { /* Vorschau ohne Extension */ }
+    return '';
+  }
+  function modelName(m) {
+    return MSG('model_' + m.id.replace(/-/g, '_')) || m.name;
+  }
+  (function applyI18n() {
+    var t = MSG('wTitle');
+    if (t) document.title = t;
+    document.querySelectorAll('[data-i18n]').forEach(function (el) {
+      var s = MSG(el.getAttribute('data-i18n'));
+      if (s) el.textContent = s;
+    });
+    // Eigene, vertrauenswürdige Strings aus messages.json (enthalten <b>/<kbd>)
+    document.querySelectorAll('[data-i18n-html]').forEach(function (el) {
+      var s = MSG(el.getAttribute('data-i18n-html'));
+      if (s) el.innerHTML = s;
+    });
+  })();
 
   function start(settings) {
     var engine = new window.CursorDuckEngine(settings);
@@ -37,13 +62,13 @@
   DuckModels.list.forEach(function (m, i) {
     var d = document.createElement('div');
     d.className = 'g';
-    d.title = m.name;
+    d.title = modelName(m);
     var c = document.createElement('canvas');
     var W = 90, H = 58, dpr = Math.min(2, devicePixelRatio || 1);
     c.width = W * dpr; c.height = H * dpr;
     c.style.width = W + 'px'; c.style.height = H + 'px';
     var s = document.createElement('span');
-    s.textContent = m.name;
+    s.textContent = modelName(m);
     d.appendChild(c); d.appendChild(s);
     d.onclick = function () {
       if (window.__duck) window.__duck.apply({ model: m.id });

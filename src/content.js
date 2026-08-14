@@ -1,4 +1,6 @@
 /*
+ * (c) 2026 Lucas Reiser (forliHD) — Alle Rechte vorbehalten. Siehe LICENSE.
+ *
  * CursorDuck — Content-Script-Bootstrap
  * Top-Frame: Ente rendern. Sub-Frames: nur Cursor-Position nach oben melden.
  */

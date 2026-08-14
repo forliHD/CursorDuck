@@ -13,7 +13,7 @@
         <h1>Cursor&nbsp;Duck</h1>
         <p id="modelName">Stockente</p>
       </div>
-      <label class="switch" title="Ente an/aus">
+      <label class="switch" title="Ente an/aus" data-i18n-title="enabledTitle">
         <input type="checkbox" id="enabled" checked>
         <span class="track"><span class="knob"></span></span>
       </label>
@@ -23,56 +23,56 @@
   <main>
     <section>
       <div class="sec-head">
-        <h2>Entenmodell</h2>
-        <button id="randomBtn" class="ghost">🎲 Zufall</button>
+        <h2 data-i18n="secModel">Entenmodell</h2>
+        <button id="randomBtn" class="ghost" data-i18n="btnRandom">🎲 Zufall</button>
       </div>
       <div id="models" class="models"></div>
     </section>
 
     <section>
-      <h2>Einstellungen</h2>
+      <h2 data-i18n="secSettings">Einstellungen</h2>
       <label class="slider">
-        <span>Größe <b id="sizeV">1.0×</b></span>
+        <span><span data-i18n="lblSize">Größe</span> <b id="sizeV">1.0×</b></span>
         <input type="range" id="size" min="0.5" max="2.2" step="0.05">
       </label>
       <label class="slider">
-        <span>Tempo <b id="speedV">1.0×</b></span>
+        <span><span data-i18n="lblSpeed">Tempo</span> <b id="speedV">1.0×</b></span>
         <input type="range" id="speed" min="0.4" max="2.2" step="0.05">
       </label>
       <label class="slider">
-        <span>Küken <b id="ducklingsV">0</b></span>
+        <span><span data-i18n="lblDucklings">Küken</span> <b id="ducklingsV">0</b></span>
         <input type="range" id="ducklings" min="0" max="6" step="1">
       </label>
       <label class="slider">
-        <span>Verspieltheit <b id="playfulnessV">1.0×</b></span>
+        <span><span data-i18n="lblPlayfulness">Verspieltheit</span> <b id="playfulnessV">1.0×</b></span>
         <input type="range" id="playfulness" min="0.2" max="3" step="0.1">
       </label>
       <label class="slider">
-        <span>Sichtbarkeit <b id="opacityV">100 %</b></span>
+        <span><span data-i18n="lblOpacity">Sichtbarkeit</span> <b id="opacityV">100 %</b></span>
         <input type="range" id="opacity" min="0.2" max="1" step="0.05">
       </label>
     </section>
 
     <section class="checks">
-      <label><input type="checkbox" id="peck"> <span>Pickt den Cursor an</span></label>
-      <label><input type="checkbox" id="feed"> <span>Brotkrumen per Doppelklick 🍞</span></label>
-      <label><input type="checkbox" id="effects"> <span>Wasser-Effekte &amp; Splashes</span></label>
-      <label><input type="checkbox" id="reflection"> <span>Spiegelung im Wasser</span></label>
-      <label><input type="checkbox" id="sound"> <span>Quaken hörbar 🔊</span></label>
+      <label><input type="checkbox" id="peck"> <span data-i18n="chkPeck">Pickt den Cursor an</span></label>
+      <label><input type="checkbox" id="feed"> <span data-i18n="chkFeed">Brotkrumen per Doppelklick 🍞</span></label>
+      <label><input type="checkbox" id="effects"> <span data-i18n="chkEffects">Wasser-Effekte &amp; Splashes</span></label>
+      <label><input type="checkbox" id="reflection"> <span data-i18n="chkReflection">Spiegelung im Wasser</span></label>
+      <label><input type="checkbox" id="sound"> <span data-i18n="chkSound">Quaken hörbar 🔊</span></label>
     </section>
 
     <section>
-      <h2>Kunststückchen</h2>
+      <h2 data-i18n="secTricks">Kunststückchen</h2>
       <div class="tricks" id="tricks"></div>
     </section>
 
     <section class="site">
-      <label><input type="checkbox" id="siteOff"> <span>Auf <b id="host">dieser Seite</b> pausieren</span></label>
+      <label><input type="checkbox" id="siteOff"> <span id="siteLabel">Auf <b id="host">dieser Seite</b> pausieren</span></label>
     </section>
 
     <footer>
-      <div class="stats"><b id="pets">0</b> Streicheleinheiten · <b id="pecks">0</b> Pickser · <b id="fishN">0</b> Fische</div>
-      <div class="hint">Alt+Shift+D: an/aus · Alt+Shift+N: nächstes Modell</div>
+      <div class="stats"><b id="pets">0</b> <span data-i18n="statsPets">Streicheleinheiten</span> · <b id="pecks">0</b> <span data-i18n="statsPecks">Pickser</span> · <b id="fishN">0</b> <span data-i18n="statsFish">Fische</span></div>
+      <div class="hint" data-i18n="hintShortcuts">Alt+Shift+D: an/aus · Alt+Shift+N: nächstes Modell</div>
     </footer>
   </main>
 

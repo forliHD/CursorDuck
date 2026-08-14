@@ -128,4 +128,21 @@ duck({
 ```
 
 Danach die ID in `MODEL_IDS` in `src/background.js` ergänzen, damit sie auch per
-Tastenkürzel erreichbar ist.
+Tastenkürzel erreichbar ist. Für neue Modelle bitte auch `model_<id>` in
+`_locales/de/messages.json` und `_locales/en/messages.json` eintragen.
+
+## Sprachen
+
+Die Oberfläche (Popup, Willkommensseite, Modellnamen) ist über `_locales/`
+zweisprachig: Deutsch und Englisch. Chrome wählt automatisch passend zur
+Browsersprache; alles außer Deutsch bekommt Englisch (`default_locale: en`).
+Das deutsche HTML dient als eingebauter Fallback, damit die Demo-Seiten auch
+ohne Extension-Kontext funktionieren.
+
+## Lizenz
+
+**© 2026 Lucas Reiser (forliHD) — alle Rechte vorbehalten.** Der Code ist
+öffentlich einsehbar (Source-Available), darf aber ohne schriftliche
+Genehmigung weder kopiert, verändert, weiterverbreitet noch — etwa in
+Extension-Stores — neu veröffentlicht oder als eigenes Werk ausgegeben
+werden. Details in [LICENSE](LICENSE).
