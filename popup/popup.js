@@ -1,4 +1,5 @@
 /* CursorDuck — Popup */
+/* (c) 2026 Lucas Reiser (forliHD) — Alle Rechte vorbehalten. Siehe LICENSE. */
 (function () {
   'use strict';
 
@@ -30,6 +31,45 @@
       runtime: {}
     };
   }
+
+  // ── i18n: Texte kommen aus _locales/, das deutsche HTML ist der Fallback ──
+  function MSG(key) {
+    try {
+      if (chrome.i18n && chrome.i18n.getMessage) return chrome.i18n.getMessage(key) || '';
+    } catch (e) { /* Vorschau ohne Extension-Kontext */ }
+    return '';
+  }
+
+  function modelName(m) {
+    return MSG('model_' + m.id.replace(/-/g, '_')) || m.name;
+  }
+
+  function applyI18n() {
+    document.querySelectorAll('[data-i18n]').forEach(function (el) {
+      var t = MSG(el.getAttribute('data-i18n'));
+      if (t) el.textContent = t;
+    });
+    document.querySelectorAll('[data-i18n-title]').forEach(function (el) {
+      var t = MSG(el.getAttribute('data-i18n-title'));
+      if (t) el.title = t;
+    });
+    // "Auf <host> pausieren" — der Hostname steckt mitten im Satz
+    var sp = MSG('sitePause');
+    var lab = document.getElementById('siteLabel');
+    if (sp && sp.indexOf('{host}') !== -1 && lab) {
+      var parts = sp.split('{host}');
+      var hostB = document.getElementById('host');
+      var hostText = (hostB && hostB.textContent) || MSG('hostFallback') || 'dieser Seite';
+      lab.textContent = '';
+      lab.appendChild(document.createTextNode(parts[0]));
+      var b = document.createElement('b');
+      b.id = 'host';
+      b.textContent = hostText;
+      lab.appendChild(b);
+      lab.appendChild(document.createTextNode(parts[1] || ''));
+    }
+  }
+  applyI18n();
 
   var SLIDERS = [
     ['size', function (v) { return v.toFixed(1) + '×'; }],
@@ -112,7 +152,7 @@
     DuckModels.list.forEach(function (m) {
       var d = document.createElement('div');
       d.className = 'm tier-' + m.tier + (m.id === cfg.model ? ' on' : '');
-      d.title = m.name + (m.tier !== 'common' ? ' · ' + m.tier : '');
+      d.title = modelName(m) + (m.tier !== 'common' ? ' · ' + m.tier : '');
       d.dataset.id = m.id;
       var c = document.createElement('canvas');
       var W = 88, H = 52, dpr = Math.min(2, devicePixelRatio || 1);
@@ -121,13 +161,13 @@
       x.setTransform(dpr, 0, 0, dpr, 0, 0);
       DuckRender.draw(x, m, { x: W / 2, y: H - 11, r: 19, t: 1.4, dir: 1, reflection: false });
       var s = document.createElement('span');
-      s.textContent = m.name;
+      s.textContent = modelName(m);
       d.appendChild(c); d.appendChild(s);
       d.onclick = function () {
         save({ model: m.id });
         wrap.querySelectorAll('.m').forEach(function (el) { el.classList.remove('on'); });
         d.classList.add('on');
-        document.getElementById('modelName').textContent = m.name;
+        document.getElementById('modelName').textContent = modelName(m);
       };
       wrap.appendChild(d);
     });
@@ -160,14 +200,14 @@
     document.getElementById('randomBtn').onclick = function () {
       var id = DuckModels.randomId();
       save({ model: id });
-      document.getElementById('modelName').textContent = DuckModels.get(id).name;
+      document.getElementById('modelName').textContent = modelName(DuckModels.get(id));
       buildModels();
     };
 
     var tr = document.getElementById('tricks');
     TRICKS.forEach(function (a) {
       var b = document.createElement('button');
-      b.textContent = a[1];
+      b.textContent = MSG('trick_' + a[0]) || a[1];
       b.onclick = function () { send({ type: 'duck:trigger', action: a[0], dur: a[0] === 'sleep' ? 8 : 2.4 }); };
       tr.appendChild(b);
     });
@@ -186,7 +226,7 @@
   // ── Start ───────────────────────────────────────────────────
   chrome.storage.sync.get(DEFAULTS, function (loaded) {
     cfg = loaded;
-    document.getElementById('modelName').textContent = DuckModels.get(cfg.model).name;
+    document.getElementById('modelName').textContent = modelName(DuckModels.get(cfg.model));
     buildModels();
     bind();
   });

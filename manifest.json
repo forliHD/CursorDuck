@@ -1,8 +1,9 @@
 {
   "manifest_version": 3,
-  "name": "Cursor Duck",
-  "version": "1.0.1",
-  "description": "Eine süße Ente schwimmt deinem Mauszeiger hinterher, lässt sich streicheln und füttern, jagt Fische. Mit Küken und 31 Entenmodellen.",
+  "name": "__MSG_appName__",
+  "version": "1.1.0",
+  "description": "__MSG_appDesc__",
+  "default_locale": "en",
   "icons": {
     "16": "icons/icon16.png",
     "32": "icons/icon32.png",
@@ -41,11 +42,11 @@
   "commands": {
     "toggle-duck": {
       "suggested_key": { "default": "Alt+Shift+D" },
-      "description": "Ente an/aus"
+      "description": "__MSG_cmdToggle__"
     },
     "next-duck": {
       "suggested_key": { "default": "Alt+Shift+N" },
-      "description": "Nächstes Entenmodell"
+      "description": "__MSG_cmdNext__"
     }
   }
 }

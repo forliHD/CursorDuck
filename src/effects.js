@@ -1,4 +1,6 @@
 /*
+ * (c) 2026 Lucas Reiser (forliHD) — Alle Rechte vorbehalten. Siehe LICENSE.
+ *
  * CursorDuck — Partikel & Wassereffekte 💦
  * Ringe, Tropfen, Herzchen, Federn, Blubberblasen, Noten, Zzz, Konfetti, Funkeln.
  */

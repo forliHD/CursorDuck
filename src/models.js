@@ -1,4 +1,6 @@
 /*
+ * (c) 2026 Lucas Reiser (forliHD) — Alle Rechte vorbehalten. Siehe LICENSE.
+ *
  * CursorDuck — Entenmodelle 🦆
  *
  * Jedes Modell ist reine Daten: Farben, Proportionen, Accessoires, Effekte.

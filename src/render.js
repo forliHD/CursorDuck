@@ -1,4 +1,6 @@
 /*
+ * (c) 2026 Lucas Reiser (forliHD) — Alle Rechte vorbehalten. Siehe LICENSE.
+ *
  * CursorDuck — Renderer 🦆
  *
  * Zeichnet eine Ente prozedural auf ein 2D-Canvas.

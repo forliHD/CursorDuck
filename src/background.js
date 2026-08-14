@@ -1,4 +1,6 @@
 /*
+ * (c) 2026 Lucas Reiser (forliHD) — Alle Rechte vorbehalten. Siehe LICENSE.
+ *
  * CursorDuck — Service Worker
  * Kümmert sich um Defaults und die Tastenkürzel.
  * Alles läuft über storage.sync — die Content-Scripts hören auf onChanged.
