@@ -23,11 +23,6 @@
       var s = MSG(el.getAttribute('data-i18n'));
       if (s) el.textContent = s;
     });
-    // Eigene, vertrauenswürdige Strings aus messages.json (enthalten <b>/<kbd>)
-    document.querySelectorAll('[data-i18n-html]').forEach(function (el) {
-      var s = MSG(el.getAttribute('data-i18n-html'));
-      if (s) el.innerHTML = s;
-    });
   })();
 
   function start(settings) {
