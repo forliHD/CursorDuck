@@ -131,6 +131,18 @@ Danach die ID in `MODEL_IDS` in `src/background.js` ergänzen, damit sie auch pe
 Tastenkürzel erreichbar ist. Für neue Modelle bitte auch `model_<id>` in
 `_locales/de/messages.json` und `_locales/en/messages.json` eintragen.
 
+## Store-Pakete bauen
+
+```bash
+python3 tools/build.py
+```
+
+Erzeugt aus einer Codebasis beide Pakete in `dist/`: Chrome (Manifest V3,
+identisch mit `manifest.json`) und Firefox (Manifest V2, automatisch
+abgeleitet — Firefox behandelt MV3-Hostberechtigungen als opt-in, was die
+Ente unsichtbar machen würde). Für ein Release nur die Version in
+`manifest.json` erhöhen und neu bauen.
+
 ## Sprachen
 
 Die Oberfläche (Popup, Willkommensseite, Modellnamen) ist über `_locales/`
