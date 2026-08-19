@@ -1,6 +1,6 @@
 {
   "appName": { "message": "Cursor Duck" },
-  "appDesc": { "message": "Eine süße Ente schwimmt deinem Mauszeiger hinterher, lässt sich streicheln und füttern, jagt Fische. Mit Küken und 31 Entenmodellen." },
+  "appDesc": { "message": "Eine süße Ente schwimmt deinem Mauszeiger hinterher, lässt sich streicheln und füttern, jagt Fische. Mit Küken und 33 Entenmodellen." },
   "cmdToggle": { "message": "Ente an/aus" },
   "cmdNext": { "message": "Nächstes Entenmodell" },
 
@@ -40,6 +40,17 @@
   "trick_dizzy": { "message": "Schwindel" },
   "trick_dance": { "message": "Tänzchen" },
   "trick_peekaboo": { "message": "Kuckuck" },
+  "trick_visitor": { "message": "Besuch" },
+
+  "secAchievements": { "message": "Erfolge" },
+  "achPets1": { "message": "Streichel-Fan" },
+  "achPets2": { "message": "Schmuse-Profi" },
+  "achPecks1": { "message": "Pick-Pick" },
+  "achFish1": { "message": "Erster Fang" },
+  "achFish2": { "message": "Meisterangler" },
+  "achCrumbs1": { "message": "Brotpatron" },
+  "achDance1": { "message": "Tanzpartner" },
+  "achVisit1": { "message": "Neue Freundin" },
 
   "model_mallard": { "message": "Stockente (Erpel)" },
   "model_mallard_hen": { "message": "Stockente (Weibchen)" },
@@ -72,6 +83,8 @@
   "model_rainbow": { "message": "Regenbogen-Ente" },
   "model_galaxy": { "message": "Galaxie-Ente" },
   "model_golden": { "message": "Goldene Ente" },
+  "model_pumpkin": { "message": "Kürbis-Ente" },
+  "model_xmas": { "message": "Weihnachts-Ente" },
 
   "wTitle": { "message": "Cursor Duck ist da 🦆" },
   "wH1": { "message": "Deine Ente ist eingezogen 🦆" },
@@ -105,5 +118,23 @@
   "wCtrl3t": { "message": "nächstes Entenmodell" },
   "wCtrl4": { "message": "Auf einzelnen Seiten stört sie? Im Popup „Auf dieser Seite pausieren“." },
   "wModelsTitle": { "message": "Alle Modelle" },
+  "uTitle": { "message": "Cursor Duck — Update 🎉" },
+  "uH1": { "message": "Deine Ente hat Neues gelernt 🎉" },
+  "uLead": { "message": "Das steckt in diesem Update — probier alles direkt hier auf der Seite aus." },
+  "uF1b": { "message": "Besuch:" },
+  "uF1t": { "message": "Alle paar Minuten schaut eine wilde Ente vorbei — Quak-Duett mit Herzchen inklusive." },
+  "uF2b": { "message": "Küken picken mit:" },
+  "uF2t": { "message": "Brotkrumen sind jetzt Familiensache — die Kleinen fressen mit." },
+  "uF3b": { "message": "Scroll-Strömung:" },
+  "uF3t": { "message": "Beim Scrollen zieht die Strömung die Entenfamilie kurz mit." },
+  "uF4b": { "message": "Saison-Enten:" },
+  "uF4t": { "message": "Kürbis-Ente im Oktober, Weihnachts-Ente im Dezember — nur in ihrem Monat wählbar." },
+  "uF5b": { "message": "Erfolge:" },
+  "uF5t": { "message": "Kleine Abzeichen im Popup — vom Streichel-Fan bis zum Meisterangler." },
+  "uF6b": { "message": "Nachtmodus:" },
+  "uF6t": { "message": "Nach 22 Uhr wird sie schneller müde und träumt in Sternchen." },
+  "uF7b": { "message": "Fisch-Jagd repariert:" },
+  "uF7t": { "message": "Klappt jetzt bei jeder Entengröße — auch die Mini-Ente fängt wieder." },
+  "uTip": { "message": "Alles Weitere wie gehabt: Popup über das Enten-Symbol, Alt+Shift+D schaltet sie an und aus." },
   "wTip": { "message": "Sie liegt über der Seite, nimmt aber keine Klicks entgegen — Links, Text und Buttons funktionieren ganz normal." }
 }

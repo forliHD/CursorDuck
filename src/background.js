@@ -36,6 +36,13 @@ chrome.runtime.onInstalled.addListener(async (details) => {
   await chrome.storage.sync.set(cur); // fehlende Keys mit Defaults auffüllen
   if (details.reason === 'install') {
     chrome.tabs.create({ url: chrome.runtime.getURL('welcome/welcome.html') });
+  } else if (details.reason === 'update') {
+    // Update-Seite nur bei Feature-Updates (x.Y-Sprung), nicht bei Patches
+    const prev = String(details.previousVersion || '').split('.');
+    const cur2 = chrome.runtime.getManifest().version.split('.');
+    if (prev[0] !== cur2[0] || prev[1] !== cur2[1]) {
+      chrome.tabs.create({ url: chrome.runtime.getURL('welcome/update.html') });
+    }
   }
 });
 

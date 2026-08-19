@@ -297,10 +297,12 @@
     // Paddeln schneller bei Tempo
     this.paddle += dt * (2.2 + speed * 0.022);
 
-    // Am Rand bleiben
-    var m = this.radius() * 1.2;
-    this.x = clamp(this.x, -m, this.e.w + m);
-    this.y = clamp(this.y, m * 0.6, this.e.h + m);
+    // Am Rand bleiben — wilde Enten dürfen raus, sie ziehen ja weiter
+    if (!this.wild) {
+      var m = this.radius() * 1.2;
+      this.x = clamp(this.x, -m, this.e.w + m);
+      this.y = clamp(this.y, m * 0.6, this.e.h + m);
+    }
     return speed;
   };
 
@@ -487,6 +489,10 @@
           this.actionTick = 1.6;
           var hz = this.headWorld();
           e.fx.zzz(hz.x + r * 0.3, hz.y - r * 0.5);
+          // nachts träumt sie in Sternchen
+          if (e.isNight()) {
+            e.fx.sparkle(hz.x - r * rand(0.1, 0.6), hz.y - r * rand(0.6, 1.2), '#b9c8ff', rand(3, 5));
+          }
         }
         this.vx = approach(this.vx, 0, 1.5, dt);
         this.vy = approach(this.vy, 0, 1.5, dt);
@@ -690,6 +696,8 @@
         }
         if (this.stTime > this.stDur) {
           e.sound.quack(this.model.quackPitch * 1.15, true);
+          e.stats.dances = (e.stats.dances || 0) + 1;
+          e.saveStats();
           this.setState('idle', 1);
         }
         break;
@@ -720,6 +728,31 @@
           e.sound.quack(this.model.quackPitch * 1.25, true);
         }
         if (this.stTime > this.stDur) { this.pkbDove = false; this.pkbUp = false; this.setState('shake', 0.8); }
+        break;
+      }
+
+      case 'greet': {
+        // Besuch! Zur wilden Ente drehen und im Wechsel zurückquaken
+        var vg = e.visitor;
+        if (!vg) { this.setState('idle', 1); break; }
+        if (Math.abs(vg.x - this.x) > r * 0.4) this.face = vg.x > this.x ? 1 : -1;
+        t.headRot = -0.1;
+        t.eyeHappy = this.stTime > 1 ? 1 : 0;
+        this.vx = approach(this.vx, 0, 3, dt);
+        this.vy = approach(this.vy, 0, 3, dt);
+        this.actionTick -= dt;
+        if (this.actionTick <= 0) {
+          this.actionTick = 1.8;
+          e.sound.quack(this.model.quackPitch, true);
+          var hgr = this.headWorld();
+          e.fx.note(hgr.x + this.dirF * 6, hgr.y - r * 0.3);
+          this.greetQuackT = 0.5;
+        }
+        this.greetQuackT = Math.max(0, (this.greetQuackT || 0) - dt);
+        if (this.greetQuackT > 0) t.beakOpen = Math.sin(this.greetQuackT * Math.PI * 2) * 0.55 + 0.2;
+        if (this.stTime > this.stDur || vg.wildPhase === 'leave' && this.stTime > 1) {
+          this.setState('idle', 1);
+        }
         break;
       }
 
@@ -852,7 +885,7 @@
           }
         }
         if (dist > stopDist * 1.6) { this.setState('swim', 1); break; }
-        if (e.pointerIdle > cfg.sleepAfter) { this.setState('sleep', 99); break; }
+        if (e.pointerIdle > cfg.sleepAfter * (e.isNight() ? 0.5 : 1)) { this.setState('sleep', 99); break; }
         if (cfg.peck && this.peckCd <= 0 && dist < r * 3.4 && e.pointerIdle > 0.6) {
           this.peckDone = false;
           this.setState('peck', 0.62);
@@ -982,6 +1015,8 @@
     this.crumbs = [];         // Brotkrumen auf dem Wasser
     this.fish = null;         // höchstens ein Fisch zur Zeit
     this.fishCd = rand(20, 45);
+    this.visitor = null;      // wilde Ente auf der Durchreise
+    this.visitorCd = rand(120, 300);
     this._bound = {};
     this.setModel(this.cfg.model);
   }
@@ -1025,6 +1060,12 @@
 
   Engine.prototype.saveStats = function () {
     if (this.onStats) this.onStats(this.stats);
+  };
+
+  // Nachts (22–6 Uhr) wird sie schneller müde und träumt mit Sternchen
+  Engine.prototype.isNight = function () {
+    var h = new Date().getHours();
+    return h >= 22 || h < 6;
   };
 
   // ── Fisch ─────────────────────────────────────────────────────
@@ -1093,13 +1134,99 @@
     }
   };
 
+  // ── Wilde Ente (Besuch) ───────────────────────────────────────
+  Engine.prototype.spawnVisitor = function () {
+    var pool = ['mallard', 'mallard-hen', 'teal', 'mandarin', 'wood', 'tufted', 'pekin']
+      .filter(function (id) { return id !== this.modelId; }, this);
+    var v = new Duck(this, DuckModels.get(pick(pool)), false);
+    v.wild = true;
+    v.wildPhase = 'enter';
+    // von der Seite mit mehr Platz hereinschwimmen
+    v.wildSide = this.duck.x < this.w / 2 ? 1 : -1;
+    v.x = v.wildSide > 0 ? this.w + 70 : -70;
+    v.y = clamp(this.duck.y + rand(-110, 110), 60, this.h - 40);
+    v.wildY0 = v.y;
+    this.visitor = v;
+    return v;
+  };
+
+  Duck.prototype.updateWild = function (dt) {
+    var e = this.e, t = this.tgt, a = this.a, d = e.duck;
+    this.stTime += dt;
+    t.wingFlap = 0; t.squash = 1; t.eyeOpen = 1; t.beakOpen = 0;
+    t.headRot = 0; t.wingLift = 0; t.lean = 0; t.headDip = 0;
+
+    if (this.wildPhase === 'enter') {
+      // Treffpunkt: seitlich neben der Haupt-Ente warten
+      var mx = d.x + this.wildSide * Math.max(130, d.radius() * 2.8);
+      this.swim(dt, mx, d.y, 26, 0.8);
+      if (Math.hypot(mx - this.x, d.y - this.y) < 70 || this.stTime > 12) {
+        this.wildPhase = 'greet';
+        this.stTime = 0;
+        this.greetTick = 0.2;
+        this.wildQuack = false;
+        // Für Besuch unterbricht sie auch Putzen & Co. — nur Schlafen,
+        // Streicheln, Jagen und Fressen gehen vor.
+        var st0 = d.state;
+        if (st0 === 'idle' || st0 === 'swim' || INTERRUPTIBLE[st0]) {
+          d.setState('greet', 3.4);
+          d.actionTick = 0.9;   // antwortet versetzt zum Besuch
+        }
+      }
+    } else if (this.wildPhase === 'greet') {
+      this.face = d.x > this.x ? 1 : -1;
+      this.vx = approach(this.vx, 0, 3, dt);
+      this.vy = approach(this.vy, 0, 3, dt);
+      t.headRot = -0.12;
+      this.greetTick -= dt;
+      if (this.greetTick <= 0) {
+        this.greetTick = 1.8;
+        e.sound.quack(this.model.quackPitch * 1.02);
+        var hw = this.headWorld();
+        e.fx.note(hw.x + this.dirF * 6, hw.y - 8);
+        this.wildQuackT = 0.5;
+      }
+      this.wildQuackT = Math.max(0, (this.wildQuackT || 0) - dt);
+      if (this.wildQuackT > 0) t.beakOpen = Math.sin(this.wildQuackT * Math.PI * 2) * 0.6 + 0.2;
+      if (this.stTime > 3.6) {
+        this.wildPhase = 'leave';
+        this.stTime = 0;
+        e.stats.visits = (e.stats.visits || 0) + 1;
+        e.saveStats();
+        e.fx.heart((this.x + d.x) / 2, Math.min(this.y, d.y) - this.radius() * 1.9, 7);
+      }
+    } else {
+      // weiterziehen und verschwinden
+      var ex = this.wildSide > 0 ? e.w + this.radius() * 4 : -this.radius() * 4;
+      this.swim(dt, ex, this.wildY0, 10, 0.85);
+      if (this.x < -this.radius() * 3 || this.x > e.w + this.radius() * 3 || this.stTime > 14) {
+        e.visitor = null;
+      }
+    }
+
+    this.blinkIn -= dt;
+    if (this.blinkIn <= 0) { this.blinkIn = rand(2.2, 6); this.blinkT = 0.15; }
+    if (this.blinkT > 0) { this.blinkT -= dt; t.eyeOpen = 0.05; }
+
+    a.wingFlap = approach(a.wingFlap, t.wingFlap, 20, dt);
+    a.squash = approach(a.squash, t.squash, 12, dt);
+    a.eyeOpen = approach(a.eyeOpen, t.eyeOpen, 24, dt);
+    a.beakOpen = approach(a.beakOpen, t.beakOpen, 22, dt);
+    a.headRot = approach(a.headRot, t.headRot, 8, dt);
+    a.headDip = approach(a.headDip, t.headDip, 18, dt);
+    this.integrate(dt);
+  };
+
   // ── Brotkrumen ────────────────────────────────────────────────
   Engine.prototype.throwCrumbs = function (x, y) {
     var n = 3 + Math.floor(Math.random() * 3);
+    // Krumen passen zur Entengröße — einer Riesenente winzige Krümel
+    // hinzuwerfen sah verloren aus
+    var k = clamp(this.cfg.size, 0.6, 2);
     for (var i = 0; i < n && this.crumbs.length < 14; i++) {
       var cx = clamp(x + rand(-26, 26), 10, this.w - 10);
       var cy = clamp(y + rand(-16, 16), 10, this.h - 10);
-      this.crumbs.push({ x: cx, y: cy, size: rand(3.4, 5.4), phase: Math.random() * TAU });
+      this.crumbs.push({ x: cx, y: cy, size: rand(3.4, 5.4) * k, phase: Math.random() * TAU });
       if (this.cfg.effects) {
         this.fx.ripple(cx, cy, 2, 18, 0.7, 'rgba(255,255,255,0.55)', 1.6);
         this.fx.droplet(cx, cy - 4, rand(-20, 20), -rand(30, 70), 1.2);
@@ -1269,6 +1396,29 @@
     b.vis = function () {
       if (document.hidden) self.pause(); else self.resume();
     };
+    // Scroll-Strömung: Scrollen erzeugt eine kurze "Strömung", die die
+    // Enten mitzieht (Seite runter → Wasser zieht nach oben und umgekehrt).
+    b.pageScroll = function () {
+      var y = root.scrollY || root.pageYOffset || 0;
+      if (self._scrollY == null) { self._scrollY = y; return; }
+      var d = y - self._scrollY;
+      self._scrollY = y;
+      if (!self.running || Math.abs(d) < 3) return;
+      var kick = clamp(-d * 0.9, -240, 240);
+      var dk = self.duck;
+      if (dk) {
+        if (dk.state === 'sleep' && Math.abs(kick) > 150) {
+          dk.setState('wake', 0.7);
+          dk.say('!', '#ffb03d');
+        }
+        dk.vy += kick * 0.55;
+        if (self.cfg.effects && Math.abs(kick) > 100 && Math.random() < 0.4) {
+          self.fx.ripple(dk.x, dk.y, 4, dk.radius() * 1.3, 0.8, 'rgba(255,255,255,0.35)', 1.4);
+        }
+      }
+      for (var bi = 0; bi < self.babies.length; bi++) self.babies[bi].vy += kick * 0.45;
+      if (self.fish) self.fish.y += kick * 0.02;
+    };
     // Cursor-Position aus iframes einsammeln
     b.msg = function (ev) {
       var data = ev.data;
@@ -1288,6 +1438,7 @@
     root.addEventListener('mousedown', b.down, { passive: true, capture: true });
     root.addEventListener('dblclick', b.dbl, { passive: true, capture: true });
     root.addEventListener('resize', b.resize, { passive: true });
+    root.addEventListener('scroll', b.pageScroll, { passive: true });
     root.addEventListener('message', b.msg, false);
     document.addEventListener('visibilitychange', b.vis, false);
     root.addEventListener('keydown', function () { self.sound.unlock(); }, { passive: true, once: true });
@@ -1301,6 +1452,7 @@
     root.removeEventListener('mousedown', b.down, true);
     root.removeEventListener('dblclick', b.dbl, true);
     root.removeEventListener('resize', b.resize);
+    root.removeEventListener('scroll', b.pageScroll);
     root.removeEventListener('message', b.msg);
     document.removeEventListener('visibilitychange', b.vis);
   };
@@ -1379,14 +1531,62 @@
     if (!this.wiggleT) this.wiggleN = 0;
 
     this.updateFish(dt);
+
+    // Wilde Ente: Besuch abwickeln bzw. gelegentlich einen ankündigen
+    if (this.visitor) {
+      this.visitor.updateWild(dt);
+    } else {
+      var vst = this.duck.state;
+      var vCalm = vst === 'idle' || vst === 'swim' || vst === 'bob' || vst === 'look';
+      if (vCalm && !this.fish && !this.crumbs.length && this.cfg.playfulness > 0.25) {
+        this.visitorCd -= dt * this.cfg.playfulness;
+        if (this.visitorCd <= 0) {
+          this.visitorCd = rand(150, 360);
+          this.spawnVisitor();
+        }
+      }
+    }
+
     this.duck.update(dt);
 
-    // Küken folgen der Spur der Mama
+    // Küken folgen der Spur der Mama — außer es liegen Krumen im Wasser,
+    // dann picken sie mit.
     for (var i = 0; i < this.babies.length; i++) {
       var b = this.babies[i];
-      var p = this.duck.sampleTrail(b.gap);
-      var side = Math.sin(this.time * 2.4 + i * 1.7) * 5;
-      b.swim(dt, p.x, p.y + side, 3, 1.15);
+      var crumb = null;
+      if (this.crumbs.length) {
+        var bd = 1e18;
+        for (var ci = 0; ci < this.crumbs.length; ci++) {
+          var cdx = this.crumbs[ci].x - b.x, cdy = this.crumbs[ci].y - b.y;
+          var cd = cdx * cdx + cdy * cdy;
+          if (cd < bd) { bd = cd; crumb = this.crumbs[ci]; }
+        }
+      }
+      if (crumb) {
+        b.swim(dt, crumb.x, crumb.y, b.radius() * 0.9, 1.1);
+        var cdist = Math.hypot(crumb.x - b.x, crumb.y - b.y);
+        b.eating = cdist < b.radius() * 1.8;
+        if (b.eating) {
+          b.nibbleT = (b.nibbleT || 0) - dt;
+          if (b.nibbleT <= 0) {
+            b.nibbleT = 0.4;
+            crumb.size -= 0.7;   // Küken knabbern kleinere Happen
+            if (this.cfg.effects) this.fx.ripple(crumb.x, crumb.y, 2, 12, 0.5, 'rgba(255,255,255,0.45)', 1.2);
+            this.sound.peck();
+            if (crumb.size <= 1.2) {
+              this.crumbs.splice(this.crumbs.indexOf(crumb), 1);
+              this.fx.sparkle(crumb.x, crumb.y - 5, '#ffe9b8', 4);
+              this.stats.crumbs = (this.stats.crumbs || 0) + 1;
+              this.saveStats();
+            }
+          }
+        }
+      } else {
+        b.eating = false;
+        var p = this.duck.sampleTrail(b.gap);
+        var side = Math.sin(this.time * 2.4 + i * 1.7) * 5;
+        b.swim(dt, p.x, p.y + side, 3, 1.15);
+      }
       b.updateBaby(dt);
     }
 
@@ -1397,7 +1597,7 @@
   Duck.prototype.updateBaby = function (dt) {
     var a = this.a, t = this.tgt, e = this.e;
     this.stTime += dt;
-    t.wingFlap = 0; t.squash = 1; t.eyeOpen = 1; t.beakOpen = 0; t.headRot = 0;
+    t.wingFlap = 0; t.squash = 1; t.eyeOpen = 1; t.beakOpen = 0; t.headRot = 0; t.headDip = 0;
 
     this.actionTick -= dt;
     if (this.actionTick <= 0) {
@@ -1410,7 +1610,12 @@
         e.fx.note(hb.x, hb.y - 4, 'rgba(90,110,150,0.6)');
       }
     }
-    if (this.babyActT > 0) {
+    if (this.eating) {
+      // Krumen picken: Köpfchen nickt im Knabber-Takt
+      var nib = Math.sin(e.time * 12 + this.phase);
+      t.headDip = 0.5 + nib * 0.25;
+      t.beakOpen = Math.max(0, nib) * 0.5;
+    } else if (this.babyActT > 0) {
       this.babyActT -= dt;
       var k = this.babyActT;
       if (this.babyAct === 'flap') { t.wingFlap = Math.abs(Math.sin(e.time * 16)); t.squash = 1 + Math.sin(e.time * 16) * 0.05; }
@@ -1428,6 +1633,7 @@
     a.eyeOpen = approach(a.eyeOpen, t.eyeOpen, 24, dt);
     a.beakOpen = approach(a.beakOpen, t.beakOpen, 22, dt);
     a.headRot = approach(a.headRot, t.headRot, 8, dt);
+    a.headDip = approach(a.headDip, t.headDip, 18, dt);
 
     var speed = this.integrate(dt);
     if (e.cfg.effects) {
@@ -1447,6 +1653,9 @@
 
     // Fisch & Brotkrumen liegen im/auf dem Wasser → unter die Enten
     if (this.fish || this.crumbs.length) this.drawExtras(ctx);
+
+    // Besuch schwimmt hinter der Familie
+    if (this.visitor) DuckRender.draw(ctx, this.visitor.model, this.visitor.pose());
 
     // Küken zuerst (hinten), dann die große Ente
     for (var i = this.babies.length - 1; i >= 0; i--) {
@@ -1484,6 +1693,10 @@
     if (action === 'dizzy') {
       this.duck.dizzyDir = Math.random() < 0.5 ? -1 : 1;
       this.duck.setState('dizzy', dur || 2.4);
+      return action;
+    }
+    if (action === 'visitor') {
+      if (!this.visitor) this.spawnVisitor();
       return action;
     }
     this.duck.setState(action, dur || 1.6);

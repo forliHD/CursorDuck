@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Cursor Duck — Update 🎉</title>
+<style>
+  :root { --ink:#16283a; --muted:#5d7590; --line:#d8e6f3; --card:#fff; --accent:#2f86d6; }
+  @media (prefers-color-scheme: dark) {
+    :root { --ink:#e9f1f8; --muted:#93aac1; --line:#2a3949; --card:#182430; --accent:#57a8ec; }
+  }
+  * { box-sizing:border-box; }
+  body {
+    margin:0; min-height:100vh; color:var(--ink);
+    font:16px/1.65 ui-rounded,-apple-system,"Segoe UI",system-ui,sans-serif;
+    background:
+      radial-gradient(1100px 600px at 20% -10%, rgba(140,200,245,.45), transparent 60%),
+      radial-gradient(900px 500px at 100% 10%, rgba(160,225,240,.35), transparent 55%),
+      #eef5fc;
+  }
+  @media (prefers-color-scheme: dark) {
+    body { background:
+      radial-gradient(1100px 600px at 20% -10%, rgba(30,70,110,.55), transparent 60%),
+      radial-gradient(900px 500px at 100% 10%, rgba(24,80,95,.4), transparent 55%),
+      #101922; }
+  }
+  .wrap { max-width:720px; margin:0 auto; padding:56px 28px 120px; }
+  h1 { font-size:38px; margin:0 0 6px; letter-spacing:-1px; }
+  .lead { font-size:18px; color:var(--muted); margin:0 0 30px; }
+  .card {
+    background:var(--card); border:1px solid var(--line); border-radius:18px;
+    padding:22px 26px; margin:14px 0; box-shadow:0 8px 30px rgba(25,60,100,.07);
+  }
+  ul { margin:0; padding-left:20px; }
+  li { margin:8px 0; }
+  b { color:var(--accent); }
+  .tip { color:var(--muted); font-size:14px; margin-top:26px; text-align:center; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1 data-i18n="uH1">Deine Ente hat Neues gelernt 🎉</h1>
+  <p class="lead" data-i18n="uLead">Das steckt in diesem Update — probier alles direkt hier auf der Seite aus.</p>
+
+  <div class="card">
+    <ul>
+      <li><b data-i18n="uF1b">Besuch:</b> <span data-i18n="uF1t">Alle paar Minuten schaut eine wilde Ente vorbei — Quak-Duett mit Herzchen inklusive.</span></li>
+      <li><b data-i18n="uF2b">Küken picken mit:</b> <span data-i18n="uF2t">Brotkrumen sind jetzt Familiensache — die Kleinen fressen mit.</span></li>
+      <li><b data-i18n="uF3b">Scroll-Strömung:</b> <span data-i18n="uF3t">Beim Scrollen zieht die Strömung die Entenfamilie kurz mit.</span></li>
+      <li><b data-i18n="uF4b">Saison-Enten:</b> <span data-i18n="uF4t">Kürbis-Ente im Oktober, Weihnachts-Ente im Dezember — nur in ihrem Monat wählbar.</span></li>
+      <li><b data-i18n="uF5b">Erfolge:</b> <span data-i18n="uF5t">Kleine Abzeichen im Popup — vom Streichel-Fan bis zum Meisterangler.</span></li>
+      <li><b data-i18n="uF6b">Nachtmodus:</b> <span data-i18n="uF6t">Nach 22 Uhr wird sie schneller müde und träumt in Sternchen.</span></li>
+      <li><b data-i18n="uF7b">Fisch-Jagd repariert:</b> <span data-i18n="uF7t">Klappt jetzt bei jeder Entengröße — auch die Mini-Ente fängt wieder.</span></li>
+    </ul>
+  </div>
+
+  <p class="tip" data-i18n="uTip">Alles Weitere wie gehabt: Popup über das Enten-Symbol, Alt+Shift+D schaltet sie an und aus.</p>
+</div>
+
+<script src="../src/models.js"></script>
+<script src="../src/render.js"></script>
+<script src="../src/effects.js"></script>
+<script src="../src/engine.js"></script>
+<script src="update.js"></script>
+</body>
+</html>

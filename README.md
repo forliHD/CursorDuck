@@ -24,7 +24,10 @@ Fertig — die Ente schwimmt los, und eine Willkommensseite erklärt kurz die Ku
 | **Aufmerksam bleiben** | Zieht der Cursor weg, bricht sie laufende Spielereien ab und schwimmt hinterher. Springt der Cursor plötzlich (Fensterwechsel, iframe), merkt sie mit „!“ auf und holt extra flott auf. |
 | **Streicheln** | Cursor über der Ente hin- und herwackeln → sie kneift die Augen zu ^^, wird rot, wackelt, Herzchen steigen auf. Voller Balken = glückliches Quaken. |
 | **Cursor picken** | Maus stillhalten: sie holt auf und pickt den Zeiger an — mit Funken, Wasserring und „nom“. |
-| **Füttern** | Doppelklick irgendwo auf die Seite wirft Brotkrumen ins Wasser — sie schwimmt hin und pickt sie einzeln auf, mit Häppchen-Ripples und zufriedenem Quaken. |
+| **Füttern** | Doppelklick irgendwo auf die Seite wirft Brotkrumen ins Wasser — sie schwimmt hin und pickt sie einzeln auf, mit Häppchen-Ripples und zufriedenem Quaken. Küken picken mit! |
+| **Besuch** | Alle paar Minuten schwimmt eine wilde Ente vorbei: Die beiden begrüßen sich mit einem Quak-Duett und Herzchen, dann zieht sie weiter. |
+| **Scroll-Strömung** | Beim Scrollen zieht die „Strömung" die Entenfamilie kurz mit — heftiges Scrollen weckt sogar eine schlafende Ente. |
+| **Nachtmodus** | Zwischen 22 und 6 Uhr wird sie schneller müde und träumt mit Sternchen. |
 | **Fisch-Jagd** | Ab und zu zieht ein Fischschatten unter der Oberfläche vorbei. Sie entdeckt ihn („!“), jagt ihn, schnappt zu — und erwischt ihn nicht immer. Gefangene Fische zählt das Popup mit. |
 | **Schwindel** | Den Cursor ein paarmal schnell um sie kreisen lassen → ihr wird schwummrig: sie taumelt, Sternchen kreisen, dann schüttelt sie sich. |
 | **Tänzchen** | Den Cursor neben ihr schnell hin- und herwackeln → sie legt ein Tänzchen hin: wippen, Flügel schwingen, Notenwölkchen, im Takt umdrehen. |
@@ -36,7 +39,7 @@ Fertig — die Ente schwimmt los, und eine Willkommensseite erklärt kurz die Ku
 | **Küken** | Bis zu 6 Küken schwimmen in einer Reihe auf Mamas Spur hinterher — mit eigenen kleinen Animationen und flauschig-gelbem Farbschema. |
 | **Anklicken** | Klick auf die Ente → sie quakt zurück. Doppelklick auf die Ente → Flügelschlagen. |
 
-## Die 31 Entenmodelle
+## Die 33 Entenmodelle
 
 **Echte Enten:** Stockente (Erpel & Weibchen), Quietsche-Ente, Pekingente, Mandarinente,
 Brautente, Reiherente, Krickente, Laufente, Chonk-Ente, Küken, Schwan, Gans.
@@ -46,8 +49,12 @@ Königs-Ente, Ninja-Ente, Goth-Ente, Party-Ente (mit Konfetti), Chefkoch-Ente, Z
 Astro-Ente (Helm), Zombie-Ente, Engels-Ente (Heiligenschein), Teufels-Ente, Cowboy-Ente,
 Regenbogen-Ente, Galaxie-Ente (Sternenkörper), Goldene Ente.
 
+**Saisonal:** Kürbis-Ente (nur im Oktober) und Weihnachts-Ente (nur im Dezember)
+tauchen automatisch in ihrem Monat im Popup auf.
+
 Seltene Modelle sind im Popup markiert (blau = selten, lila = episch, gold = legendär).
-Der 🎲-Knopf zieht zufällig — Legendäre sind selten.
+Der 🎲-Knopf zieht zufällig — Legendäre sind selten. Im Popup gibt es außerdem
+kleine **Erfolge** (Streicheleinheiten, Fänge, Tänzchen, Besuche …).
 
 ## Einstellungen (Popup)
 
