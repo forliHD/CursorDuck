@@ -731,9 +731,23 @@
         var hdist = Math.sqrt(hdx * hdx + hdy * hdy);
         t.headRot = clamp(hdy * 0.002, -0.3, 0.35);
         t.eyeOpen = 1;
-        this.swim(dt, f.x + f.vx * 0.22, f.y + f.vy * 0.22, r * 0.55, 1.35);
+        var htx = f.x + f.vx * 0.22, hty = f.y + f.vy * 0.22;
+        if (hdist > 200) {
+          this.swim(dt, htx, hty, r * 0.55, 1.35);
+        } else {
+          // Endspurt: volle Fahrt aufs Ziel — der Proportionalregler von
+          // swim() würde hier ausrollen und langsamer werden als der Fisch.
+          var hd0 = Math.sqrt((htx - this.x) * (htx - this.x) + (hty - this.y) * (hty - this.y)) || 1;
+          var chase = 470 * cfg.speed;
+          this.vx = approach(this.vx, (htx - this.x) / hd0 * chase, 6, dt);
+          this.vy = approach(this.vy, (hty - this.y) / hd0 * chase, 6, dt);
+        }
         this.snapCd = Math.max(0, (this.snapCd || 0) - dt);
-        if (hdist < r * 1.25 && this.snapCd <= 0 && this.stTime > 0.3) {
+        // Zuschnappen ist ein Ausfall mit dem Hals, kein Punkttreffer:
+        // großzügige, größenunabhängige Reichweite. Ein enges Fenster kann
+        // eine kleine Ente kinematisch nie treffen (Wenderadius > Fenster),
+        // sie orbitiert dann ewig um den Fisch.
+        if (hdist < Math.max(95, r * 1.4) && this.snapCd <= 0 && this.stTime > 0.3) {
           this.snapCd = 0.75;
           a.headDip = 0.9; a.beakOpen = 0.9;   // Schnapp-Ruck ohne Einblenden
           e.fx.splash(f.x, f.y, 0.8);
@@ -748,7 +762,11 @@
             this.gulped = false;
             this.setState('gulp', 1.15);
           } else {
+            // Daneben! Der Fisch bekommt ein echtes Fluchtfenster:
+            // sie verliert Schwung und braucht länger bis zum nächsten Schnapp.
             f.scared = 2.2;
+            this.snapCd = 1.4;
+            this.vx *= 0.25; this.vy *= 0.25;
             if (Math.random() < 0.5) this.say('!', '#ff9d2e');
           }
         }
@@ -1046,7 +1064,9 @@
     var fdist = Math.sqrt(fdx * fdx + fdy * fdy) || 0.001;
     var hunted = d.state === 'hunt';
 
-    if ((hunted && fdist < 190) || f.scared > 0) {
+    // Kleine Enten pirschen leiser — der Fisch bemerkt sie später
+    var panicDist = 190 * clamp(this.cfg.size, 0.55, 1);
+    if ((hunted && fdist < panicDist) || f.scared > 0) {
       // Flucht: weg von der Ente, aber langsamer als eine sprintende Ente
       var fmax = (f.scared > 0 ? 340 : 300) * this.cfg.speed;
       f.vx = approach(f.vx, fdx / fdist * fmax, 3.5, dt);
