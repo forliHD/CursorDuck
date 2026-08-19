@@ -61,10 +61,9 @@
       engine.stats = stats || { pets: 0, pecks: 0 };
       engine.onStats = throttle(function (s) {
         try {
-          chrome.storage.local.set({ stats: {
-            pets: s.pets || 0, pecks: s.pecks || 0,
-            fish: s.fish || 0, crumbs: s.crumbs || 0
-          } });
+          var snap = {};
+          for (var k in s) snap[k] = s[k] || 0;
+          chrome.storage.local.set({ stats: snap });
         } catch (e) {}
       }, 2000);
       engine.mount(document.documentElement);

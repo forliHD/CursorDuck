@@ -84,8 +84,37 @@
     ['dabble', 'Gründeln'], ['dive', 'Tauchen'], ['spin', 'Pirouette'],
     ['bathe', 'Baden'], ['shake', 'Schütteln'], ['sleep', 'Nickerchen'],
     ['crumbs', 'Füttern'], ['fish', 'Fisch-Jagd'], ['dizzy', 'Schwindel'],
-    ['dance', 'Tänzchen'], ['peekaboo', 'Kuckuck']
+    ['dance', 'Tänzchen'], ['peekaboo', 'Kuckuck'], ['visitor', 'Besuch']
   ];
+
+  // [Stat-Schlüssel, Ziel, Emoji, i18n-Key, deutscher Fallback]
+  var ACHIEVEMENTS = [
+    ['pets', 10, '🫶', 'achPets1', 'Streichel-Fan'],
+    ['pets', 100, '💖', 'achPets2', 'Schmuse-Profi'],
+    ['pecks', 25, '🐦', 'achPecks1', 'Pick-Pick'],
+    ['fish', 1, '🐟', 'achFish1', 'Erster Fang'],
+    ['fish', 25, '🎣', 'achFish2', 'Meisterangler'],
+    ['crumbs', 20, '🍞', 'achCrumbs1', 'Brotpatron'],
+    ['dances', 5, '💃', 'achDance1', 'Tanzpartner'],
+    ['visits', 1, '💕', 'achVisit1', 'Neue Freundin']
+  ];
+
+  function renderAchievements(stats) {
+    var wrap = document.getElementById('achievements');
+    if (!wrap) return;
+    wrap.textContent = '';
+    ACHIEVEMENTS.forEach(function (a) {
+      var val = stats[a[0]] || 0, goal = a[1], done = val >= goal;
+      var d = document.createElement('div');
+      d.className = 'a' + (done ? ' done' : '');
+      var em = document.createElement('span'); em.className = 'em'; em.textContent = a[2];
+      var tx = document.createElement('span'); tx.className = 'tx'; tx.textContent = MSG(a[3]) || a[4];
+      var pr = document.createElement('span'); pr.className = 'pr';
+      pr.textContent = done ? '✓' : Math.min(val, goal) + '/' + goal;
+      d.appendChild(em); d.appendChild(tx); d.appendChild(pr);
+      wrap.appendChild(d);
+    });
+  }
 
   function save(patch) {
     Object.assign(cfg, patch);
@@ -150,6 +179,8 @@
     var wrap = document.getElementById('models');
     wrap.textContent = '';
     DuckModels.list.forEach(function (m) {
+      // Saison-Enten nur in ihrem Monat zeigen (außer sie ist gerade gewählt)
+      if (!DuckModels.isAvailable(m) && m.id !== cfg.model) return;
       var d = document.createElement('div');
       d.className = 'm tier-' + m.tier + (m.id === cfg.model ? ' on' : '');
       d.title = modelName(m) + (m.tier !== 'common' ? ' · ' + m.tier : '');
@@ -231,10 +262,11 @@
     bind();
   });
 
-  chrome.storage.local.get({ stats: { pets: 0, pecks: 0, fish: 0 } }, function (o) {
+  chrome.storage.local.get({ stats: { pets: 0, pecks: 0, fish: 0, crumbs: 0, dances: 0, visits: 0 } }, function (o) {
     document.getElementById('pets').textContent = o.stats.pets || 0;
     document.getElementById('pecks').textContent = o.stats.pecks || 0;
     document.getElementById('fishN').textContent = o.stats.fish || 0;
+    renderAchievements(o.stats);
   });
 
   chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {

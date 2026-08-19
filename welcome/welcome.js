@@ -55,6 +55,7 @@
   var grid = document.getElementById('grid');
   var tiles = [];
   DuckModels.list.forEach(function (m, i) {
+    if (!DuckModels.isAvailable(m)) return;   // Saison-Enten nur in ihrem Monat
     var d = document.createElement('div');
     d.className = 'g';
     d.title = modelName(m);

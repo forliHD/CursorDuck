@@ -19,9 +19,14 @@
   }
 }
 * { box-sizing: border-box; }
+/* Breite auch am html-Element festnageln: Chromium rastet die Popup-Breite
+   sonst gelegentlich falsch ein, wenn Inhalt (Modell-Raster) asynchron
+   nachlädt — das Popup öffnet dann sporadisch überbreit. */
+html { width: 340px; overflow-x: hidden; }
 body {
   width: 340px; margin: 0; background: var(--bg); color: var(--ink);
   font: 13px/1.45 ui-rounded, -apple-system, "Segoe UI", system-ui, sans-serif;
+  overflow-x: hidden;
 }
 header {
   position: relative;
@@ -130,6 +135,20 @@ input[type=range]::-webkit-slider-thumb {
 }
 .tricks button:hover { background: var(--accent); color: #fff; border-color: var(--accent); }
 .tricks button:active { transform: translateY(1px); }
+
+/* Erfolge */
+.ach { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; }
+.a {
+  display: flex; align-items: center; gap: 5px;
+  border: 1px solid var(--line); border-radius: 8px; padding: 4px 6px;
+  font-size: 10.5px; color: var(--muted); opacity: .75;
+}
+.a .em { filter: grayscale(1); font-size: 13px; }
+.a .tx { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.a .pr { font-variant-numeric: tabular-nums; font-size: 9.5px; }
+.a.done { opacity: 1; color: var(--ink); border-color: var(--accent); background: var(--accent-soft); }
+.a.done .em { filter: none; }
+.a.done .pr { color: var(--accent); font-weight: 700; }
 
 footer { text-align: center; color: var(--muted); font-size: 11px; }
 .stats b { color: var(--ink); }

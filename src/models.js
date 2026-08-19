@@ -329,6 +329,27 @@
       wing: '#ffdd6a', wingBar: '#fff8d8', tail: '#ffdd6a', foot: '#ffb01f',
       glow: '#ffd24a', sparkle: 1.2, trail: 'rgba(255,210,74,0.3)',
       scale: 1.05, quackPitch: 1.15
+    }),
+
+    // ── Saison-Enten (nur in ihrem Monat im Popup wählbar) ────────
+    duck({
+      id: 'pumpkin', name: 'Kürbis-Ente', emoji: '🎃', tier: 'epic',
+      season: { months: [10] },
+      body: '#f28c28', bodyDark: '#c96a12', belly: '#ffc078',
+      head: '#3e7a34', headDark: '#2a5423',
+      beak: '#e8c33c', beakDark: '#c39f22',
+      wing: '#e07b1e', wingBar: '#ffd9a8', tail: '#c96a12', foot: '#8a5a2c',
+      crest: { len: 0.45, color: '#2a5423', kind: 'spike' },
+      glow: '#ff9231', sparkle: 0.4, quackPitch: 0.9
+    }),
+    duck({
+      id: 'xmas', name: 'Weihnachts-Ente', emoji: '🎄', tier: 'epic',
+      season: { months: [12] },
+      body: '#f4f6f8', bodyDark: '#c9d4de', belly: '#ffffff',
+      head: '#d6404a', headDark: '#a92832',
+      beak: '#ffb01f', beakDark: '#d98a06',
+      wing: '#e8edf2', wingBar: '#d6404a', tail: '#dfe6ec', foot: '#e8952e',
+      hat: 'santa', glow: '#ffdfe2', sparkle: 0.5, quackPitch: 1.05
     })
   ];
 
@@ -339,10 +360,19 @@
     return BY_ID[id] || BY_ID.mallard;
   }
 
+  // Saisonale Modelle sind nur in ihrem Monat verfügbar.
+  // month (1–12) ist für Tests übergebbar, Standard = aktueller Monat.
+  function isAvailable(m, month) {
+    if (!m.season) return true;
+    var now = month || (new Date().getMonth() + 1);
+    return m.season.months.indexOf(now) !== -1;
+  }
+
   function randomId(rnd) {
     var r = (rnd || Math.random)();
     // Legendaries sind selten, damit sie sich besonders anfühlen.
     var pool = MODELS.filter(function (m) {
+      if (!isAvailable(m)) return false;
       if (m.tier === 'legendary') return r < 0.04;
       if (m.tier === 'epic') return r < 0.35;
       return true;
@@ -350,5 +380,8 @@
     return pool[Math.floor((rnd || Math.random)() * pool.length)].id;
   }
 
-  root.DuckModels = { list: MODELS, get: get, byId: BY_ID, randomId: randomId, BASE: BASE };
+  root.DuckModels = {
+    list: MODELS, get: get, byId: BY_ID, randomId: randomId,
+    isAvailable: isAvailable, BASE: BASE
+  };
 })(typeof window !== 'undefined' ? window : this);

@@ -1,6 +1,6 @@
 {
   "appName": { "message": "Cursor Duck" },
-  "appDesc": { "message": "A cute duck swims after your mouse pointer, lets you pet and feed it, and hunts fish. With ducklings and 31 duck models." },
+  "appDesc": { "message": "A cute duck swims after your mouse pointer, lets you pet and feed it, and hunts fish. With ducklings and 33 duck models." },
   "cmdToggle": { "message": "Duck on/off" },
   "cmdNext": { "message": "Next duck model" },
 
@@ -40,6 +40,17 @@
   "trick_dizzy": { "message": "Dizzy" },
   "trick_dance": { "message": "Dance" },
   "trick_peekaboo": { "message": "Peekaboo" },
+  "trick_visitor": { "message": "Visitor" },
+
+  "secAchievements": { "message": "Achievements" },
+  "achPets1": { "message": "Petting fan" },
+  "achPets2": { "message": "Cuddle pro" },
+  "achPecks1": { "message": "Peck peck" },
+  "achFish1": { "message": "First catch" },
+  "achFish2": { "message": "Master angler" },
+  "achCrumbs1": { "message": "Bread patron" },
+  "achDance1": { "message": "Dance partner" },
+  "achVisit1": { "message": "New friend" },
 
   "model_mallard": { "message": "Mallard (drake)" },
   "model_mallard_hen": { "message": "Mallard (hen)" },
@@ -72,6 +83,8 @@
   "model_rainbow": { "message": "Rainbow Duck" },
   "model_galaxy": { "message": "Galaxy Duck" },
   "model_golden": { "message": "Golden Duck" },
+  "model_pumpkin": { "message": "Pumpkin Duck" },
+  "model_xmas": { "message": "Christmas Duck" },
 
   "wTitle": { "message": "Cursor Duck has arrived 🦆" },
   "wH1": { "message": "Your duck has moved in 🦆" },
@@ -105,5 +118,23 @@
   "wCtrl3t": { "message": "next duck model" },
   "wCtrl4": { "message": "In the way on some site? Use “Pause on this site” in the popup." },
   "wModelsTitle": { "message": "All models" },
+  "uTitle": { "message": "Cursor Duck — Update 🎉" },
+  "uH1": { "message": "Your duck has learned new tricks 🎉" },
+  "uLead": { "message": "Here's what's in this update — try everything right on this page." },
+  "uF1b": { "message": "Visitors:" },
+  "uF1t": { "message": "Every few minutes a wild duck stops by — quack duet with hearts included." },
+  "uF2b": { "message": "Ducklings join the feast:" },
+  "uF2t": { "message": "Bread crumbs are a family affair now — the little ones nibble along." },
+  "uF3b": { "message": "Scroll current:" },
+  "uF3t": { "message": "Scrolling briefly sweeps the duck family along with the current." },
+  "uF4b": { "message": "Seasonal ducks:" },
+  "uF4t": { "message": "Pumpkin Duck in October, Christmas Duck in December — only available in their month." },
+  "uF5b": { "message": "Achievements:" },
+  "uF5t": { "message": "Little badges in the popup — from petting fan to master angler." },
+  "uF6b": { "message": "Night mode:" },
+  "uF6t": { "message": "After 10 pm she gets sleepy sooner and dreams in little stars." },
+  "uF7b": { "message": "Fish hunt fixed:" },
+  "uF7t": { "message": "Works at every duck size now — even the tiny duck catches again." },
+  "uTip": { "message": "Everything else as usual: popup via the duck icon, Alt+Shift+D toggles her on and off." },
   "wTip": { "message": "She floats above the page but never intercepts clicks — links, text and buttons keep working as usual." }
 }

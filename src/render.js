@@ -665,6 +665,33 @@
         ctx.ellipse(hr * 0.62, hr * 0.12, hr * 0.72, hr * 0.18, 0, -Math.PI, 0);
         ctx.fill();
         break;
+      case 'santa': {
+        // Zipfelmütze: rote Haube, weißes Bündchen, Bommel kippt nach hinten
+        var sway2 = Math.sin(p.t * 1.8) * hr * 0.06;
+        ctx.fillStyle = '#d6404a';
+        ctx.beginPath();
+        ctx.moveTo(-hr * 0.82, hr * 0.18);
+        ctx.quadraticCurveTo(-hr * 0.55, -hr * 0.85, hr * 0.05, -hr * 0.72);
+        ctx.quadraticCurveTo(-hr * 0.45, -hr * 1.05, -hr * 1.15, -hr * 0.62 + sway2);
+        ctx.quadraticCurveTo(-hr * 0.55, -hr * 0.35, -hr * 0.35, hr * 0.05);
+        ctx.lineTo(hr * 0.72, hr * 0.02);
+        ctx.quadraticCurveTo(hr * 0.55, -hr * 0.55, hr * 0.05, -hr * 0.72);
+        ctx.closePath();
+        ctx.fill();
+        // Bündchen
+        ctx.save();
+        ctx.strokeStyle = '#fdfdfa';
+        ctx.lineWidth = hr * 0.26;
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.moveTo(-hr * 0.82, hr * 0.16);
+        ctx.quadraticCurveTo(0, hr * 0.32, hr * 0.74, hr * 0.02);
+        ctx.stroke();
+        ctx.restore();
+        // Bommel
+        fillEll(ctx, -hr * 1.15, -hr * 0.62 + sway2, hr * 0.2, hr * 0.2, 0, '#ffffff');
+        break;
+      }
     }
     ctx.restore();
   }
