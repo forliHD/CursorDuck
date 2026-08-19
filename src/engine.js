@@ -336,6 +336,8 @@
         e.fx.splash(this.x, this.y, 0.7);
         this.say('!', '#ff6b4a');
         e.sound.quack(this.model.quackPitch * 1.5);
+        e.stats.startles = (e.stats.startles || 0) + 1;
+        e.saveStats();
       } else if (st !== 'startle') {
         this.setState('pet', 99);
         this.pet = clamp(this.pet + dt * 0.85, 0, 1.0001);
@@ -670,7 +672,11 @@
           var oa = this.stTime * 7;
           e.fx.sparkle(hd.x + Math.cos(oa) * r * 0.95, hd.y - r * 0.35 + Math.sin(oa) * r * 0.3, '#ffd23d', 4.5);
         }
-        if (this.stTime > this.stDur) this.setState('shake', 0.9);
+        if (this.stTime > this.stDur) {
+          e.stats.dizzy = (e.stats.dizzy || 0) + 1;
+          e.saveStats();
+          this.setState('shake', 0.9);
+        }
         break;
       }
 
@@ -727,7 +733,12 @@
           this.say('!', '#59b6f7');
           e.sound.quack(this.model.quackPitch * 1.25, true);
         }
-        if (this.stTime > this.stDur) { this.pkbDove = false; this.pkbUp = false; this.setState('shake', 0.8); }
+        if (this.stTime > this.stDur) {
+          this.pkbDove = false; this.pkbUp = false;
+          e.stats.peekaboos = (e.stats.peekaboos || 0) + 1;
+          e.saveStats();
+          this.setState('shake', 0.8);
+        }
         break;
       }
 
@@ -885,7 +896,12 @@
           }
         }
         if (dist > stopDist * 1.6) { this.setState('swim', 1); break; }
-        if (e.pointerIdle > cfg.sleepAfter * (e.isNight() ? 0.5 : 1)) { this.setState('sleep', 99); break; }
+        if (e.pointerIdle > cfg.sleepAfter * (e.isNight() ? 0.5 : 1)) {
+          e.stats.sleeps = (e.stats.sleeps || 0) + 1;
+          e.saveStats();
+          this.setState('sleep', 99);
+          break;
+        }
         if (cfg.peck && this.peckCd <= 0 && dist < r * 3.4 && e.pointerIdle > 0.6) {
           this.peckDone = false;
           this.setState('peck', 0.62);
@@ -1023,8 +1039,15 @@
 
   Engine.prototype.setModel = function (id) {
     var mid = (id === 'random' || !id) ? DuckModels.randomId() : id;
+    var prev = this.modelId;
     this.modelId = mid;
     var m = DuckModels.get(mid);
+    // Erfolgs-Zähler: Modenschau & Legendäre (nicht beim ersten Boot)
+    if (this.duck && mid !== prev) {
+      this.stats.modelSwitches = (this.stats.modelSwitches || 0) + 1;
+      if (m.tier === 'legendary') this.stats.legendary = 1;
+      this.saveStats();
+    }
     if (this.duck) {
       this.duck.model = m;
     } else {
@@ -1130,7 +1153,13 @@
         for (var b = 0; b < 3; b++) this.fx.bubble(f.x + rand(-8, 8), f.y + rand(0, 6));
       }
       this.fish = null;
-      if (hunted) { d.say('?', '#4a90d9'); d.setState('look', 1.2); }
+      if (hunted) {
+        d.say('?', '#4a90d9');
+        d.setState('look', 1.2);
+        // Der Angler-Klassiker: der Entkommene wird immer größer erzählt
+        this.stats.fishEscaped = (this.stats.fishEscaped || 0) + 1;
+        this.saveStats();
+      }
     }
   };
 
@@ -1418,6 +1447,13 @@
       }
       for (var bi = 0; bi < self.babies.length; bi++) self.babies[bi].vy += kick * 0.45;
       if (self.fish) self.fish.y += kick * 0.02;
+      // Wellenreiten zählt — aber höchstens alle 1,5s, sonst füllt ein
+      // einziger Scrollrausch den Zähler
+      if (Math.abs(kick) > 180 && self.time - (self._surfT || -9) > 1.5) {
+        self._surfT = self.time;
+        self.stats.surfs = (self.stats.surfs || 0) + 1;
+        self.saveStats();
+      }
     };
     // Cursor-Position aus iframes einsammeln
     b.msg = function (ev) {
