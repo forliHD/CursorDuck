@@ -92,11 +92,23 @@
     ['pets', 10, '🫶', 'achPets1', 'Streichel-Fan'],
     ['pets', 100, '💖', 'achPets2', 'Schmuse-Profi'],
     ['pecks', 25, '🐦', 'achPecks1', 'Pick-Pick'],
+    ['pecks', 200, '🪵', 'achPecks2', 'Ehrenspecht'],
     ['fish', 1, '🐟', 'achFish1', 'Erster Fang'],
     ['fish', 25, '🎣', 'achFish2', 'Meisterangler'],
+    ['fishEscaped', 10, '🐠', 'achFishEsc', 'Der war SO groß!'],
     ['crumbs', 20, '🍞', 'achCrumbs1', 'Brotpatron'],
+    ['crumbs', 100, '🥖', 'achCrumbs2', 'Bäcker-Liebling'],
     ['dances', 5, '💃', 'achDance1', 'Tanzpartner'],
-    ['visits', 1, '💕', 'achVisit1', 'Neue Freundin']
+    ['dances', 25, '🕺', 'achDance2', 'Discokugel'],
+    ['visits', 1, '💕', 'achVisit1', 'Neue Freundin'],
+    ['visits', 10, '🏡', 'achVisit2', 'Beliebtes Ufer'],
+    ['startles', 10, '😱', 'achStartle', 'Buh!'],
+    ['dizzy', 5, '🎠', 'achDizzy', 'Karussellfahrt'],
+    ['peekaboos', 5, '🫣', 'achPeek', 'Guck-guck!'],
+    ['sleeps', 10, '😴', 'achSleep', 'Sandmännchen'],
+    ['surfs', 25, '🏄', 'achSurf', 'Wellenreiterin'],
+    ['modelSwitches', 10, '👗', 'achStyle', 'Modenschau'],
+    ['legendary', 1, '✨', 'achLegend', 'Es glitzert!']
   ];
 
   function renderAchievements(stats) {
