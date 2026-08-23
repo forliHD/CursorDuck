@@ -1,0 +1,8 @@
+# macOS
+.DS_Store
+
+# Build-Artefakte & Store-Material (per tools/build.py erzeugt)
+dist/
+
+# Lokale Claude-Code-Arbeitsdateien und Worktrees
+.claude/
