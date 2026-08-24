@@ -38,6 +38,7 @@
       submerge: p.submerge || 0, alpha: p.alpha == null ? 1 : p.alpha,
       blush: p.blush || 0, sleep: p.sleep || 0, wobble: p.wobble || 0,
       beakOpen: p.beakOpen || 0,
+      walk: p.walk || 0, hop: p.hop || 0,
       reflection: p.reflection !== false, water: p.water !== false
     };
   }
@@ -765,6 +766,43 @@
     drawHat(ctx, m, g, p);
   }
 
+  // Watschel-Beine: nur sichtbar, wenn die Ente "an Land" steht (pose.walk > 0).
+  // Gezeichnet im Körper-Rahmen; der Boden (die Wasseroberfläche) liegt dort
+  // bei walkLift - bob, weil der Rumpf im Hauptzeichenpfad um walkLift
+  // angehoben wird.
+  function drawLegs(ctx, m, g, p) {
+    var r = g.r;
+    var ground = (p.walkLift || 0) - (p.bob || 0);
+    if (ground < r * 0.12) return;
+    var hipY = g.bcy + g.bh * 0.55;
+    for (var i = 0; i < 2; i++) {
+      var off = i * Math.PI;
+      var swing = Math.sin(p.paddle + off);
+      var liftF = Math.max(0, Math.cos(p.paddle + off)) * r * 0.12 * p.walk;
+      var hipX = g.bcx + g.bw * (0.06 + i * 0.24);
+      var footX = hipX + swing * r * 0.22;
+      var footY = ground - liftF;
+      ctx.save();
+      var al = i === 0 ? 0.72 : 0.95;   // hinteres Bein etwas zurückgenommen
+      ctx.strokeStyle = rgba(m.foot, al);
+      ctx.lineWidth = r * 0.085;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(hipX, hipY);
+      ctx.quadraticCurveTo(hipX + swing * r * 0.06, (hipY + footY) * 0.55, footX, footY - r * 0.02);
+      ctx.stroke();
+      // Schwimmfuß zeigt in Blickrichtung
+      ctx.fillStyle = rgba(m.foot, al);
+      ctx.beginPath();
+      ctx.moveTo(footX - r * 0.07, footY);
+      ctx.lineTo(footX + r * 0.26, footY - r * 0.06);
+      ctx.lineTo(footX + r * 0.22, footY + r * 0.05);
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+    }
+  }
+
   function drawFeet(ctx, m, g, p) {
     var r = g.r;
     var ph = p.paddle;
@@ -842,6 +880,7 @@
   }
 
   function drawAbove(ctx, m, g, p) {
+    if (p.walk > 0.03) drawLegs(ctx, m, g, p);
     drawTail(ctx, m, g, p);
     drawWing(ctx, m, g, p, true);   // ferner Flügel hinter dem Körper
     drawBody(ctx, m, g, p);
@@ -890,11 +929,17 @@
     // Spiegelung zurück — sie schneidet dann durchs Wasser statt zu gleiten.
     var steep = Math.min(1, Math.abs(p.lean) * 0.75);
 
+    // "An Land": walk hebt den Rumpf über die Oberfläche (Beine übernehmen),
+    // hop ist ein zusätzlicher Sprung-Offset in Pixeln (Rein-/Raushüpfen).
+    var walk = p.walk;
+    var lift = walk * r * 0.9 + p.hop;
+    p.walkLift = lift;
+
     // 1) Spiegelung — nur als weiche Silhouette, sonst wirkt sie wie ein zweites Tier
-    if (p.reflection && p.submerge < 0.45 && steep < 0.95) {
+    if (p.reflection && p.submerge < 0.45 && steep < 0.95 && walk < 0.6) {
       ctx.save();
       clipBelow(ctx, r);
-      ctx.globalAlpha *= 0.15 * (1 - p.submerge * 2.2) * (1 - steep);
+      ctx.globalAlpha *= 0.15 * (1 - p.submerge * 2.2) * (1 - steep) * (1 - Math.min(1, walk * 1.6));
       ctx.translate(Math.sin(p.t * 1.7) * r * 0.05, 0);
       ctx.scale(1, -0.42);
       ctx.translate(0, p.bob * 0.6);
@@ -904,19 +949,32 @@
       ctx.restore();
     }
 
-    // 2) Unterwasser-Anteil
-    ctx.save();
-    clipBelow(ctx, r);
-    ctx.globalAlpha *= 0.42;
-    ctx.translate(0, p.bob * 0.35);
-    bodyTransform(ctx, p, function () { drawUnderwater(ctx, m, g, p); });
-    ctx.restore();
+    // 2) Unterwasser-Anteil (steht sie an Land, gibt es keinen)
+    if (walk < 0.62) {
+      ctx.save();
+      clipBelow(ctx, r);
+      ctx.globalAlpha *= 0.42 * (1 - Math.min(1, walk * 1.6));
+      ctx.translate(0, p.bob * 0.35);
+      bodyTransform(ctx, p, function () { drawUnderwater(ctx, m, g, p); });
+      ctx.restore();
+    }
 
     // 3) Wasserlinie / Kontaktschatten
-    if (p.water && p.submerge < 0.9 && steep < 0.95) {
+    if (p.water && p.submerge < 0.9 && steep < 0.95 && walk < 0.9) {
       ctx.save();
-      ctx.globalAlpha *= (1 - p.submerge) * (1 - steep);
+      ctx.globalAlpha *= (1 - p.submerge) * (1 - steep) * (1 - walk);
       bodyTransform(ctx, p, function () { drawWaterline(ctx, m, g, p); });
+      ctx.restore();
+    }
+
+    // Auf "Land" stattdessen: weicher Kontaktschatten unter den Füßen
+    // (hebt sie beim Springen ab, wird der Schatten blasser)
+    if (walk > 0.03 && p.water) {
+      ctx.save();
+      ctx.globalAlpha *= 0.22 * walk * Math.max(0.25, 1 - p.hop / (r * 1.5));
+      ell(ctx, 0, r * 0.05, g.bw * (0.8 + walk * 0.1), r * 0.15, 0);
+      ctx.fillStyle = 'rgba(28,68,108,0.9)';
+      ctx.fill();
       ctx.restore();
     }
 
@@ -924,7 +982,7 @@
     if (m.glow && p.submerge < 0.6) {
       ctx.save();
       clipAbove(ctx, r);
-      ctx.translate(0, p.bob);
+      ctx.translate(0, p.bob - lift);
       ctx.shadowColor = m.glow;
       ctx.shadowBlur = r * 0.9;
       ctx.globalAlpha *= 0.8 * (1 - p.submerge);
@@ -936,10 +994,11 @@
       ctx.restore();
     }
 
-    // 5) Über-Wasser-Anteil
+    // 5) Über-Wasser-Anteil (an Land um lift angehoben — die Beine
+    //    reichen von dort bis zur Oberfläche runter)
     ctx.save();
     clipAbove(ctx, r);
-    ctx.translate(0, p.bob);
+    ctx.translate(0, p.bob - lift);
     bodyTransform(ctx, p, function () { drawAbove(ctx, m, g, p); });
     ctx.restore();
 
@@ -965,7 +1024,11 @@
     var h = headPos(g, p);
     var c = Math.cos(p.lean), s = Math.sin(p.lean);
     var lx = h.x * c - h.y * s, ly = h.x * s + h.y * c;
-    return { x: p.x + lx * p.dir, y: p.y + ly + p.bob + p.submerge * r * 1.35, r: g.hr };
+    return {
+      x: p.x + lx * p.dir,
+      y: p.y + ly + p.bob + p.submerge * r * 1.35 - (p.walk * r * 0.9 + p.hop),
+      r: g.hr
+    };
   }
 
   // Küken-Variante eines Modells: kleiner, runder, flauschig-gelb,

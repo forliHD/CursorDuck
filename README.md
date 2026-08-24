@@ -25,7 +25,9 @@ Fertig — die Ente schwimmt los, und eine Willkommensseite erklärt kurz die Ku
 | **Streicheln** | Cursor über der Ente hin- und herwackeln → sie kneift die Augen zu ^^, wird rot, wackelt, Herzchen steigen auf. Voller Balken = glückliches Quaken. |
 | **Cursor picken** | Maus stillhalten: sie holt auf und pickt den Zeiger an — mit Funken, Wasserring und „nom“. |
 | **Füttern** | Doppelklick irgendwo auf die Seite wirft Brotkrumen ins Wasser — sie schwimmt hin und pickt sie einzeln auf, mit Häppchen-Ripples und zufriedenem Quaken. Küken picken mit! |
-| **Besuch** | Alle paar Minuten schwimmt eine wilde Ente vorbei: Die beiden begrüßen sich mit einem Quak-Duett und Herzchen, dann zieht sie weiter. |
+| **Nicht überfüttern** | Zu viele Brotkrumen am Stück machen sie sichtbar pummelig, dann hickst sie — und irgendwann macht es PLOPP: Federwolke, kurz weg, und sie ploppt verlegen wieder aus dem Wasser. |
+| **Besuch** | Alle paar Minuten schwimmt eine wilde Ente vorbei: Quak-Duett zur Begrüßung, dann legen die beiden ein synchrones Tänzchen mit Pirouette hin — Herzchen zum Abschied, und weiter geht's. |
+| **Landgang** | Ab und zu klettert sie aus dem Wasser, watschelt auf ihren Beinchen einmal stolz im Kreis über die Seite und springt genau dort wieder hinein, wo sie rausgekommen ist. |
 | **Scroll-Strömung** | Beim Scrollen zieht die „Strömung" die Entenfamilie kurz mit — heftiges Scrollen weckt sogar eine schlafende Ente. |
 | **Nachtmodus** | Zwischen 22 und 6 Uhr wird sie schneller müde und träumt mit Sternchen. |
 | **Fisch-Jagd** | Ab und zu zieht ein Fischschatten unter der Oberfläche vorbei. Sie entdeckt ihn („!“), jagt ihn, schnappt zu — und erwischt ihn nicht immer. Gefangene Fische zählt das Popup mit. |
@@ -54,14 +56,15 @@ tauchen automatisch in ihrem Monat im Popup auf.
 
 Seltene Modelle sind im Popup markiert (blau = selten, lila = episch, gold = legendär).
 Der 🎲-Knopf zieht zufällig — Legendäre sind selten. Im Popup gibt es außerdem
-kleine **Erfolge** (Streicheleinheiten, Fänge, Tänzchen, Besuche …).
+**22 Erfolge** (Streicheleinheiten, Fänge, Tänzchen, Besuche, „Landratte",
+„Platzt vor Glück" …).
 
 ## Einstellungen (Popup)
 
 Größe, Tempo, Anzahl Küken, Verspieltheit, Sichtbarkeit, Ton an/aus, Wasser-Effekte,
 Spiegelung, Cursor-Picken, Brotkrumen-Füttern, „Auf dieser Seite pausieren“ — alles greift
-sofort, ohne Neuladen. Dazu zwölf Knöpfe, um Kunststücke direkt auszulösen (inklusive
-Füttern, Fisch-Jagd und Schwindel).
+sofort, ohne Neuladen. Dazu 16 Knöpfe, um Kunststücke direkt auszulösen (inklusive
+Füttern, Fisch-Jagd, Landgang und Besuch).
 
 Tastenkürzel: `Alt+Shift+D` (an/aus), `Alt+Shift+N` (nächstes Modell).
 

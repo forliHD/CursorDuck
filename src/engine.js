@@ -107,6 +107,22 @@
     o.start(t0); o.stop(t0 + 0.09);
   };
 
+  Sound.prototype.pop = function () {
+    // Kurzer Cartoon-Plopp (fürs Platzen nach Überfütterung)
+    if (!this.on) return;
+    this.unlock();
+    var ac = this.ac; if (!ac || ac.state === 'closed') return;
+    if (ac.state === 'suspended') ac.resume();
+    var t0 = ac.currentTime;
+    var o = ac.createOscillator(); o.type = 'sine';
+    o.frequency.setValueAtTime(340, t0);
+    o.frequency.exponentialRampToValueAtTime(70, t0 + 0.11);
+    var g = ac.createGain();
+    this._env(g, t0, this.vol * 0.9, 0.13, 0.003);
+    o.connect(g); g.connect(ac.destination);
+    o.start(t0); o.stop(t0 + 0.16);
+  };
+
   // ── Verhaltens-Katalog ────────────────────────────────────────
   // w = Gewicht in der Zufallsauswahl
   var IDLE_ACTIONS = [
@@ -120,7 +136,8 @@
     { id: 'spin', w: 1.2, dur: [2.0, 2.8] },
     { id: 'bathe', w: 1.2, dur: [2.2, 3.0] },
     { id: 'bob', w: 2.4, dur: [1.2, 2.2] },
-    { id: 'dance', w: 0.8, dur: [2.6, 3.4] }
+    { id: 'dance', w: 0.8, dur: [2.6, 3.4] },
+    { id: 'waddle', w: 0.8, dur: [6.15, 6.15] }   // Landgang: feste Choreo-Länge
   ];
 
   function weightedAction() {
@@ -158,10 +175,13 @@
     this.a = {                // Animationswerte
       headDip: 0, headSide: 0, headRot: 0, eyeOpen: 1, eyeHappy: 0,
       wingFlap: 0, wingLift: 0, lean: 0, squash: 1, submerge: 0,
-      blush: 0, sleep: 0, wobble: 0, beakOpen: 0
+      blush: 0, sleep: 0, wobble: 0, beakOpen: 0, walk: 0
     };
     this.tgt = {};
     for (var k in this.a) this.tgt[k] = this.a[k];
+    this.hopY = 0;            // Sprung-Offset (Landgang, Platzen)
+    this.vanish = 0;          // 1 = kurz unsichtbar (geplatzt)
+    this.fullness = 0;        // wie vollgefressen (Brotkrumen am Stück)
     this.pet = 0;
     this.petHold = 0;
     this.blinkIn = rand(1.5, 5);
@@ -206,8 +226,10 @@
       eyeOpen: a.eyeOpen, eyeHappy: a.eyeHappy,
       wingFlap: a.wingFlap, wingLift: a.wingLift,
       paddle: this.paddle, squash: a.squash, submerge: a.submerge,
-      alpha: this.e.cfg.opacity, blush: a.blush, sleep: a.sleep,
+      alpha: this.e.cfg.opacity * (1 - (this.vanish || 0)),
+      blush: a.blush, sleep: a.sleep,
       wobble: a.wobble, beakOpen: a.beakOpen,
+      walk: a.walk, hop: this.hopY,
       reflection: this.e.cfg.reflection && !this.baby
     };
   };
@@ -316,7 +338,11 @@
     t.headDip = 0; t.headSide = 0; t.headRot = 0; t.eyeHappy = 0;
     t.wingFlap = 0; t.wingLift = 0; t.lean = 0; t.squash = 1;
     t.submerge = 0; t.blush = 0; t.sleep = 0; t.wobble = 0;
-    t.beakOpen = 0; t.eyeOpen = 1;
+    t.beakOpen = 0; t.eyeOpen = 1; t.walk = 0;
+    // Sprung-Offset klingt ab, falls ihn kein Zustand setzt
+    this.hopY *= Math.max(0, 1 - dt * 14);
+    // Bäuchlein leert sich mit der Zeit von selbst
+    this.fullness = Math.max(0, this.fullness - dt * 0.22);
 
     var dx = px - this.x, dy = py - this.y;
     var dist = Math.sqrt(dx * dx + dy * dy);
@@ -325,8 +351,10 @@
     var st = this.state;
 
     // ── Streicheln erkennen ─────────────────────────────────
+    // (nicht beim Tauchen, an Land oder mitten im Platzen)
     var inside = this.hit(px, py);
-    var petting = inside && e.pointerSpeed > 55 && st !== 'dive';
+    var petting = inside && e.pointerSpeed > 55 &&
+      st !== 'dive' && st !== 'waddle' && st !== 'burst';
     if (petting) {
       if (e.pointerSpeed > 2100 && this.pet < 0.15 && st !== 'startle') {
         this.setState('startle', 0.8);
@@ -382,7 +410,8 @@
       st = 'swim';
     }
     // Cursor macht einen großen Sprung (Fenster/iframe gewechselt) → kurz aufmerken
-    if (!this.baby && e.alertPing && dist > 260 && st !== 'sleep' && st !== 'pet' && st !== 'startle') {
+    if (!this.baby && e.alertPing && dist > 260 &&
+        st !== 'sleep' && st !== 'pet' && st !== 'startle' && st !== 'burst') {
       this.say('!', '#4a90d9');
     }
 
@@ -437,6 +466,19 @@
         this.pkbDove = false; this.pkbUp = false;
         this.setState('peekaboo', 2.4);
         st = 'peekaboo';
+      }
+
+      // Ziemlich vollgefressen? Hicks als Vorwarnung vorm Platzen.
+      if (this.fullness >= 5 && (st === 'idle' || st === 'swim' || st === 'feed')) {
+        this.hicCd = (this.hicCd || 0) - dt;
+        if (this.hicCd <= 0) {
+          this.hicCd = rand(1.6, 2.8);
+          a.squash = 1.12;
+          a.beakOpen = 0.5;
+          this.say('hicks!', '#c98a2e');
+          e.fx.bubble(this.x + rand(-6, 6), this.y - r * 0.4);
+          e.sound.quack(this.model.quackPitch * 1.5);
+        }
       }
     }
 
@@ -742,25 +784,199 @@
         break;
       }
 
+      case 'waddle': {
+        // Landgang: aus dem Wasser hüpfen, einmal stolz im Kreis watscheln,
+        // dann genau an derselben Stelle wieder reinspringen.
+        var W_OUT = 0.7, W_WALK = 4.6, W_IN = 0.8;
+        if (!this.wadInit) {
+          this.wadInit = true;
+          this.wadDir = Math.random() < 0.5 ? -1 : 1;
+          this.wadR = Math.max(46, r * 1.5);
+          // Der Kreis liegt komplett auf der wadDir-Seite des Startpunkts —
+          // Startpunkt so verschieben, dass alles im Fenster bleibt.
+          var wx0 = this.wadDir > 0
+            ? clamp(this.x, r * 1.4, e.w - this.wadR * 2 - r * 1.4)
+            : clamp(this.x, this.wadR * 2 + r * 1.4, e.w - r * 1.4);
+          var wy0 = clamp(this.y, r * 2 + this.wadR * 0.45, e.h - r - this.wadR * 0.45);
+          this.wadX0 = wx0; this.wadY0 = wy0;
+          this.x = wx0; this.y = wy0;
+          e.fx.splash(wx0, wy0, 0.9);
+          e.sound.splash(0.7);
+          for (var wd2 = 0; wd2 < 6; wd2++) {
+            e.fx.droplet(wx0 + rand(-r, r), wy0 - r * rand(0.2, 1),
+              rand(-80, 80), -rand(30, 120), rand(1, 1.9));
+          }
+        }
+        var wt = this.stTime;
+        this.vx = 0; this.vy = 0;
+        t.walk = 1;
+        if (wt < W_OUT) {
+          // Raufhüpfen auf die Oberfläche
+          var ok = wt / W_OUT;
+          this.hopY = Math.sin(ok * Math.PI) * r * 0.55;
+          t.wingFlap = (1 - ok) * 0.5;
+        } else if (wt < W_OUT + W_WALK) {
+          // Einmal im Kreis (der Kreis geht durch den Startpunkt)
+          var k3 = (wt - W_OUT) / W_WALK;
+          var wang = k3 * TAU;
+          var wpx = this.wadX0 + this.wadDir * this.wadR * (1 - Math.cos(wang));
+          var wpy = this.wadY0 + this.wadR * 0.42 * Math.sin(wang);
+          var ddx = wpx - this.x;
+          if (Math.abs(ddx) > 0.4) this.face = ddx > 0 ? 1 : -1;
+          this.x = wpx; this.y = wpy;
+          // Watschel-Gang: Trippel-Schritte, Kippeln von Bein zu Bein
+          this.paddle += dt * 9;
+          t.lean = Math.sin(this.paddle) * 0.09;
+          t.wobble = Math.sin(this.paddle) * 0.3;
+          this.hopY = Math.abs(Math.sin(this.paddle)) * r * 0.07;
+          t.headRot = -0.06 + Math.sin(this.paddle * 0.5) * 0.05;
+          this.actionTick -= dt;
+          if (this.actionTick <= 0) {
+            this.actionTick = 0.3;
+            // Schrittchen kräuseln die Oberfläche, frisch raus tropft sie noch
+            e.fx.ripple(this.x + rand(-r * 0.3, r * 0.3), this.y, 2, 13, 0.55, 'rgba(255,255,255,0.4)', 1.2);
+            if (wt < W_OUT + 1.6) {
+              e.fx.droplet(this.x + rand(-r * 0.5, r * 0.5), this.y - r * 0.5,
+                rand(-30, 30), rand(10, 60), rand(0.8, 1.4));
+            }
+          }
+          if (!this.wadQuacked && k3 > 0.45) {
+            this.wadQuacked = true;
+            e.sound.quack(this.model.quackPitch * 1.05, true);
+            var hw2 = this.headWorld();
+            e.fx.note(hw2.x + this.dirF * 8, hw2.y - r * 0.3);
+          }
+        } else {
+          // Absprung — genau dort rein, wo sie rausgeklettert ist
+          var k4 = clamp((wt - W_OUT - W_WALK) / W_IN, 0, 1);
+          this.x = this.wadX0; this.y = this.wadY0;
+          this.hopY = Math.sin(k4 * Math.PI) * r * 0.95;
+          t.wingFlap = 0.5;
+          t.walk = k4 > 0.55 ? 0 : 1;
+          t.eyeHappy = 1;
+          if (!this.wadSplash && k4 > 0.82) {
+            this.wadSplash = true;
+            e.fx.splash(this.x, this.y, 1.5);
+            e.sound.splash(1.2);
+            for (var ws = 0; ws < 6; ws++) {
+              e.fx.droplet(this.x + rand(-r, r), this.y - 2,
+                rand(-170, 170), -rand(80, 240), rand(1.2, 2.2));
+            }
+          }
+        }
+        if (wt > W_OUT + W_WALK + W_IN) {
+          this.wadInit = this.wadQuacked = this.wadSplash = false;
+          e.stats.waddles = (e.stats.waddles || 0) + 1;
+          e.saveStats();
+          this.setState('bob', 1.2);
+        }
+        break;
+      }
+
+      case 'burst': {
+        // Zu viel gefuttert: aufplustern, PLOPP, Federwolke — und gleich
+        // wieder auftauchen, als wäre (fast) nichts gewesen.
+        var bkT = this.stTime;
+        this.vx = approach(this.vx, 0, 4, dt);
+        this.vy = approach(this.vy, 0, 4, dt);
+        if (bkT < 0.62) {
+          var inf = bkT / 0.62;
+          t.squash = 1 + inf * 0.55;
+          t.wobble = Math.sin(bkT * 30) * 0.25 * inf;
+          t.beakOpen = inf * 0.5;
+          t.wingLift = inf * 0.8;
+          t.blush = 1;
+          t.eyeOpen = 1;
+          if (!this.burstOh && bkT > 0.12) {
+            this.burstOh = true;
+            this.say('oh-oh', '#ff9d2e');
+          }
+        } else if (!this.burstPop) {
+          this.burstPop = true;
+          var br = this.radius();
+          for (var fi = 0; fi < 16; fi++) {
+            e.fx.feather(this.x + rand(-br, br) * 0.6, this.y - br * rand(0.2, 1.4),
+              fi % 3 === 0 ? this.model.body : (fi % 3 === 1 ? this.model.belly : this.model.wing));
+          }
+          e.fx.splash(this.x, this.y, 1.5);
+          e.fx.puff(this.x, this.y - br * 0.6, 'rgba(255,244,214,0.75)');
+          e.fx.exclaim(this.x, this.y - br * 1.9, 'PLOPP!', '#ff6b4a');
+          e.sound.pop();
+          e.sound.splash(1.2);
+          this.vanish = 1;
+          this.fullness = 0;
+          e.stats.bursts = (e.stats.bursts || 0) + 1;
+          e.saveStats();
+        } else if (bkT > 1.7 && !this.burstBack) {
+          this.burstBack = true;
+          this.vanish = 0;
+          a.submerge = 1;      // von unten wieder auftauchen
+          a.squash = 0.92;
+          e.fx.splash(this.x, this.y, 1.1);
+          e.sound.splash(0.9);
+          e.sound.quack(this.model.quackPitch * 1.3, true);
+          this.say('puh!', '#59b6f7');
+        } else if (this.burstBack) {
+          t.eyeHappy = 1;
+          t.blush = 0.8;       // ein bisschen verlegen
+        }
+        // solange sie weg ist, blubbert es an der Stelle
+        if (this.vanish && Math.random() < dt * 8) {
+          e.fx.bubble(this.x + rand(-14, 14), this.y + rand(-4, 6));
+        }
+        if (bkT > this.stDur) {
+          this.burstOh = this.burstPop = this.burstBack = false;
+          this.setState('shake', 1.0);
+        }
+        break;
+      }
+
       case 'greet': {
-        // Besuch! Zur wilden Ente drehen und im Wechsel zurückquaken
+        // Besuch! Erst Quak-Duett, dann synchrones Tänzchen mit Pirouette.
         var vg = e.visitor;
         if (!vg) { this.setState('idle', 1); break; }
-        if (Math.abs(vg.x - this.x) > r * 0.4) this.face = vg.x > this.x ? 1 : -1;
-        t.headRot = -0.1;
-        t.eyeHappy = this.stTime > 1 ? 1 : 0;
         this.vx = approach(this.vx, 0, 3, dt);
         this.vy = approach(this.vy, 0, 3, dt);
-        this.actionTick -= dt;
-        if (this.actionTick <= 0) {
-          this.actionTick = 1.8;
-          e.sound.quack(this.model.quackPitch, true);
-          var hgr = this.headWorld();
-          e.fx.note(hgr.x + this.dirF * 6, hgr.y - r * 0.3);
-          this.greetQuackT = 0.5;
+        if (vg.wildPhase === 'dance') {
+          // Beide tanzen zum selben Takt (e.time), gespiegelt zueinander
+          var gb = e.time * 7.5;
+          var gdk = vg.stTime;
+          var genv = Math.min(1, gdk * 3) * clamp((3.6 - gdk) * 2, 0, 1);
+          t.eyeHappy = 1;
+          t.squash = 1 + Math.sin(gb) * 0.07 * genv;
+          t.wobble = Math.sin(gb * 0.5) * 0.5 * genv;
+          t.wingLift = 0.25 + Math.max(0, Math.sin(gb)) * 0.4 * genv;
+          t.headRot = -0.12 + Math.sin(gb + 1.2) * 0.15 * genv;
+          t.beakOpen = Math.max(0, Math.sin(gb)) * 0.22 * genv;
+          if (gdk > 1.55 && gdk < 2.35) {
+            // Pirouette in der Mitte — gegenläufig zum Besuch
+            this.dirF = Math.cos((gdk - 1.55) * 7.85) * (vg.wildSide >= 0 ? -1 : 1);
+            this.face = this.dirF >= 0 ? 1 : -1;
+          } else if (Math.abs(vg.x - this.x) > r * 0.4) {
+            this.face = vg.x > this.x ? 1 : -1;
+          }
+          this.actionTick -= dt;
+          if (this.actionTick <= 0) {
+            this.actionTick = 0.55;
+            var hgd = this.headWorld();
+            e.fx.note(hgd.x + rand(-6, 6), hgd.y - r * 0.4);
+          }
+        } else {
+          // Begrüßung: zur wilden Ente drehen und im Wechsel zurückquaken
+          if (Math.abs(vg.x - this.x) > r * 0.4) this.face = vg.x > this.x ? 1 : -1;
+          t.headRot = -0.1;
+          t.eyeHappy = this.stTime > 1 ? 1 : 0;
+          this.actionTick -= dt;
+          if (this.actionTick <= 0) {
+            this.actionTick = 1.8;
+            e.sound.quack(this.model.quackPitch, true);
+            var hgr = this.headWorld();
+            e.fx.note(hgr.x + this.dirF * 6, hgr.y - r * 0.3);
+            this.greetQuackT = 0.5;
+          }
+          this.greetQuackT = Math.max(0, (this.greetQuackT || 0) - dt);
+          if (this.greetQuackT > 0) t.beakOpen = Math.sin(this.greetQuackT * Math.PI * 2) * 0.55 + 0.2;
         }
-        this.greetQuackT = Math.max(0, (this.greetQuackT || 0) - dt);
-        if (this.greetQuackT > 0) t.beakOpen = Math.sin(this.greetQuackT * Math.PI * 2) * 0.55 + 0.2;
         if (this.stTime > this.stDur || vg.wildPhase === 'leave' && this.stTime > 1) {
           this.setState('idle', 1);
         }
@@ -863,7 +1079,14 @@
               e.fx.sparkle(best.x, best.y - 6, '#ffe9b8', 5);
               e.stats.crumbs = (e.stats.crumbs || 0) + 1;
               e.saveStats();
+              this.fullness += 1;
               if (Math.random() < 0.4) this.say('nom', '#c98a2e');
+              // Zu viel am Stück? Dann macht es gleich PLOPP.
+              if (this.fullness >= 9) {
+                this.burstOh = this.burstPop = this.burstBack = false;
+                this.setState('burst', 3.2);
+                break;
+              }
               if (!crumbs.length) {
                 e.fx.heart(this.x, this.y - r * 1.8, 6 * cfg.size);
                 e.sound.quack(this.model.quackPitch * 1.1, true);
@@ -927,6 +1150,11 @@
         break;
     }
 
+    // Voller Bauch macht sichtbar pummelig — bis es irgendwann PLOPP macht
+    if (this.fullness > 0 && this.state !== 'burst') {
+      t.squash *= 1 + Math.min(1, this.fullness / 9) * 0.15;
+    }
+
     // ── Physik & Animation ──────────────────────────────────
     var speed = this.integrate(dt);
 
@@ -950,6 +1178,7 @@
     a.sleep = approach(a.sleep, t.sleep, 4, dt);
     a.wobble = approach(a.wobble, t.wobble, 26, dt);
     a.beakOpen = approach(a.beakOpen, t.beakOpen, 24, dt);
+    a.walk = approach(a.walk, t.walk, 6, dt);
 
     // ── Wasserspur ──────────────────────────────────────────
     if (cfg.effects && a.submerge < 0.7) {
@@ -1184,6 +1413,7 @@
     this.stTime += dt;
     t.wingFlap = 0; t.squash = 1; t.eyeOpen = 1; t.beakOpen = 0;
     t.headRot = 0; t.wingLift = 0; t.lean = 0; t.headDip = 0;
+    t.wobble = 0; t.eyeHappy = 0;
 
     if (this.wildPhase === 'enter') {
       // Treffpunkt: seitlich neben der Haupt-Ente warten
@@ -1198,8 +1428,8 @@
         // Streicheln, Jagen und Fressen gehen vor.
         var st0 = d.state;
         if (st0 === 'idle' || st0 === 'swim' || INTERRUPTIBLE[st0]) {
-          d.setState('greet', 3.4);
-          d.actionTick = 0.9;   // antwortet versetzt zum Besuch
+          d.setState('greet', 12);   // lang genug für Duett + Tänzchen
+          d.actionTick = 0.9;        // antwortet versetzt zum Besuch
         }
       }
     } else if (this.wildPhase === 'greet') {
@@ -1218,11 +1448,48 @@
       this.wildQuackT = Math.max(0, (this.wildQuackT || 0) - dt);
       if (this.wildQuackT > 0) t.beakOpen = Math.sin(this.wildQuackT * Math.PI * 2) * 0.6 + 0.2;
       if (this.stTime > 3.6) {
+        // Nach dem Duett wird getanzt!
+        this.wildPhase = 'dance';
+        this.stTime = 0;
+        this.danceNoteT = 0.25;
+        e.sound.quack(this.model.quackPitch * 1.2, true);
+      }
+    } else if (this.wildPhase === 'dance') {
+      // Synchrones Tänzchen: gleicher Takt wie die Haupt-Ente (e.time),
+      // aber spiegelbildlich — mit gemeinsamer Pirouette in der Mitte.
+      var beat = e.time * 7.5;
+      var dk2 = this.stTime;
+      var denv2 = Math.min(1, dk2 * 3) * clamp((3.6 - dk2) * 2, 0, 1);
+      this.vx = approach(this.vx, 0, 4, dt);
+      this.vy = approach(this.vy, 0, 4, dt);
+      t.eyeHappy = 1;
+      t.squash = 1 + Math.sin(beat) * 0.07 * denv2;
+      t.wobble = Math.sin(beat * 0.5 + Math.PI) * 0.5 * denv2;
+      t.wingLift = 0.25 + Math.max(0, Math.sin(beat)) * 0.4 * denv2;
+      t.headRot = -0.1 + Math.sin(beat + 1.2) * 0.15 * denv2;
+      t.beakOpen = Math.max(0, Math.sin(beat)) * 0.25 * denv2;
+      if (dk2 > 1.55 && dk2 < 2.35) {
+        this.dirF = Math.cos((dk2 - 1.55) * 7.85) * (this.wildSide >= 0 ? 1 : -1);
+        this.face = this.dirF >= 0 ? 1 : -1;
+      } else {
+        this.face = d.x > this.x ? 1 : -1;
+      }
+      this.danceNoteT -= dt;
+      if (this.danceNoteT <= 0) {
+        this.danceNoteT = 0.55;
+        var hw3 = this.headWorld();
+        e.fx.note(hw3.x + rand(-6, 6), hw3.y - 10);
+        if (Math.random() < 0.4) e.sound.quack(this.model.quackPitch * rand(1.0, 1.25), true);
+      }
+      if (dk2 > 3.6) {
         this.wildPhase = 'leave';
         this.stTime = 0;
         e.stats.visits = (e.stats.visits || 0) + 1;
         e.saveStats();
-        e.fx.heart((this.x + d.x) / 2, Math.min(this.y, d.y) - this.radius() * 1.9, 7);
+        e.fx.heart((this.x + d.x) / 2, Math.min(this.y, d.y) - this.radius() * 1.9, 8);
+        e.fx.heart(this.x, this.y - this.radius() * 1.8, 6);
+        e.fx.heart(d.x, d.y - d.radius() * 1.8, 6);
+        e.sound.quack(this.model.quackPitch * 1.3, true);
       }
     } else {
       // weiterziehen und verschwinden
@@ -1243,6 +1510,10 @@
     a.beakOpen = approach(a.beakOpen, t.beakOpen, 22, dt);
     a.headRot = approach(a.headRot, t.headRot, 8, dt);
     a.headDip = approach(a.headDip, t.headDip, 18, dt);
+    a.wobble = approach(a.wobble, t.wobble, 26, dt);
+    a.wingLift = approach(a.wingLift, t.wingLift, 8, dt);
+    a.eyeHappy = approach(a.eyeHappy, t.eyeHappy, 14, dt);
+    a.lean = approach(a.lean, t.lean, 7, dt);
     this.integrate(dt);
   };
 
@@ -1404,7 +1675,8 @@
       if (!d) return;
       var dist = Math.hypot(ev.clientX - d.x, ev.clientY - d.y);
       if (self.cfg.effects) self.fx.ripple(ev.clientX, ev.clientY, 4, 34, 0.7, 'rgba(255,255,255,0.5)', 2);
-      if (dist < d.radius() * 2.6 && d.state !== 'dive') {
+      if (dist < d.radius() * 2.6 && d.state !== 'dive' &&
+          d.state !== 'waddle' && d.state !== 'burst') {
         // Ente direkt angeklickt → sie quakt zurück
         d.setState('quack', 1.0);
         d.quacked = false;
@@ -1416,7 +1688,9 @@
       var dist = ev.clientX !== undefined ? Math.hypot(ev.clientX - d.x, ev.clientY - d.y) : 0;
       if (dist < d.radius() * 2.6) {
         // Doppelklick auf die Ente → Flügelschlagen (wie gehabt)
-        if (d.state !== 'dive') d.setState('flap', 1.3);
+        if (d.state !== 'dive' && d.state !== 'waddle' && d.state !== 'burst') {
+          d.setState('flap', 1.3);
+        }
       } else if (self.cfg.feed) {
         // Doppelklick ins Wasser → Brotkrumen werfen
         self.throwCrumbs(ev.clientX, ev.clientY);
@@ -1733,6 +2007,16 @@
     }
     if (action === 'visitor') {
       if (!this.visitor) this.spawnVisitor();
+      return action;
+    }
+    if (action === 'waddle') {
+      this.duck.wadInit = this.duck.wadQuacked = this.duck.wadSplash = false;
+      this.duck.setState('waddle', 6.15);
+      return action;
+    }
+    if (action === 'burst') {
+      this.duck.burstOh = this.duck.burstPop = this.duck.burstBack = false;
+      this.duck.setState('burst', 3.2);
       return action;
     }
     this.duck.setState(action, dur || 1.6);
