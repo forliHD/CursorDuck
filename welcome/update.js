@@ -26,8 +26,9 @@
     engine.mount(document.body);
     engine.start();
     window.__duck = engine;
-    // Direkt was zeigen: nach kurzem Moment kommt Besuch vorbei
-    setTimeout(function () { engine.trigger('visitor'); }, 2500);
+    // Direkt was zeigen: erst der Landgang, danach kommt Besuch zum Tanzen
+    setTimeout(function () { engine.trigger('waddle'); }, 2200);
+    setTimeout(function () { engine.trigger('visitor'); }, 9500);
   }
 
   if (isExt) {

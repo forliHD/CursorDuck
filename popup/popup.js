@@ -84,7 +84,8 @@
     ['dabble', 'Gründeln'], ['dive', 'Tauchen'], ['spin', 'Pirouette'],
     ['bathe', 'Baden'], ['shake', 'Schütteln'], ['sleep', 'Nickerchen'],
     ['crumbs', 'Füttern'], ['fish', 'Fisch-Jagd'], ['dizzy', 'Schwindel'],
-    ['dance', 'Tänzchen'], ['peekaboo', 'Kuckuck'], ['visitor', 'Besuch']
+    ['dance', 'Tänzchen'], ['peekaboo', 'Kuckuck'], ['waddle', 'Landgang'],
+    ['visitor', 'Besuch']
   ];
 
   // [Stat-Schlüssel, Ziel, Emoji, i18n-Key, deutscher Fallback]
@@ -98,6 +99,7 @@
     ['fishEscaped', 10, '🐠', 'achFishEsc', 'Der war SO groß!'],
     ['crumbs', 20, '🍞', 'achCrumbs1', 'Brotpatron'],
     ['crumbs', 100, '🥖', 'achCrumbs2', 'Bäcker-Liebling'],
+    ['bursts', 3, '🎈', 'achBurst', 'Platzt vor Glück'],
     ['dances', 5, '💃', 'achDance1', 'Tanzpartner'],
     ['dances', 25, '🕺', 'achDance2', 'Discokugel'],
     ['visits', 1, '💕', 'achVisit1', 'Neue Freundin'],
@@ -107,6 +109,7 @@
     ['peekaboos', 5, '🫣', 'achPeek', 'Guck-guck!'],
     ['sleeps', 10, '😴', 'achSleep', 'Sandmännchen'],
     ['surfs', 25, '🏄', 'achSurf', 'Wellenreiterin'],
+    ['waddles', 5, '🚶', 'achWaddle', 'Landratte'],
     ['modelSwitches', 10, '👗', 'achStyle', 'Modenschau'],
     ['legendary', 1, '✨', 'achLegend', 'Es glitzert!']
   ];
