@@ -11,7 +11,7 @@ every duck stays crisp at any size, and a new model is just a few lines of color
 
 - **Chrome:** [Chrome Web Store](https://chromewebstore.google.com/detail/hohfcnokdpmjggmicebcjalgjcfpfblg)
 - **Firefox:** [Firefox Add-ons](https://addons.mozilla.org/firefox/addon/cursor-duck/)
-- **Edge:** Microsoft Edge Add-ons (in review)
+- **Edge:** [Microsoft Edge Add-ons](https://microsoftedge.microsoft.com/addons/detail/cursor-duck/bflhnhaiomokfncloblfonafkeomfabj)
 
 After installing, the duck starts swimming right away and a welcome page briefly explains
 her tricks.
