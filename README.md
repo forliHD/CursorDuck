@@ -1,182 +1,107 @@
 # Cursor Duck 🦆
 
-Eine Browser-Erweiterung für Chrome und Edge: Eine süße Ente schwimmt auf jeder Website
-hinter deinem Mauszeiger her, pickt ihn ab und zu an, lässt sich streicheln und mit
-Brotkrumen füttern, jagt Fischschatten — und macht zwischendurch, was Enten eben so
-machen: gründeln, tauchen, putzen, baden, quaken, pennen.
+A browser extension for Chrome, Firefox and Edge: a cute duck swims after your mouse
+pointer on every website, pecks at it now and then, lets you pet and feed it, hunts fish
+shadows — and in between does what ducks do: dabble, dive, preen, bathe, quack, nap.
 
-Alles wird prozedural auf ein Canvas gezeichnet — **kein einziges Bild-Asset**. Dadurch ist
-jede Ente bei jeder Größe scharf, und ein neues Modell sind ein paar Zeilen Farbwerte.
+Everything is drawn procedurally onto a canvas — **not a single image asset**. That's why
+every duck stays crisp at any size, and a new model is just a few lines of color values.
 
-## Installation
+## Install
 
-1. `chrome://extensions` öffnen (in Edge: `edge://extensions`)
-2. **Entwicklermodus** einschalten (Schalter oben rechts)
-3. **Entpackte Erweiterung laden** klicken und diesen Ordner auswählen
+- **Chrome:** [Chrome Web Store](https://chromewebstore.google.com/detail/hohfcnokdpmjggmicebcjalgjcfpfblg)
+- **Firefox:** [Firefox Add-ons](https://addons.mozilla.org/firefox/addon/cursor-duck/)
+- **Edge:** Microsoft Edge Add-ons (in review)
 
-Fertig — die Ente schwimmt los, und eine Willkommensseite erklärt kurz die Kunststücke.
+After installing, the duck starts swimming right away and a welcome page briefly explains
+her tricks.
 
-## Was sie kann
+## What she can do
 
 | | |
 |---|---|
-| **Hinterherschwimmen** | Folgt dem Cursor mit Trägheit, schlängelt beim Paddeln, zieht Kielwasser und Bugwelle. Weit abgehängt? Dann sprintet sie. Dabei neigt sie sich in ihre Schwimmrichtung und dreht sich beim Kurswechsel sichtbar ein — bei steilem Kurs verkürzt sich der Körper leicht, als sähe man sie von vorn. |
-| **Aufmerksam bleiben** | Zieht der Cursor weg, bricht sie laufende Spielereien ab und schwimmt hinterher. Springt der Cursor plötzlich (Fensterwechsel, iframe), merkt sie mit „!“ auf und holt extra flott auf. |
-| **Streicheln** | Cursor über der Ente hin- und herwackeln → sie kneift die Augen zu ^^, wird rot, wackelt, Herzchen steigen auf. Voller Balken = glückliches Quaken. |
-| **Cursor picken** | Maus stillhalten: sie holt auf und pickt den Zeiger an — mit Funken, Wasserring und „nom“. |
-| **Füttern** | Doppelklick irgendwo auf die Seite wirft Brotkrumen ins Wasser — sie schwimmt hin und pickt sie einzeln auf, mit Häppchen-Ripples und zufriedenem Quaken. Küken picken mit! |
-| **Nicht überfüttern** | Zu viele Brotkrumen am Stück machen sie sichtbar pummelig, dann hickst sie — und irgendwann macht es PLOPP: Federwolke, kurz weg, und sie ploppt verlegen wieder aus dem Wasser. |
-| **Besuch** | Alle paar Minuten schwimmt eine wilde Ente vorbei: Quak-Duett zur Begrüßung, dann legen die beiden ein synchrones Tänzchen mit Pirouette hin — Herzchen zum Abschied, und weiter geht's. |
-| **Landgang** | Ab und zu klettert sie aus dem Wasser, watschelt auf ihren Beinchen einmal stolz im Kreis über die Seite und springt genau dort wieder hinein, wo sie rausgekommen ist. |
-| **Scroll-Strömung** | Beim Scrollen zieht die „Strömung" die Entenfamilie kurz mit — heftiges Scrollen weckt sogar eine schlafende Ente. |
-| **Nachtmodus** | Zwischen 22 und 6 Uhr wird sie schneller müde und träumt mit Sternchen. |
-| **Fisch-Jagd** | Ab und zu zieht ein Fischschatten unter der Oberfläche vorbei. Sie entdeckt ihn („!“), jagt ihn, schnappt zu — und erwischt ihn nicht immer. Gefangene Fische zählt das Popup mit. |
-| **Schwindel** | Den Cursor ein paarmal schnell um sie kreisen lassen → ihr wird schwummrig: sie taumelt, Sternchen kreisen, dann schüttelt sie sich. |
-| **Tänzchen** | Den Cursor neben ihr schnell hin- und herwackeln → sie legt ein Tänzchen hin: wippen, Flügel schwingen, Notenwölkchen, im Takt umdrehen. |
-| **Kuckuck** | Den Cursor ruhig auf ihr ablegen → sie taucht verschmitzt ab und ploppt daneben wieder auf. |
-| **Hingucken** | Der Kopf folgt dem Cursor deutlich sichtbar — beim Schwimmen wie im Stand, auf beiden Blickseiten. |
-| **Erschrecken** | Ganz schnell durch sie durchwischen → sie fährt hoch, Federn fliegen, empörtes Quaken. |
-| **Nickerchen** | 15 Sekunden Ruhe → Kopf ins Gefieder, Zzz. Wacht mit „!“ wieder auf. |
-| **Idle-Animationen** | Gründeln (Popo hoch, Kopf unter Wasser), Tauchen mit Blasen und Auftauch-Splash, Gefieder putzen, Flügelschlagen, Schütteln, Baden, Pirouetten, Umschauen, Wippen, Quaken mit Notenwölkchen. |
-| **Küken** | Bis zu 6 Küken schwimmen in einer Reihe auf Mamas Spur hinterher — mit eigenen kleinen Animationen (inklusive Dösen) und flauschig-gelbem Farbschema. Die Familie hält sanft Abstand, kein Küken verschwindet hinter der Mama. |
-| **Küken-Nest** | Wird die Mama müde, bringt sie die Küken erst selbst zu Bett: Ein Nest taucht auf (es wächst mit Kükenzahl und Entengröße), sie wartet am Rand, stupst den Kleinen ein Gute-Nacht-Küsschen zu — und schläft dann daneben ein, gelegentlich Herzchen träumend. Wacht sie auf, versinkt das Nest blubbernd. |
-| **Anklicken** | Klick auf die Ente → sie quakt zurück. Doppelklick auf die Ente → Flügelschlagen. |
+| **Following you** | Follows the cursor with inertia, weaves while paddling, leaves a wake and a bow wave. Far behind? Then she sprints. She tilts into her swimming direction and visibly turns when changing course — on a steep course her body foreshortens slightly, as if seen head-on. |
+| **Staying attentive** | When the cursor moves away she abandons whatever she was doing and swims after it. If the cursor jumps suddenly (window switch, iframe), she perks up with a “!” and catches up extra fast. |
+| **Petting** | Wiggle the cursor over her → she squints happily ^^, blushes, wobbles, hearts float up. A full bar means a happy quack. |
+| **Pecking the cursor** | Hold the mouse still: she catches up and pecks at the pointer — with sparks, a ripple and a “nom”. |
+| **Feeding** | Double-click anywhere on the page to toss bread crumbs into the water — she swims over and picks them up one by one, with nibble ripples and contented quacking. The ducklings join in! |
+| **Don't overfeed her** | Too many crumbs in a row make her visibly plump, then she hiccups — and eventually it goes POP: a cloud of feathers, gone for a moment, and she plops back out of the water looking sheepish. |
+| **Visitors** | Every few minutes a wild duck swims by: a quack duet to say hello, then the two perform a synchronized little dance with a pirouette — hearts on parting, and off she goes. |
+| **Shore leave** | Every now and then she climbs out of the water, proudly waddles a circle across the page on her little legs, and jumps back in exactly where she got out. |
+| **Scroll current** | Scrolling briefly sweeps the duck family along with the current — vigorous scrolling even wakes a sleeping duck. |
+| **Night mode** | Between 10 pm and 6 am she gets sleepy sooner and dreams in little stars. |
+| **Fish hunt** | Every now and then a fish shadow passes below the surface. She spots it (“!”), chases it, snaps — and doesn't always get it. The popup counts her catches. |
+| **Dizziness** | Circle the cursor around her a few times → she gets woozy: she staggers, stars orbit, then she shakes it off. |
+| **Dancing** | Wiggle the cursor quickly next to her → she dances: bobbing, wing swings, little music notes, turning to the beat. |
+| **Peekaboo** | Rest the cursor calmly on her → she dives cheekily and pops up right next to it. |
+| **Watching you** | Her head visibly tracks the cursor — while swimming and at rest, on both sides. |
+| **Startling** | Swipe through her really fast → she jumps, feathers fly, indignant quacking. |
+| **Napping** | 15 seconds of quiet → head into the feathers, Zzz. Wakes up again with a “!”. |
+| **Idle animations** | Dabbling (tail up, head underwater), diving with bubbles and a surfacing splash, preening, wing flapping, shaking, bathing, pirouettes, looking around, bobbing, quacking with music notes. |
+| **Ducklings** | Up to 6 ducklings swim in a row along mama's trail — with their own little animations (including dozing off) and a fluffy yellow color scheme. The family gently keeps its distance, so no duckling disappears behind mama. |
+| **Duckling nest** | When mama gets sleepy she first puts the ducklings to bed: a nest appears (it grows with the number of ducklings and the duck size), she waits at the rim, gives the little ones a good-night nudge — then falls asleep beside them, occasionally dreaming little hearts. When she wakes up, the nest sinks away with a bubble. |
+| **Clicking** | Click the duck → she quacks back. Double-click the duck → wing flapping. |
 
-## Die Entenmodelle
+## The duck models
 
-**Echte Enten:** Stockente (Erpel & Weibchen), Quietsche-Ente, Pekingente, Mandarinente,
-Brautente, Reiherente, Krickente, Laufente, Chonk-Ente, Küken, Schwan, Gans.
+**Real ducks:** mallard (drake & hen), rubber duck, pekin duck, mandarin duck, wood duck,
+tufted duck, teal, runner duck, chonk duck, duckling, swan, goose.
 
-**Fantasie:** Debug-Ente (mit Brille), Cyber-Ente (Neon-Visor), Geister-Ente, Piraten-Ente,
-Königs-Ente, Ninja-Ente, Goth-Ente, Party-Ente (mit Konfetti), Chefkoch-Ente, Zauber-Ente,
-Astro-Ente (Helm), Zombie-Ente, Engels-Ente (Heiligenschein), Teufels-Ente, Cowboy-Ente,
-Regenbogen-Ente, Galaxie-Ente (Sternenkörper), Goldene Ente.
+**Fantasy:** debug duck (with glasses), cyber duck (neon visor), ghost duck, pirate duck,
+royal duck, ninja duck, goth duck, party duck (with confetti), chef duck, wizard duck,
+astro duck (helmet), zombie duck, angel duck (halo), devil duck, cowboy duck,
+rainbow duck, galaxy duck (starry body), golden duck.
 
-**Saisonal:** Kürbis-Ente (Oktober), Weihnachts-Ente (Dezember) und Oster-Ente
-(drei Wochen vor bis eine Woche nach dem per Gauß-Formel berechneten
-Ostersonntag) tauchen automatisch in ihrem Zeitfenster im Popup auf.
+**Seasonal:** pumpkin duck (October), Christmas duck (December) and Easter duck
+(from three weeks before until one week after Easter Sunday, computed with Gauss's
+Easter algorithm) appear in the popup automatically during their time window.
 
-**Mit Sprüchen:** Die Visionärs-Ente (schwarzer Rollkragen, runde Brille)
-quakt nicht nur — ab und zu sagt sie Dinge wie „One more thing …",
-„You're holding it wrong." oder „Quack different." (zwölf Sprüche).
-Eigene Sprüche gehen über das `sayings`-Feld im Modell.
+**With opinions:** the visionary duck (black turtleneck, round glasses) doesn't just
+quack — every now and then she says things like “One more thing …”,
+“You're holding it wrong.” or “Quack different.” (twelve lines in total).
 
-Seltene Modelle sind im Popup markiert (blau = selten, lila = episch, gold = legendär).
-Der 🎲-Knopf zieht zufällig — Legendäre sind selten. Im Popup gibt es außerdem
-**35 Erfolge** — vom Streichel-Fan über „Identitätskrise" bis „Keynote-Fan";
-ein Klick auf einen Erfolg verrät, wie man ihn holt.
+Rare models are marked in the popup (blue = rare, purple = epic, gold = legendary).
+The 🎲 button picks at random — legendaries are rare. The popup also holds
+**35 achievements** — from petting fan through “Identity crisis” to “Keynote fan”;
+clicking an achievement reveals how to earn it.
 
-## Einstellungen (Popup)
+## Settings (popup)
 
-Größe, Tempo, Anzahl Küken, Verspieltheit, Sichtbarkeit, Ton an/aus, Wasser-Effekte,
-Spiegelung, Cursor-Picken, Brotkrumen-Füttern, „Neues Zufallsmodell bei jedem
-Browserstart“, „Auf dieser Seite pausieren“ — alles greift sofort, ohne Neuladen. Dazu 16 Knöpfe, um Kunststücke direkt auszulösen (inklusive
-Füttern, Fisch-Jagd, Landgang und Besuch).
+Size, speed, number of ducklings, playfulness, opacity, sound on/off, water effects,
+reflection, cursor pecking, crumb feeding, “new random model on every browser start”,
+“pause on this site” — everything applies instantly, without reloading. Plus 16 buttons
+to trigger tricks directly (including feeding, fish hunt, shore leave and visitors).
 
-Tastenkürzel: `Alt+Shift+D` (an/aus), `Alt+Shift+N` (nächstes Modell).
+Keyboard shortcuts: `Alt+Shift+D` (on/off), `Alt+Shift+N` (next model).
 
-Der Ton ist per Voreinstellung **aus**. Eingeschaltet quakt sie synthetisch (Web Audio,
-keine Sounddateien) im Cartoon-Stil: Sägezahn-Träger mit Abwärts-Sweep, ~105-Hz-Knarren
-(Amplitudenmodulation), zwei Formanten und Rausch-Anlaut; Freude quakt zweisilbig.
-Jedes Modell hat eine eigene Stimmlage, Küken piepsen hoch.
+Sound is **off** by default. Switched on, she quacks synthetically (Web Audio, no sound
+files) in cartoon style: a sawtooth carrier with a downward sweep, ~105 Hz rasp
+(amplitude modulation), two formants and a noise onset; joy quacks in two syllables.
+Every model has its own pitch, ducklings peep high.
 
-## Aufbau
+## Technical details
 
-```
-manifest.json          Manifest V3
-src/models.js          Entenmodelle: Farben, Proportionen, Accessoires, Effekte
-src/render.js          Zeichnet eine Ente prozedural (Körper, Hals, Kopf, Schnabel,
-                       Flügel, Hüte, Brillen, Wasserlinie, Spiegelung, Unterwasser)
-src/effects.js         Partikel: Ringe, Tropfen, Herzchen, Federn, Blasen, Noten,
-                       Zzz, Konfetti, Funkeln
-src/engine.js          Schwimmphysik (mit Richtungs-Neigung), Verhaltens-Automat,
-                       Streicheln, Füttern, Fisch-Jagd, Schwindel, Küken, Sound
-src/content.js         Bootstrap im Tab, Live-Updates aus dem Storage
-src/background.js      Service Worker: Defaults, Tastenkürzel, Zufall pro Start
-popup/                 Einstellungen mit Live-Vorschau
-welcome/               Begrüßungsseite nach der Installation
-icons/                 App-Symbole (mit demselben Renderer erzeugt)
-```
+- **Manifest V3** (Firefox ships as MV2, since Firefox treats MV3 host permissions as
+  opt-in, which would leave the duck invisible). Permissions: only `storage` and
+  `activeTab`. No network access, no data collection, no external dependencies.
+- The duck lives in a **canvas inside a Shadow DOM** with `pointer-events: none` at the
+  very top of the stack — clicks, text selection and page CSS remain untouched.
+- Inside `<iframe>`s only a tiny listener runs that reports the cursor position to the top
+  window; drawing happens exclusively in the top window (one duck per tab, not one per frame).
+- The animation pauses automatically when the tab goes into the background.
+- All motion is time-interpolated and therefore independent of the frame rate.
+- The interface (popup, welcome page, model names) is bilingual via `_locales/`: German and
+  English. The browser picks automatically by its language; everything except German gets
+  English (`default_locale: en`).
 
-Nicht Teil der Erweiterung, aber praktisch beim Entwickeln:
+## Privacy
 
-```
-demo/index.html         Testwiese mit Steuerpult und allen Animationsknöpfen
-demo/lab.html           Eine Ente groß, Pose per JS setzbar
-demo/grid.html          Alle Modelle seitenweise
-demo/poses.html         Ein Modell in allen Extremposen
-demo/extension-sim.html Content-Script gegen eine nachgebaute chrome.*-API
-demo/icons.html         Symbole rendern und speichern (braucht tools/iconserver.py)
-demo/shots.html         Store-Screenshots (DE + EN, zahlenfrei) → dist/
-```
+Cursor Duck collects **no data whatsoever**, has no network functionality and talks to no
+server. Details: [PRIVACY.md](PRIVACY.md) (English and German).
 
-Lokal starten:
+## License
 
-```bash
-python3 tools/iconserver.py
-```
-
-Dann `http://127.0.0.1:8778/demo/index.html` öffnen. (Der kleine Server
-liefert mit `Cache-Control: no-store` aus — der normale `http.server`
-serviert beim Entwickeln gern veraltete Scripts.)
-
-## Technische Details
-
-- **Manifest V3**, Berechtigungen nur `storage` und `activeTab`. Keine Netzwerkzugriffe,
-  keine Datensammlung, keine externen Abhängigkeiten.
-- Die Ente lebt in einem **Canvas im Shadow DOM** mit `pointer-events: none` ganz oben im
-  Stapel — Klicks, Textauswahl und Seiten-CSS bleiben unberührt.
-- In `<iframe>`s läuft nur ein Mini-Listener, der die Cursorposition ans Hauptfenster meldet;
-  gezeichnet wird ausschließlich im obersten Fenster (eine Ente pro Tab, nicht eine pro Frame).
-- Animation pausiert automatisch, wenn der Tab in den Hintergrund geht.
-- Alle Bewegungen sind zeitbasiert interpoliert und damit unabhängig von der Bildrate.
-
-## Eine eigene Ente bauen
-
-In `src/models.js` einen Eintrag ergänzen:
-
-```js
-duck({
-  id: 'meine-ente', name: 'Meine Ente', emoji: '🦆', tier: 'rare',
-  body: '#88c0d0', bodyDark: '#5e81ac', belly: '#eceff4',
-  head: '#88c0d0', headDark: '#5e81ac',
-  beak: '#ebcb8b', beakDark: '#d08770',
-  wing: '#81a1c1', wingBar: '#eceff4', tail: '#81a1c1', foot: '#ebcb8b',
-  hat: 'crown',          // pirate|crown|party|ninja|tophat|wizard|chef|astro|halo|horns|cowboy|cap
-  glasses: 'round',      // round|sun|visor|eyepatch|monocle
-  crest: { len: 0.5, color: '#5e81ac', kind: 'tuft' },   // tuft|spike|fan
-  glow: '#88c0d0', sparkle: 0.5, quackPitch: 1.2
-})
-```
-
-Danach die ID in `MODEL_IDS` in `src/background.js` ergänzen, damit sie auch per
-Tastenkürzel erreichbar ist. Für neue Modelle bitte auch `model_<id>` in
-`_locales/de/messages.json` und `_locales/en/messages.json` eintragen.
-
-## Store-Pakete bauen
-
-```bash
-python3 tools/build.py
-```
-
-Erzeugt aus einer Codebasis beide Pakete in `dist/`: Chrome (Manifest V3,
-identisch mit `manifest.json`) und Firefox (Manifest V2, automatisch
-abgeleitet — Firefox behandelt MV3-Hostberechtigungen als opt-in, was die
-Ente unsichtbar machen würde). Für ein Release nur die Version in
-`manifest.json` erhöhen und neu bauen.
-
-## Sprachen
-
-Die Oberfläche (Popup, Willkommensseite, Modellnamen) ist über `_locales/`
-zweisprachig: Deutsch und Englisch. Chrome wählt automatisch passend zur
-Browsersprache; alles außer Deutsch bekommt Englisch (`default_locale: en`).
-Das deutsche HTML dient als eingebauter Fallback, damit die Demo-Seiten auch
-ohne Extension-Kontext funktionieren.
-
-## Lizenz
-
-**© 2026 Lucas Reiser (forliHD) — alle Rechte vorbehalten.** Der Code ist
-öffentlich einsehbar (Source-Available), darf aber ohne schriftliche
-Genehmigung weder kopiert, verändert, weiterverbreitet noch — etwa in
-Extension-Stores — neu veröffentlicht oder als eigenes Werk ausgegeben
-werden. Details in [LICENSE](LICENSE).
+**© 2026 Lucas Reiser (forliHD) — all rights reserved.** The code is source-available for
+viewing, but may not be copied, modified, redistributed or — for instance in extension
+stores — republished or presented as your own work without written permission.
+Details in [LICENSE](LICENSE).
