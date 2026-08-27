@@ -39,7 +39,7 @@ Fertig — die Ente schwimmt los, und eine Willkommensseite erklärt kurz die Ku
 | **Nickerchen** | 15 Sekunden Ruhe → Kopf ins Gefieder, Zzz. Wacht mit „!“ wieder auf. |
 | **Idle-Animationen** | Gründeln (Popo hoch, Kopf unter Wasser), Tauchen mit Blasen und Auftauch-Splash, Gefieder putzen, Flügelschlagen, Schütteln, Baden, Pirouetten, Umschauen, Wippen, Quaken mit Notenwölkchen. |
 | **Küken** | Bis zu 6 Küken schwimmen in einer Reihe auf Mamas Spur hinterher — mit eigenen kleinen Animationen (inklusive Dösen) und flauschig-gelbem Farbschema. Die Familie hält sanft Abstand, kein Küken verschwindet hinter der Mama. |
-| **Küken-Nest** | Schläft die Mama ein, taucht neben ihr ein kuscheliges Nest auf — die Küken schwimmen hin, legen sich hinein und träumen mit (Zzz). Wacht sie auf, versinkt das Nest blubbernd. |
+| **Küken-Nest** | Wird die Mama müde, bringt sie die Küken erst selbst zu Bett: Ein Nest taucht auf (es wächst mit Kükenzahl und Entengröße), sie wartet am Rand, stupst den Kleinen ein Gute-Nacht-Küsschen zu — und schläft dann daneben ein, gelegentlich Herzchen träumend. Wacht sie auf, versinkt das Nest blubbernd. |
 | **Anklicken** | Klick auf die Ente → sie quakt zurück. Doppelklick auf die Ente → Flügelschlagen. |
 
 ## Die Entenmodelle
@@ -57,13 +57,14 @@ Regenbogen-Ente, Galaxie-Ente (Sternenkörper), Goldene Ente.
 Ostersonntag) tauchen automatisch in ihrem Zeitfenster im Popup auf.
 
 **Mit Sprüchen:** Die Visionärs-Ente (schwarzer Rollkragen, runde Brille)
-quakt nicht nur — ab und zu sagt sie Dinge wie „One more thing …" oder
-„iQuack.“ Eigene Sprüche gehen über das `sayings`-Feld im Modell.
+quakt nicht nur — ab und zu sagt sie Dinge wie „One more thing …",
+„You're holding it wrong." oder „Quack different." (zwölf Sprüche).
+Eigene Sprüche gehen über das `sayings`-Feld im Modell.
 
 Seltene Modelle sind im Popup markiert (blau = selten, lila = episch, gold = legendär).
 Der 🎲-Knopf zieht zufällig — Legendäre sind selten. Im Popup gibt es außerdem
-**22 Erfolge** (Streicheleinheiten, Fänge, Tänzchen, Besuche, „Landratte",
-„Platzt vor Glück" …).
+**35 Erfolge** — vom Streichel-Fan über „Identitätskrise" bis „Keynote-Fan";
+ein Klick auf einen Erfolg verrät, wie man ihn holt.
 
 ## Einstellungen (Popup)
 
@@ -75,7 +76,9 @@ Füttern, Fisch-Jagd, Landgang und Besuch).
 Tastenkürzel: `Alt+Shift+D` (an/aus), `Alt+Shift+N` (nächstes Modell).
 
 Der Ton ist per Voreinstellung **aus**. Eingeschaltet quakt sie synthetisch (Web Audio,
-keine Sounddateien) — jedes Modell hat eine eigene Stimmlage, Küken piepsen hoch.
+keine Sounddateien) im Cartoon-Stil: Sägezahn-Träger mit Abwärts-Sweep, ~105-Hz-Knarren
+(Amplitudenmodulation), zwei Formanten und Rausch-Anlaut; Freude quakt zweisilbig.
+Jedes Modell hat eine eigene Stimmlage, Küken piepsen hoch.
 
 ## Aufbau
 

@@ -314,7 +314,10 @@
       wing: '#333338', wingBar: '#4a4a52', tail: '#28282d', foot: '#8a8f98',
       glasses: 'round', quackPitch: 0.95,
       sayings: ['One more thing …', 'iQuack.', 'Think different.',
-                'It just works.', 'Insanely great!', 'Boom!']
+                'Quack different.', 'It just works.', 'Insanely great!',
+                'Boom!', "You're holding it wrong.", 'Real artists ship.',
+                'Stay hungry. Stay foolish.', "There's a quack for that.",
+                'Simplicity quacks.']
     }),
     duck({
       id: 'rainbow', name: 'Regenbogen-Ente', emoji: '🌈', tier: 'legendary',

@@ -88,30 +88,44 @@
     ['visitor', 'Besuch']
   ];
 
-  // [Stat-Schlüssel, Ziel, Emoji, i18n-Key, deutscher Fallback]
+  // [Stat-Schlüssel, Ziel, Emoji, i18n-Key, Name (Fallback), Erklärung (Fallback)]
+  // Ein Klick auf einen Erfolg klappt die Erklärung auf.
   var ACHIEVEMENTS = [
-    ['pets', 10, '🫶', 'achPets1', 'Streichel-Fan'],
-    ['pets', 100, '💖', 'achPets2', 'Schmuse-Profi'],
-    ['pecks', 25, '🐦', 'achPecks1', 'Pick-Pick'],
-    ['pecks', 200, '🪵', 'achPecks2', 'Ehrenspecht'],
-    ['fish', 1, '🐟', 'achFish1', 'Erster Fang'],
-    ['fish', 25, '🎣', 'achFish2', 'Meisterangler'],
-    ['fishEscaped', 10, '🐠', 'achFishEsc', 'Der war SO groß!'],
-    ['crumbs', 20, '🍞', 'achCrumbs1', 'Brotpatron'],
-    ['crumbs', 100, '🥖', 'achCrumbs2', 'Bäcker-Liebling'],
-    ['bursts', 3, '🎈', 'achBurst', 'Platzt vor Glück'],
-    ['dances', 5, '💃', 'achDance1', 'Tanzpartner'],
-    ['dances', 25, '🕺', 'achDance2', 'Discokugel'],
-    ['visits', 1, '💕', 'achVisit1', 'Neue Freundin'],
-    ['visits', 10, '🏡', 'achVisit2', 'Beliebtes Ufer'],
-    ['startles', 10, '😱', 'achStartle', 'Buh!'],
-    ['dizzy', 5, '🎠', 'achDizzy', 'Karussellfahrt'],
-    ['peekaboos', 5, '🫣', 'achPeek', 'Guck-guck!'],
-    ['sleeps', 10, '😴', 'achSleep', 'Sandmännchen'],
-    ['surfs', 25, '🏄', 'achSurf', 'Wellenreiterin'],
-    ['waddles', 5, '🚶', 'achWaddle', 'Landratte'],
-    ['modelSwitches', 10, '👗', 'achStyle', 'Modenschau'],
-    ['legendary', 1, '✨', 'achLegend', 'Es glitzert!']
+    ['pets', 10, '🫶', 'achPets1', 'Streichel-Fan', 'Streichle die Ente 10-mal so lange, bis die Herzchen sprühen.'],
+    ['pets', 100, '💖', 'achPets2', 'Schmuse-Profi', '100 volle Streicheleinheiten — sie erkennt deine Maus am Geräusch.'],
+    ['pets', 500, '🧸', 'achPets3', 'Lieblingsmensch', '500 Streicheleinheiten. Zugegeben: Eigentlich hat sie DICH gezähmt.'],
+    ['pecks', 25, '🐦', 'achPecks1', 'Pick-Pick', 'Halt die Maus still, bis sie den Cursor 25-mal angepickt hat.'],
+    ['pecks', 200, '🪵', 'achPecks2', 'Ehrenspecht', '200 Pickser gegen deinen Cursor. Der arme Zeiger.'],
+    ['pecks', 1000, '⛏️', 'achPecks3', 'Presslufthammer', '1000 Pickser. Beantrage besser einen neuen Cursor.'],
+    ['fish', 1, '🐟', 'achFish1', 'Erster Fang', 'Ihr erster gefangener Fisch. Sie war sehr stolz.'],
+    ['fish', 25, '🎣', 'achFish2', 'Meisterangler', '25 Fische geschnappt — im Teich erzählt man sich Geschichten.'],
+    ['fish', 100, '🦈', 'achFish3', 'Schrecken der Meere', '100 Fische. Die Fische haben inzwischen einen Steckbrief von ihr.'],
+    ['fishEscaped', 10, '🐠', 'achFishEsc', 'Der war SO groß!', '10 Fische sind ihr entwischt. Jeder einzelne war natürlich riesig.'],
+    ['crumbs', 20, '🍞', 'achCrumbs1', 'Brotpatron', 'Wirf per Doppelklick Brotkrumen ins Wasser — 20 wurden verputzt.'],
+    ['crumbs', 100, '🥖', 'achCrumbs2', 'Bäcker-Liebling', '100 Krumen serviert. Beim Bäcker grüßt man dich mit Vornamen.'],
+    ['crumbs', 500, '🏭', 'achCrumbs3', 'Großbäckerei', '500 Krumen. Du fütterst nicht mehr — du belieferst.'],
+    ['bursts', 3, '🎈', 'achBurst', 'Platzt vor Glück', 'Füttere sie 3-mal so voll, dass es PLOPP macht. Keine Sorge, sie kommt wieder.'],
+    ['bursts', 10, '💥', 'achBurst2', 'Plopp-Stammkundin', '10 Plopps. Die Federn haben inzwischen eine eigene Flugroute.'],
+    ['dances', 5, '💃', 'achDance1', 'Tanzpartner', 'Wackel den Cursor schnell neben ihr hin und her — 5 Tänzchen getanzt.'],
+    ['dances', 25, '🕺', 'achDance2', 'Discokugel', '25 Tänzchen. Der Teich gilt jetzt offiziell als Club.'],
+    ['visits', 1, '💕', 'achVisit1', 'Neue Freundin', 'Der erste Besuch einer wilden Ente — Quak-Duett und Tänzchen inklusive.'],
+    ['visits', 10, '🏡', 'achVisit2', 'Beliebtes Ufer', '10 Besuche. Es hat sich offenbar rumgesprochen.'],
+    ['visits', 50, '🎪', 'achVisit3', 'Enten-Festival', '50 Besuche. Streng genommen veranstaltest du inzwischen ein Festival.'],
+    ['startles', 10, '😱', 'achStartle', 'Buh!', 'Wisch 10-mal blitzschnell durch sie durch — Federn flogen.'],
+    ['dizzy', 5, '🎠', 'achDizzy', 'Karussellfahrt', 'Kreise den Cursor schnell um sie herum, bis ihr 5-mal schwummrig wurde.'],
+    ['dizzy', 25, '🌀', 'achDizzy2', 'Waschmaschine', '25 Schleudergänge. Sie sieht bis heute Sternchen.'],
+    ['peekaboos', 5, '🫣', 'achPeek', 'Guck-guck!', 'Leg den Cursor ruhig auf ihr ab — 5-mal Kuckuck gespielt.'],
+    ['sleeps', 10, '😴', 'achSleep', 'Sandmännchen', 'Lass sie 10-mal ungestört einschlafen. Zzz.'],
+    ['sleeps', 50, '🛌', 'achSleep2', 'Murmeltier', '50 Nickerchen. Und täglich grüßt die Ente.'],
+    ['nests', 5, '🪺', 'achNest', 'Gute-Nacht-Geschichte', 'Bring die Küken 5-mal ins Nest — Mama stupst sie höchstpersönlich zu Bett.'],
+    ['surfs', 25, '🏄', 'achSurf', 'Wellenreiterin', 'Scroll kräftig durch die Seite — 25-mal ritt die Familie die Strömung.'],
+    ['surfs', 100, '🌊', 'achSurf2', 'Tsunami-Reiterin', '100 Wellen. Dein Scrollrad verlangt Gefahrenzulage.'],
+    ['modelSwitches', 10, '👗', 'achStyle', 'Modenschau', 'Wechsle 10-mal das Entenmodell im Popup.'],
+    ['modelSwitches', 100, '🎭', 'achStyle2', 'Identitätskrise', '100 Modellwechsel. Wer bin ich — und wenn ja, wie viele Enten?'],
+    ['legendary', 1, '✨', 'achLegend', 'Es glitzert!', 'Wähle eine legendäre Ente: Regenbogen, Galaxie oder Gold.'],
+    ['quotes', 10, '🎤', 'achQuote', 'Keynote-Fan', 'Hör dir 10 Sprüche der Visionärs-Ente an. One more thing …'],
+    ['waddles', 5, '🚶', 'achWaddle', 'Landratte', 'Sieh ihr 5-mal beim Landgang zu — oder stups ihn im Popup an.'],
+    ['waddles', 25, '🥾', 'achWaddle2', 'Wanderverein', '25 Landgänge. Die Watschelrunde ist jetzt ein eingetragener Verein.']
   ];
 
   function renderAchievements(stats) {
@@ -126,7 +140,15 @@
       var tx = document.createElement('span'); tx.className = 'tx'; tx.textContent = MSG(a[3]) || a[4];
       var pr = document.createElement('span'); pr.className = 'pr';
       pr.textContent = done ? '✓' : Math.min(val, goal) + '/' + goal;
-      d.appendChild(em); d.appendChild(tx); d.appendChild(pr);
+      var desc = document.createElement('div'); desc.className = 'desc';
+      desc.textContent = MSG(a[3] + 'D') || a[5];
+      d.appendChild(em); d.appendChild(tx); d.appendChild(pr); d.appendChild(desc);
+      // Klick klappt die Erklärung auf (immer nur eine gleichzeitig)
+      d.onclick = function () {
+        var was = d.classList.contains('open');
+        wrap.querySelectorAll('.a.open').forEach(function (el) { el.classList.remove('open'); });
+        if (!was) d.classList.add('open');
+      };
       wrap.appendChild(d);
     });
   }

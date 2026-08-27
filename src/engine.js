@@ -48,30 +48,69 @@
     g.gain.exponentialRampToValueAtTime(Math.max(0.0002, peak), t0 + (attack || 0.008));
     g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
   };
+  // Eine Quack-Silbe im Cartoon-Stil: Sägezahn-Träger mit Abwärts-Sweep,
+  // ~105-Hz-Knarren (Amplitudenmodulation — das Syrinx-Rattern), zwei
+  // Formanten (nasales ~950 Hz + bissiges ~2400 Hz) und ein kurzer
+  // Rausch-Anlaut ("K"). Der berühmte Kino-Quack ist ein lizenzpflichtiges
+  // Sample — das hier ist unsere synthetische Verneigung davor.
+  Sound.prototype._syllable = function (t0, p, dur, joy, loud) {
+    var ac = this.ac;
+    var out = ac.createGain();
+    this._env(out, t0, this.vol * 0.95 * (loud || 1), dur + 0.07);
+    out.connect(ac.destination);
+
+    var f1 = ac.createBiquadFilter();
+    f1.type = 'bandpass'; f1.Q.value = 6;
+    f1.frequency.setValueAtTime(1050 * p, t0);
+    f1.frequency.exponentialRampToValueAtTime(640 * p, t0 + dur * 0.85);
+    var f2 = ac.createBiquadFilter();
+    f2.type = 'bandpass'; f2.Q.value = 9;
+    f2.frequency.value = 2400 * p;
+    var g1 = ac.createGain(); g1.gain.value = 1.0;
+    var g2 = ac.createGain(); g2.gain.value = 0.55;
+    f1.connect(g1); g1.connect(out);
+    f2.connect(g2); g2.connect(out);
+
+    // Knarren: LFO moduliert die Lautstärke des Trägers
+    var am = ac.createGain(); am.gain.value = 0.55;
+    var lfo = ac.createOscillator(); lfo.type = 'triangle';
+    lfo.frequency.setValueAtTime(105 * Math.sqrt(p), t0);
+    var lfoG = ac.createGain(); lfoG.gain.value = 0.45;
+    lfo.connect(lfoG); lfoG.connect(am.gain);
+    am.connect(f1); am.connect(f2);
+    lfo.start(t0); lfo.stop(t0 + dur + 0.05);
+
+    for (var i = 0; i < 2; i++) {
+      var o = ac.createOscillator(); o.type = 'sawtooth';
+      var f0 = (joy ? 300 : 260) * p * (i ? 1.012 : 1);
+      o.frequency.setValueAtTime(f0 * 1.25, t0);
+      o.frequency.exponentialRampToValueAtTime(f0, t0 + 0.05);
+      o.frequency.exponentialRampToValueAtTime(f0 * 0.55, t0 + dur);
+      var og = ac.createGain(); og.gain.value = i ? 0.4 : 0.8;
+      o.connect(og); og.connect(am);
+      o.start(t0); o.stop(t0 + dur + 0.04);
+    }
+
+    // Anlaut: kurzer Rauschimpuls in den oberen Formanten
+    var nl = Math.floor(ac.sampleRate * 0.028);
+    var nb = ac.createBuffer(1, nl, ac.sampleRate);
+    var nd = nb.getChannelData(0);
+    for (var ni = 0; ni < nl; ni++) nd[ni] = (Math.random() * 2 - 1) * (1 - ni / nl);
+    var ns = ac.createBufferSource(); ns.buffer = nb;
+    var ng = ac.createGain(); ng.gain.value = 0.5;
+    ns.connect(ng); ng.connect(f2);
+    ns.start(t0);
+  };
+
   Sound.prototype.quack = function (pitch, joy) {
     if (!this.on) return;
     this.unlock();
     var ac = this.ac; if (!ac || ac.state === 'closed') return;
     if (ac.state === 'suspended') ac.resume();
     var t0 = ac.currentTime, p = pitch || 1;
-    var out = ac.createGain();
-    this._env(out, t0, this.vol * 0.9, 0.22);
-    out.connect(ac.destination);
-    var bp = ac.createBiquadFilter();
-    bp.type = 'bandpass'; bp.Q.value = 5;
-    bp.frequency.setValueAtTime(1500 * p, t0);
-    bp.frequency.exponentialRampToValueAtTime(620 * p, t0 + 0.18);
-    bp.connect(out);
-    for (var i = 0; i < 2; i++) {
-      var o = ac.createOscillator();
-      o.type = i ? 'square' : 'sawtooth';
-      var f0 = (joy ? 620 : 500) * p * (i ? 1.005 : 1);
-      o.frequency.setValueAtTime(f0, t0);
-      o.frequency.exponentialRampToValueAtTime((joy ? 260 : 190) * p, t0 + 0.19);
-      var g = ac.createGain(); g.gain.value = i ? 0.25 : 0.6;
-      o.connect(g); g.connect(bp);
-      o.start(t0); o.stop(t0 + 0.26);
-    }
+    this._syllable(t0, p, 0.24, joy, 1);
+    // Freude quakt zweisilbig: "quack-quack!"
+    if (joy) this._syllable(t0 + 0.19, p * 1.06, 0.17, true, 0.8);
   };
   Sound.prototype.splash = function (power) {
     if (!this.on) return;
@@ -538,6 +577,10 @@
           if (e.isNight()) {
             e.fx.sparkle(hz.x - r * rand(0.1, 0.6), hz.y - r * rand(0.6, 1.2), '#b9c8ff', rand(3, 5));
           }
+          // und wenn die Küken im Nest liegen, träumt sie von ihnen
+          if (e.nest && !e.nest.sink && Math.random() < 0.4) {
+            e.fx.heart(e.nest.x + rand(-8, 8), e.nest.y - e.nest.r * 0.85, rand(4, 6) * cfg.size);
+          }
         }
         this.vx = approach(this.vx, 0, 1.5, dt);
         this.vy = approach(this.vy, 0, 1.5, dt);
@@ -630,6 +673,8 @@
           // aber nicht, während sie unsichtbar ist (Burst-Fenster)
           if (this.model.sayings && !this.baby && !this.vanish && Math.random() < 0.55) {
             this.say(pick(this.model.sayings), '#9aa2ad');
+            e.stats.quotes = (e.stats.quotes || 0) + 1;
+            e.saveStats();
           }
         }
         if (this.stTime > this.stDur) { this.quacked = false; this.setState('idle', 1); }
@@ -786,6 +831,57 @@
           e.stats.peekaboos = (e.stats.peekaboos || 0) + 1;
           e.saveStats();
           this.setState('shake', 0.8);
+        }
+        break;
+      }
+
+      case 'tuckin': {
+        // Gute-Nacht-Ritual: Mama schwimmt ans Nest, wartet bis alle
+        // Küken drin liegen, stupst ihnen ein Küsschen zu — dann schläft
+        // sie selbst ein. Bewegt sich der Cursor, ist die Nacht vorbei.
+        if (e.pointerIdle < 0.2) {
+          this.tuckKiss = this.tuckHeart = false;
+          this.setState('swim', 1);
+          break;
+        }
+        var tn = e.nest;
+        if (!tn || !e.babies.length) {
+          // Nest entsteht erst im nächsten Engine-Schritt — kurz treiben
+          this.vx = approach(this.vx, 0, 3, dt);
+          this.vy = approach(this.vy, 0, 3, dt);
+          if (!e.babies.length) this.setState('sleep', 99);
+          break;
+        }
+        var tSide = this.x < tn.x ? -1 : 1;
+        this.swim(dt, tn.x + tSide * (tn.r + r * 1.15), tn.y, 8, 0.7);
+        if (Math.abs(tn.x - this.x) > r * 0.3) this.face = tn.x > this.x ? 1 : -1;
+        t.headRot = 0.08;
+        t.eyeHappy = this.stTime > 0.8 ? 1 : 0;
+        var allIn = true;
+        for (var ti = 0; ti < e.babies.length; ti++) {
+          if (!e.babies[ti].nesting) { allIn = false; break; }
+        }
+        if (!this.tuckKiss && (allIn || this.stTime > 8)) {
+          this.tuckKiss = true;
+          this.tuckT = 0;
+        }
+        if (this.tuckKiss) {
+          this.tuckT += dt;
+          // Stupserchen Richtung Nest
+          t.headDip = Math.sin(clamp(this.tuckT / 0.6, 0, 1) * Math.PI) * 0.5;
+          t.headRot = 0.16;
+          if (!this.tuckHeart && this.tuckT > 0.28) {
+            this.tuckHeart = true;
+            e.fx.heart(tn.x, tn.y - tn.r * 0.85, 6 * cfg.size);
+            e.sound.quack(this.model.quackPitch * 0.85);
+          }
+          if (this.tuckT > 1.2) {
+            this.tuckKiss = this.tuckHeart = false;
+            e.stats.sleeps = (e.stats.sleeps || 0) + 1;
+            e.stats.nests = (e.stats.nests || 0) + 1;
+            e.saveStats();
+            this.setState('sleep', 99);
+          }
         }
         break;
       }
@@ -1126,9 +1222,15 @@
         }
         if (dist > stopDist * 1.6) { this.setState('swim', 1); break; }
         if (e.pointerIdle > cfg.sleepAfter * (e.isNight() ? 0.5 : 1)) {
-          e.stats.sleeps = (e.stats.sleeps || 0) + 1;
-          e.saveStats();
-          this.setState('sleep', 99);
+          if (e.babies.length) {
+            // Erst die Küken ins Nest bringen, dann selbst schlafen
+            this.tuckKiss = this.tuckHeart = false;
+            this.setState('tuckin', 99);
+          } else {
+            e.stats.sleeps = (e.stats.sleeps || 0) + 1;
+            e.saveStats();
+            this.setState('sleep', 99);
+          }
           break;
         }
         if (cfg.peck && this.peckCd <= 0 && dist < r * 3.4 && e.pointerIdle > 0.6) {
@@ -1866,15 +1968,22 @@
 
     this.duck.update(dt);
 
-    // ── Küken-Nest: taucht auf, wenn Mama schläft ───────────────
-    var mamaSleeps = this.duck.state === 'sleep';
+    // ── Küken-Nest: taucht auf, wenn Mama schläft (oder zudeckt) ──
+    var mamaSleeps = this.duck.state === 'sleep' || this.duck.state === 'tuckin';
     if (mamaSleeps && this.babies.length && !this.nest) {
       var d0 = this.duck, nr0 = d0.radius();
       var nSide = d0.x > this.w / 2 ? -1 : 1;
+      // Nest wächst mit Kükenzahl UND Entengröße: der Slot-Ring (bei
+      // r*0.38) muss allen Küken Platz nebeneinander bieten.
+      var rB = 26 * this.cfg.size * 0.55;
+      var nCount = Math.min(8, this.babies.length);
+      var need = nCount >= 2
+        ? (rB * 1.15) / (2 * Math.sin(Math.PI / nCount) * 0.38)
+        : rB * 1.7;
       this.nest = {
         x: clamp(d0.x + nSide * nr0 * 3.1, 70, this.w - 70),
         y: clamp(d0.y + nr0 * 0.15, 70, this.h - 50),
-        r: Math.max(34, 26 * this.cfg.size + Math.min(4, this.babies.length) * 7),
+        r: Math.max(30 * this.cfg.size, rB * 2.0, need),
         appear: 0, sink: false
       };
       if (this.cfg.effects) {
@@ -1925,8 +2034,8 @@
         // Jedes Küken hat seinen festen Kuschel-Platz im Nest
         b.eating = false;
         var slotA = (i / Math.max(1, this.babies.length)) * TAU + 0.7;
-        var sx = nestOpen.x + Math.cos(slotA) * nestOpen.r * 0.34;
-        var sy = nestOpen.y + Math.sin(slotA) * nestOpen.r * 0.16 - nestOpen.r * 0.05;
+        var sx = nestOpen.x + Math.cos(slotA) * nestOpen.r * 0.38;
+        var sy = nestOpen.y + Math.sin(slotA) * nestOpen.r * 0.17 - nestOpen.r * 0.05;
         if (!b.nesting) {
           b.swim(dt, sx, sy, 3, 1.0);
           b.nestTry = (b.nestTry || 0) + dt;
@@ -2249,6 +2358,12 @@
     }
     if (action === 'visitor') {
       if (!this.visitor) this.spawnVisitor();
+      return action;
+    }
+    if (action === 'sleep' && this.babies.length) {
+      // Mit Küken läuft das Einschlafen übers Gute-Nacht-Ritual
+      this.duck.tuckKiss = this.duck.tuckHeart = false;
+      this.duck.setState('tuckin', 99);
       return action;
     }
     if (action === 'waddle') {
