@@ -26,9 +26,11 @@
     engine.mount(document.body);
     engine.start();
     window.__duck = engine;
-    // Direkt was zeigen: erst der Landgang, danach kommt Besuch zum Tanzen
-    setTimeout(function () { engine.trigger('waddle'); }, 2200);
-    setTimeout(function () { engine.trigger('visitor'); }, 9500);
+    // Direkt was zeigen: die neue Ente stellt sich vor, dann Nickerchen
+    // mit Küken-Nest (Mausbewegung weckt alle wieder auf)
+    setTimeout(function () { engine.setModel('visionary'); }, 1800);
+    setTimeout(function () { engine.trigger('quack'); }, 2600);
+    setTimeout(function () { engine.trigger('sleep', 99); }, 7000);
   }
 
   if (isExt) {

@@ -2,9 +2,16 @@
  * (c) 2026 Lucas Reiser (forliHD) — Alle Rechte vorbehalten. Siehe LICENSE.
  *
  * CursorDuck — Service Worker
- * Kümmert sich um Defaults und die Tastenkürzel.
+ * Kümmert sich um Defaults, Tastenkürzel und das Zufallsmodell pro Browserstart.
  * Alles läuft über storage.sync — die Content-Scripts hören auf onChanged.
  */
+
+// Modellkatalog laden: im MV3-Service-Worker per importScripts, im
+// Firefox-MV2-Hintergrund kommt models.js über das scripts-Array (build.py).
+if (typeof DuckModels === 'undefined' && typeof importScripts === 'function') {
+  importScripts('models.js');
+}
+
 const DEFAULTS = {
   enabled: true,
   model: 'mallard',
@@ -20,6 +27,7 @@ const DEFAULTS = {
   peck: true,
   feed: true,
   sleepAfter: 15,
+  randomOnStart: false,   // bei jedem Browserstart ein neues Zufallsmodell
   disabledHosts: []
 };
 
@@ -28,12 +36,28 @@ const MODEL_IDS = [
   'mallard', 'mallard-hen', 'rubber', 'pekin', 'mandarin', 'wood', 'tufted', 'teal',
   'runner', 'chonk', 'duckling', 'swan', 'goose', 'debug', 'neon', 'ghost', 'pirate',
   'royal', 'ninja', 'goth', 'party', 'chef', 'wizard', 'astro', 'zombie', 'angel',
-  'devil', 'cowboy', 'rainbow', 'galaxy', 'golden'
+  'devil', 'cowboy', 'visionary', 'rainbow', 'galaxy', 'golden'
 ];
 
+// Browserstart: Wer das Zufalls-Abo hat, bekommt eine frische Ente.
+// randomId() gewichtet Raritäten und filtert Saison-Enten automatisch.
+chrome.runtime.onStartup.addListener(async () => {
+  const { randomOnStart, model } = await chrome.storage.sync.get({ randomOnStart: false, model: 'mallard' });
+  if (!randomOnStart || typeof DuckModels === 'undefined') return;
+  let next = DuckModels.randomId();
+  // kleine Extrafreude: möglichst nicht dieselbe Ente wie zuletzt
+  for (let tries = 0; next === model && tries < 4; tries++) next = DuckModels.randomId();
+  await chrome.storage.sync.set({ model: next });
+});
+
 chrome.runtime.onInstalled.addListener(async (details) => {
-  const cur = await chrome.storage.sync.get(DEFAULTS);
-  await chrome.storage.sync.set(cur); // fehlende Keys mit Defaults auffüllen
+  // Nur wirklich FEHLENDE Keys mit Defaults auffüllen. Ein blindes
+  // Read-Modify-Write über alles würde beim Update-Neustart mit dem
+  // parallel laufenden onStartup-Zufallsmodell kollidieren.
+  const cur = await chrome.storage.sync.get(null);
+  const missing = {};
+  for (const k in DEFAULTS) if (!(k in cur)) missing[k] = DEFAULTS[k];
+  if (Object.keys(missing).length) await chrome.storage.sync.set(missing);
   if (details.reason === 'install') {
     chrome.tabs.create({ url: chrome.runtime.getURL('welcome/welcome.html') });
   } else if (details.reason === 'update') {

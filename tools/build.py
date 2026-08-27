@@ -32,8 +32,9 @@ def firefox_manifest(m):
     fx["manifest_version"] = 2
     # MV3 "action" heißt in MV2 "browser_action"
     fx["browser_action"] = fx.pop("action")
-    # Firefox nutzt Event-Pages statt Service Worker
-    fx["background"] = {"scripts": ["src/background.js"], "persistent": False}
+    # Firefox nutzt Event-Pages statt Service Worker; models.js kommt hier
+    # über das scripts-Array (der MV3-Worker lädt es per importScripts)
+    fx["background"] = {"scripts": ["src/models.js", "src/background.js"], "persistent": False}
     # Pflicht bei Firefox: feste Add-on-ID (auch Voraussetzung für storage.sync)
     # und die Datensammel-Deklaration (bei uns: keine Datensammlung).
     fx["browser_specific_settings"] = {

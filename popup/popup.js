@@ -7,7 +7,7 @@
     enabled: true, model: 'mallard', size: 1.0, speed: 1.0, ducklings: 0,
     playfulness: 1.0, sound: false, volume: 0.35, effects: true,
     reflection: true, opacity: 1.0, peck: true, feed: true, sleepAfter: 15,
-    disabledHosts: []
+    randomOnStart: false, disabledHosts: []
   };
 
   var cfg = null;
@@ -78,7 +78,7 @@
     ['playfulness', function (v) { return v.toFixed(1) + '×'; }],
     ['opacity', function (v) { return Math.round(v * 100) + ' %'; }]
   ];
-  var CHECKS = ['peck', 'feed', 'effects', 'reflection', 'sound'];
+  var CHECKS = ['peck', 'feed', 'effects', 'reflection', 'sound', 'randomOnStart'];
   var TRICKS = [
     ['quack', 'Quaken'], ['flap', 'Flattern'], ['preen', 'Putzen'],
     ['dabble', 'Gründeln'], ['dive', 'Tauchen'], ['spin', 'Pirouette'],

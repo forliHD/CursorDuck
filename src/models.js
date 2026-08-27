@@ -305,6 +305,18 @@
       hat: 'cowboy', quackPitch: 0.88
     }),
     duck({
+      // Schwarzer Rollkragen, runde Brille, große Visionen. Ab und zu
+      // ersetzt ein Spruch das Quaken (sayings, gerendert von engine.say).
+      id: 'visionary', name: 'Visionärs-Ente', emoji: '💡', tier: 'epic',
+      body: '#2e2e33', bodyDark: '#1c1c20', belly: '#3c3c44',
+      head: '#e8e2d4', headDark: '#c6bfae', neckRing: '#232327',
+      beak: '#f08c2e', beakDark: '#cf6d18',
+      wing: '#333338', wingBar: '#4a4a52', tail: '#28282d', foot: '#8a8f98',
+      glasses: 'round', quackPitch: 0.95,
+      sayings: ['One more thing …', 'iQuack.', 'Think different.',
+                'It just works.', 'Insanely great!', 'Boom!']
+    }),
+    duck({
       id: 'rainbow', name: 'Regenbogen-Ente', emoji: '🌈', tier: 'legendary',
       body: '#ff7a7a', bodyDark: '#d95a5a', belly: '#fff0f0',
       head: '#ff7a7a', headDark: '#d95a5a',
@@ -350,6 +362,19 @@
       beak: '#ffb01f', beakDark: '#d98a06',
       wing: '#e8edf2', wingBar: '#d6404a', tail: '#dfe6ec', foot: '#e8952e',
       hat: 'santa', glow: '#ffdfe2', sparkle: 0.5, quackPitch: 1.05
+    }),
+    duck({
+      // Ostern ist beweglich — verfügbar von 3 Wochen vor bis 1 Woche
+      // nach dem (per Gauß-Formel berechneten) Ostersonntag.
+      id: 'easter', name: 'Oster-Ente', emoji: '🐰', tier: 'epic',
+      season: { easter: true },
+      body: '#fff3d6', bodyDark: '#e8d3a2', belly: '#fffaf0',
+      head: '#fff3d6', headDark: '#e8d3a2',
+      beak: '#ffab2e', beakDark: '#e08a10',
+      wing: '#ffeec2', wingBar: '#ffd0e4', tail: '#ffeec2', foot: '#ffab2e',
+      hat: 'bunny',
+      dots: ['#ff9ec4', '#8ce0c9', '#a8c8ff', '#ffd23d'],
+      sparkle: 0.3, quackPitch: 1.25
     })
   ];
 
@@ -360,12 +385,34 @@
     return BY_ID[id] || BY_ID.mallard;
   }
 
-  // Saisonale Modelle sind nur in ihrem Monat verfügbar.
-  // month (1–12) ist für Tests übergebbar, Standard = aktueller Monat.
-  function isAvailable(m, month) {
+  // Ostersonntag (gregorianisch, anonyme Gauß-Formel)
+  function easterSunday(y) {
+    var a = y % 19, b = Math.floor(y / 100), c = y % 100;
+    var d = Math.floor(b / 4), e = b % 4, f = Math.floor((b + 8) / 25);
+    var g = Math.floor((b - f + 1) / 3), h = (19 * a + b - d - g + 15) % 30;
+    var i = Math.floor(c / 4), k = c % 4, l = (32 + 2 * e + 2 * i - h - k) % 7;
+    var mm = Math.floor((a + 11 * h + 22 * l) / 451);
+    var month = Math.floor((h + l - 7 * mm + 114) / 31);   // 3 = März, 4 = April
+    var day = ((h + l - 7 * mm + 114) % 31) + 1;
+    return new Date(y, month - 1, day);
+  }
+
+  // Saisonale Modelle sind nur in ihrem Zeitfenster verfügbar.
+  // `when` ist für Tests übergebbar: eine Monatszahl (1–12) oder ein Date.
+  function isAvailable(m, when) {
     if (!m.season) return true;
-    var now = month || (new Date().getMonth() + 1);
-    return m.season.months.indexOf(now) !== -1;
+    if (m.season.months) {
+      var mon = typeof when === 'number' ? when : ((when instanceof Date ? when : new Date()).getMonth() + 1);
+      return m.season.months.indexOf(mon) !== -1;
+    }
+    if (m.season.easter) {
+      if (typeof when === 'number') return when === 3 || when === 4;   // grobe Test-Näherung
+      var now = when instanceof Date ? when : new Date();
+      var es = easterSunday(now.getFullYear());
+      var diff = (now - es) / 86400000;
+      return diff >= -21 && diff <= 7.999;   // 3 Wochen davor bis Weißer-Sonntag-Woche
+    }
+    return true;
   }
 
   function randomId(rnd) {
@@ -382,6 +429,6 @@
 
   root.DuckModels = {
     list: MODELS, get: get, byId: BY_ID, randomId: randomId,
-    isAvailable: isAvailable, BASE: BASE
+    isAvailable: isAvailable, easterSunday: easterSunday, BASE: BASE
   };
 })(typeof window !== 'undefined' ? window : this);

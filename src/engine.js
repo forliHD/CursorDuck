@@ -230,6 +230,7 @@
       blush: a.blush, sleep: a.sleep,
       wobble: a.wobble, beakOpen: a.beakOpen,
       walk: a.walk, hop: this.hopY,
+      water: !this.nesting,   // im Nest keine eigene Wasserlinie
       reflection: this.e.cfg.reflection && !this.baby
     };
   };
@@ -625,6 +626,11 @@
           for (var q = 0; q < 3; q++) e.fx.note(hq.x + r * 0.5, hq.y - r * 0.2 - q * 6);
           e.fx.ripple(this.x, this.y, 8, 60, 1.0, 'rgba(255,255,255,0.4)', 1.6);
           if (this.model.confetti) e.fx.confetti(hq.x, hq.y);
+          // Manche Modelle haben was zu sagen (Visionärs-Ente!) —
+          // aber nicht, während sie unsichtbar ist (Burst-Fenster)
+          if (this.model.sayings && !this.baby && !this.vanish && Math.random() < 0.55) {
+            this.say(pick(this.model.sayings), '#9aa2ad');
+          }
         }
         if (this.stTime > this.stDur) { this.quacked = false; this.setState('idle', 1); }
         break;
@@ -1262,6 +1268,7 @@
     this.fishCd = rand(20, 45);
     this.visitor = null;      // wilde Ente auf der Durchreise
     this.visitorCd = rand(120, 300);
+    this.nest = null;         // Küken-Nest, taucht auf wenn Mama schläft
     this._bound = {};
     this.setModel(this.cfg.model);
   }
@@ -1859,12 +1866,54 @@
 
     this.duck.update(dt);
 
-    // Küken folgen der Spur der Mama — außer es liegen Krumen im Wasser,
-    // dann picken sie mit.
+    // ── Küken-Nest: taucht auf, wenn Mama schläft ───────────────
+    var mamaSleeps = this.duck.state === 'sleep';
+    if (mamaSleeps && this.babies.length && !this.nest) {
+      var d0 = this.duck, nr0 = d0.radius();
+      var nSide = d0.x > this.w / 2 ? -1 : 1;
+      this.nest = {
+        x: clamp(d0.x + nSide * nr0 * 3.1, 70, this.w - 70),
+        y: clamp(d0.y + nr0 * 0.15, 70, this.h - 50),
+        r: Math.max(34, 26 * this.cfg.size + Math.min(4, this.babies.length) * 7),
+        appear: 0, sink: false
+      };
+      if (this.cfg.effects) {
+        this.fx.ripple(this.nest.x, this.nest.y, 6, this.nest.r * 1.4, 1.2, 'rgba(255,255,255,0.4)', 1.6);
+      }
+    }
+    if (this.nest) {
+      var nst = this.nest;
+      if ((!mamaSleeps || !this.babies.length) && !nst.sink) {
+        // Mama ist wach → das Nest versinkt blubbernd; die Küken stehen
+        // sofort auf (sonst schwimmen sie 0,7 s in Schlafpose davon)
+        nst.sink = true;
+        for (var nw = 0; nw < this.babies.length; nw++) {
+          this.babies[nw].nesting = false;
+          this.babies[nw].nestTry = 0;
+        }
+        if (this.cfg.effects) {
+          for (var nb = 0; nb < 4; nb++) {
+            this.fx.bubble(nst.x + rand(-nst.r, nst.r) * 0.5, nst.y + rand(-4, 4));
+          }
+        }
+      }
+      nst.appear = approach(nst.appear, nst.sink ? 0 : 1, nst.sink ? 5 : 2.2, dt);
+      if (nst.sink && nst.appear < 0.03) {
+        this.nest = null;
+        for (var nbi = 0; nbi < this.babies.length; nbi++) {
+          this.babies[nbi].nesting = false;
+          this.babies[nbi].nestTry = 0;
+        }
+      }
+    }
+
+    // Küken folgen der Spur der Mama — außer das Nest ruft oder es
+    // liegen Krumen im Wasser.
+    var nestOpen = this.nest && !this.nest.sink ? this.nest : null;
     for (var i = 0; i < this.babies.length; i++) {
       var b = this.babies[i];
       var crumb = null;
-      if (this.crumbs.length) {
+      if (this.crumbs.length && !nestOpen) {
         var bd = 1e18;
         for (var ci = 0; ci < this.crumbs.length; ci++) {
           var cdx = this.crumbs[ci].x - b.x, cdy = this.crumbs[ci].y - b.y;
@@ -1872,7 +1921,30 @@
           if (cd < bd) { bd = cd; crumb = this.crumbs[ci]; }
         }
       }
-      if (crumb) {
+      if (nestOpen) {
+        // Jedes Küken hat seinen festen Kuschel-Platz im Nest
+        b.eating = false;
+        var slotA = (i / Math.max(1, this.babies.length)) * TAU + 0.7;
+        var sx = nestOpen.x + Math.cos(slotA) * nestOpen.r * 0.34;
+        var sy = nestOpen.y + Math.sin(slotA) * nestOpen.r * 0.16 - nestOpen.r * 0.05;
+        if (!b.nesting) {
+          b.swim(dt, sx, sy, 3, 1.0);
+          b.nestTry = (b.nestTry || 0) + dt;
+          // Angekommen, sobald Slot ODER Nestrand erreicht ist. Fallback:
+          // nach 4 s Anflug wird eingekuschelt — sonst kann in schmalen
+          // Fenstern die Mama-Kollision den Slot dauerhaft versperren.
+          if (Math.hypot(sx - b.x, sy - b.y) < 12 ||
+              Math.hypot(nestOpen.x - b.x, nestOpen.y - b.y) < nestOpen.r * 0.7 ||
+              b.nestTry > 4) {
+            b.nesting = true;
+            b.vx = 0; b.vy = 0;
+          }
+        } else {
+          b.x = approach(b.x, sx, 6, dt);
+          b.y = approach(b.y, sy, 6, dt);
+          b.vx = 0; b.vy = 0;
+        }
+      } else if (crumb) {
         b.swim(dt, crumb.x, crumb.y, b.radius() * 0.9, 1.1);
         var cdist = Math.hypot(crumb.x - b.x, crumb.y - b.y);
         b.eating = cdist < b.radius() * 1.8;
@@ -1900,7 +1972,64 @@
       b.updateBaby(dt);
     }
 
+    this.resolveOverlaps(dt);
     this.fx.update(dt);
+  };
+
+  // Anti-Overlap: die Familie auseinanderhalten, damit kein Küken hinter
+  // der Mama (oder einem Geschwister) verschwindet. Fast-harte Positions-
+  // Projektion (zwei Iterationen), sonst gewinnt das Spur-Folgen den
+  // Dauerkampf und drückt die Küken doch wieder in die Mama.
+  Engine.prototype.resolveOverlaps = function (dt) {
+    if (!this.babies.length) return;
+    var group = [this.duck].concat(this.babies);
+    var k = 1 - Math.exp(-30 * dt);
+    var dState = this.duck.state;
+    // Wenn Mama abgetaucht/geplatzt ist, gibt es nichts zu verdecken
+    var duckSolid = dState !== 'dive' && dState !== 'peekaboo' &&
+      dState !== 'burst' && !this.duck.vanish;
+    for (var pass = 0; pass < 2; pass++) {
+      for (var i = 0; i < group.length; i++) {
+        for (var j = i + 1; j < group.length; j++) {
+          var A = group[i], B = group[j];
+          if (A.nesting || B.nesting) continue;
+          if (A === this.duck && !duckSolid) continue;
+          var minD = (A.radius() + B.radius()) * 0.92;
+          if (A.eating || B.eating) minD *= 0.72;   // am Futter wird gedrängelt
+          var ddx = B.x - A.x, ddy = B.y - A.y;
+          var d2 = ddx * ddx + ddy * ddy;
+          if (d2 >= minD * minD) continue;
+          var d = Math.sqrt(d2);
+          var ux, uy;
+          if (d < 0.01) { ux = Math.cos(j * 2.4); uy = Math.sin(j * 2.4); d = 0.01; }
+          else { ux = ddx / d; uy = ddy / d; }
+          var push = (minD - d) * k;
+          if (A === this.duck) {
+            // Mama bleibt wo sie ist, das Küken weicht aus
+            B.x += ux * push; B.y += uy * push;
+          } else {
+            A.x -= ux * push * 0.5; A.y -= uy * push * 0.5;
+            B.x += ux * push * 0.5; B.y += uy * push * 0.5;
+          }
+          // aufeinander zulaufende Geschwindigkeit wegdämpfen (nur beim
+          // Küken — Mamas Kurs gehört dem Cursor)
+          var bvr = B.vx * ux + B.vy * uy;
+          if (bvr < 0) { B.vx -= ux * bvr; B.vy -= uy * bvr; }
+          if (A !== this.duck) {
+            var avr = A.vx * ux + A.vy * uy;
+            if (avr > 0) { A.vx -= ux * avr; A.vy -= uy * avr; }
+          }
+        }
+      }
+    }
+    // Die Pushes laufen nach dem Rand-Clamp von integrate() — Küken danach
+    // wieder einfangen, sonst schiebt eine Mama am Rand sie aus dem Bild
+    for (var ci2 = 1; ci2 < group.length; ci2++) {
+      var C = group[ci2];
+      var cm = C.radius() * 1.2;
+      C.x = clamp(C.x, -cm, this.w + cm);
+      C.y = clamp(C.y, cm * 0.6, this.h + cm);
+    }
   };
 
   // Küken: einfache Version des Verhaltens
@@ -1912,15 +2041,33 @@
     this.actionTick -= dt;
     if (this.actionTick <= 0) {
       this.actionTick = rand(2.5, 7);
-      this.babyAct = pick(['flap', 'bob', 'quack', 'look', 'none']);
-      this.babyActT = rand(0.7, 1.3);
-      if (this.babyAct === 'quack') {
-        e.sound.quack(this.model.quackPitch);
-        var hb = this.headWorld();
-        e.fx.note(hb.x, hb.y - 4, 'rgba(90,110,150,0.6)');
+      if (this.nesting) {
+        // im Nest: nur ab und zu ein kleines Zzz
+        if (Math.random() < 0.6) {
+          var hn2 = this.headWorld();
+          e.fx.zzz(hn2.x + 4, hn2.y - 6);
+        }
+      } else {
+        this.babyAct = pick(['flap', 'bob', 'quack', 'look', 'doze', 'none']);
+        this.babyActT = this.babyAct === 'doze' ? rand(2.5, 4.5) : rand(0.7, 1.3);
+        if (this.babyAct === 'quack') {
+          e.sound.quack(this.model.quackPitch);
+          var hb = this.headWorld();
+          e.fx.note(hb.x, hb.y - 4, 'rgba(90,110,150,0.6)');
+        }
+        if (this.babyAct === 'doze') {
+          var hd2 = this.headWorld();
+          e.fx.zzz(hd2.x + 3, hd2.y - 5);
+        }
       }
     }
-    if (this.eating) {
+    if (this.nesting) {
+      // Kuschelschlaf im Nest: Augen zu, Köpfchen ins Gefieder, ruhiges Atmen
+      t.eyeOpen = 0;
+      t.headRot = 0.14;
+      t.squash = 1 + Math.sin(e.time * 1.3 + this.phase) * 0.025;
+      this.babyActT = 0;
+    } else if (this.eating) {
       // Krumen picken: Köpfchen nickt im Knabber-Takt
       var nib = Math.sin(e.time * 12 + this.phase);
       t.headDip = 0.5 + nib * 0.25;
@@ -1932,11 +2079,15 @@
       else if (this.babyAct === 'bob') { t.squash = 1 + Math.sin(e.time * 6) * 0.06; }
       else if (this.babyAct === 'quack') { t.beakOpen = Math.max(0, Math.sin(k * 12)) * 0.8; }
       else if (this.babyAct === 'look') { t.headRot = Math.sin(e.time * 3) * 0.3; }
+      else if (this.babyAct === 'doze') { t.eyeOpen = 0.05; t.headRot = 0.15; }
     }
+
+    // sanftes Ein-/Ausblenden der Schlafpose (Kopf rutscht ins Gefieder)
+    a.sleep = approach(a.sleep, this.nesting ? 1 : 0, 3, dt);
 
     this.blinkIn -= dt;
     if (this.blinkIn <= 0) { this.blinkIn = rand(2, 6); this.blinkT = 0.14; }
-    if (this.blinkT > 0) { this.blinkT -= dt; t.eyeOpen = 0.05; }
+    if (this.blinkT > 0 && !this.nesting) { this.blinkT -= dt; t.eyeOpen = 0.05; }
 
     a.wingFlap = approach(a.wingFlap, t.wingFlap, 20, dt);
     a.squash = approach(a.squash, t.squash, 12, dt);
@@ -1964,16 +2115,107 @@
     // Fisch & Brotkrumen liegen im/auf dem Wasser → unter die Enten
     if (this.fish || this.crumbs.length) this.drawExtras(ctx);
 
-    // Besuch schwimmt hinter der Familie
-    if (this.visitor) DuckRender.draw(ctx, this.visitor.model, this.visitor.pose());
-
-    // Küken zuerst (hinten), dann die große Ente
-    for (var i = this.babies.length - 1; i >= 0; i--) {
+    // Tiefensortierung: wer weiter unten schwimmt, ist weiter vorn —
+    // so verdeckt nie die falsche Ente die andere. Das Nest bildet mit
+    // seinen schlafenden Küken eine Einheit (Rückwand → Küken → Rand).
+    var order = [];
+    if (this.visitor) order.push({ y: this.visitor.y, k: 'v' });
+    for (var i = 0; i < this.babies.length; i++) {
       var b = this.babies[i];
-      DuckRender.draw(ctx, b.model, b.pose());
+      if (!b.nesting) order.push({ y: b.y, k: 'b', o: b });
     }
-    DuckRender.draw(ctx, this.duck.model, this.duck.pose());
+    order.push({ y: this.duck.y, k: 'd' });
+    if (this.nest) order.push({ y: this.nest.y, k: 'n' });
+    order.sort(function (p, q) { return p.y - q.y; });
+
+    for (var oi = 0; oi < order.length; oi++) {
+      var it = order[oi];
+      if (it.k === 'v') DuckRender.draw(ctx, this.visitor.model, this.visitor.pose());
+      else if (it.k === 'b') DuckRender.draw(ctx, it.o.model, it.o.pose());
+      else if (it.k === 'd') DuckRender.draw(ctx, this.duck.model, this.duck.pose());
+      else this.drawNest(ctx);
+    }
     if (this.cfg.effects) this.fx.draw(ctx);
+  };
+
+  // ── Küken-Nest zeichnen ───────────────────────────────────────
+  Engine.prototype.drawNest = function (ctx) {
+    var n = this.nest;
+    if (!n || n.appear < 0.02) return;
+    this.drawNestRing(ctx, true);
+    var ns = [];
+    for (var i = 0; i < this.babies.length; i++) {
+      if (this.babies[i].nesting) ns.push(this.babies[i]);
+    }
+    ns.sort(function (a, b) { return a.y - b.y; });
+    for (var j = 0; j < ns.length; j++) DuckRender.draw(ctx, ns[j].model, ns[j].pose());
+    this.drawNestRing(ctx, false);
+  };
+
+  Engine.prototype.drawNestRing = function (ctx, back) {
+    var n = this.nest, ap = n.appear;
+    var r = n.r * (0.72 + 0.28 * ap);
+    var ry = r * 0.42;
+    var y = n.y + (1 - ap) * n.r * 0.9;   // taucht von unten auf / sinkt ab
+    var browns = ['#8a6a42', '#6d5232', '#a3835c'];
+    ctx.save();
+    ctx.globalAlpha *= Math.min(1, ap * 1.5) * this.cfg.opacity;
+    if (back) {
+      // Kontaktring auf dem Wasser
+      ctx.strokeStyle = 'rgba(255,255,255,0.35)';
+      ctx.lineWidth = 1.6;
+      ctx.beginPath();
+      ctx.ellipse(n.x, y + ry * 0.5, r * 1.2, ry * 0.62, 0, 0, TAU);
+      ctx.stroke();
+      // Stroh-Innenfläche
+      var sg = ctx.createLinearGradient(0, y - ry, 0, y + ry);
+      sg.addColorStop(0, '#e8cd9a');
+      sg.addColorStop(1, '#c8a26b');
+      ctx.fillStyle = sg;
+      ctx.beginPath();
+      ctx.ellipse(n.x, y, r * 0.94, ry * 0.94, 0, 0, TAU);
+      ctx.fill();
+      // ein paar Strohhalme
+      ctx.strokeStyle = 'rgba(140,105,60,0.5)';
+      ctx.lineWidth = 1.2;
+      for (var s = 0; s < 5; s++) {
+        var sa = s * 1.7 + 0.4;
+        ctx.beginPath();
+        ctx.moveTo(n.x + Math.cos(sa) * r * 0.55, y + Math.sin(sa) * ry * 0.5);
+        ctx.quadraticCurveTo(n.x + Math.cos(sa + 1) * r * 0.3, y,
+          n.x + Math.cos(sa + 2.2) * r * 0.5, y + Math.sin(sa + 2.2) * ry * 0.45);
+        ctx.stroke();
+      }
+      // hinterer Rand (obere Ellipsenhälfte)
+      for (var b1 = 0; b1 < 3; b1++) {
+        ctx.strokeStyle = browns[b1];
+        ctx.lineWidth = r * (0.14 - b1 * 0.03);
+        ctx.beginPath();
+        ctx.ellipse(n.x, y - b1 * 1.5, r * (1 - b1 * 0.05), ry * (1 - b1 * 0.06), 0, Math.PI, TAU);
+        ctx.stroke();
+      }
+    } else {
+      // vorderer Rand (untere Hälfte, dicker — dahinter kuscheln die Küken)
+      for (var b2 = 0; b2 < 3; b2++) {
+        ctx.strokeStyle = browns[b2];
+        ctx.lineWidth = r * (0.17 - b2 * 0.035);
+        ctx.beginPath();
+        ctx.ellipse(n.x, y + b2 * 1.2, r * (1 - b2 * 0.06), ry * (1 - b2 * 0.07), 0, 0, Math.PI);
+        ctx.stroke();
+      }
+      // Zweig-Textur: kurze schräge Striche auf dem Vorderrand
+      ctx.strokeStyle = 'rgba(60,42,22,0.35)';
+      ctx.lineWidth = 1.3;
+      for (var t2 = 0; t2 < 7; t2++) {
+        var ta = 0.25 + (t2 / 7) * (Math.PI - 0.5);
+        var tx = n.x + Math.cos(ta) * r, ty = y + Math.sin(ta) * ry;
+        ctx.beginPath();
+        ctx.moveTo(tx - 4, ty - 3);
+        ctx.lineTo(tx + 4, ty + 3);
+        ctx.stroke();
+      }
+    }
+    ctx.restore();
   };
 
   // ── Debug/Steuer-API ──────────────────────────────────────────
