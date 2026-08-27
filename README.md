@@ -18,7 +18,7 @@ her tricks.
 
 ## What she can do
 
-| | |
+| Trick | What happens |
 |---|---|
 | **Following you** | Follows the cursor with inertia, weaves while paddling, leaves a wake and a bow wave. Far behind? Then she sprints. She tilts into her swimming direction and visibly turns when changing course — on a steep course her body foreshortens slightly, as if seen head-on. |
 | **Staying attentive** | When the cursor moves away she abandons whatever she was doing and swims after it. If the cursor jumps suddenly (window switch, iframe), she perks up with a “!” and catches up extra fast. |
