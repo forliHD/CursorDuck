@@ -172,6 +172,20 @@
     hl.addColorStop(1, 'rgba(255,255,255,0)');
     ctx.fillStyle = hl;
     ctx.fillRect(g.bcx - g.bw, g.bcy - g.bh, g.bw * 2, g.bh);
+
+    // Ostereier-Tupfen — nach Bauch-Aufhellung und Glanz, sonst
+    // waschen die Verläufe die Farben aus
+    if (m.dots) {
+      for (var di = 0; di < 11; di++) {
+        var da = di * 2.399, dRad = Math.sqrt((di + 0.5) / 11);
+        var dx2 = g.bcx + Math.cos(da) * dRad * g.bw * 0.85;
+        var dy2 = g.bcy + Math.sin(da) * dRad * g.bh * 0.85;
+        ctx.globalAlpha *= 0.9;
+        fillEll(ctx, dx2, dy2, g.r * (0.085 + (di % 3) * 0.02), g.r * (0.075 + (di % 3) * 0.02), 0,
+          m.dots[di % m.dots.length]);
+        ctx.globalAlpha /= 0.9;
+      }
+    }
     ctx.restore();
   }
 
@@ -666,6 +680,27 @@
         ctx.ellipse(hr * 0.62, hr * 0.12, hr * 0.72, hr * 0.18, 0, -Math.PI, 0);
         ctx.fill();
         break;
+      case 'bunny': {
+        // Zwei lange Hasenohren mit rosa Innenseite, wippen leicht versetzt
+        for (var be = 0; be < 2; be++) {
+          var bs = be ? 1 : -1;
+          var earSway = Math.sin(p.t * 2.1 + be * 1.7) * 0.07;
+          ctx.save();
+          ctx.translate(bs * hr * 0.34, -hr * 0.05);
+          ctx.rotate(bs * 0.22 + earSway);
+          // Außenohr (hell, mit zarter Kontur)
+          ctx.fillStyle = '#fdf6e8';
+          ctx.strokeStyle = 'rgba(160,130,90,0.45)';
+          ctx.lineWidth = r * 0.03;
+          ctx.beginPath();
+          ctx.ellipse(0, -hr * 0.95, hr * 0.26, hr * 1.0, 0, 0, TAU);
+          ctx.fill(); ctx.stroke();
+          // Innenohr rosa
+          fillEll(ctx, 0, -hr * 0.92, hr * 0.13, hr * 0.68, 0, '#ffb7cd');
+          ctx.restore();
+        }
+        break;
+      }
       case 'santa': {
         // Zipfelmütze: rote Haube, weißes Bündchen, Bommel kippt nach hinten
         var sway2 = Math.sin(p.t * 1.8) * hr * 0.06;
@@ -949,8 +984,8 @@
       ctx.restore();
     }
 
-    // 2) Unterwasser-Anteil (steht sie an Land, gibt es keinen)
-    if (walk < 0.62) {
+    // 2) Unterwasser-Anteil (an Land oder im Nest gibt es keinen)
+    if (walk < 0.62 && p.water) {
       ctx.save();
       clipBelow(ctx, r);
       ctx.globalAlpha *= 0.42 * (1 - Math.min(1, walk * 1.6));

@@ -1,0 +1,266 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>Cursor Duck — Store-Screenshots 📸</title>
+<!--
+  Erzeugt die Store-Screenshots (1280×800) für Chrome / Firefox / Edge —
+  in Deutsch UND Englisch, bewusst ohne Zahlen im Text, damit sie nicht
+  bei jeder Version neu gebaut werden müssen.
+
+      python3 tools/iconserver.py
+      http://127.0.0.1:8778/demo/shots.html  →  „Alle speichern“
+      → dist/shot1-hero-de.png … shot3-play-en.png
+-->
+<style>
+  body { margin: 0; padding: 24px; background: #1d2430; color: #dfe8f2;
+         font: 14px/1.5 ui-rounded, system-ui, sans-serif; }
+  h1 { font-size: 20px; margin: 0 0 12px; }
+  button { font: inherit; padding: 8px 18px; border-radius: 10px; border: 0;
+           background: #2f86d6; color: #fff; cursor: pointer; margin-right: 10px; }
+  #out { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; margin-top: 18px; }
+  figure { margin: 0; }
+  figcaption { font-size: 12px; color: #8fa3ba; margin-top: 4px; }
+  canvas { width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 18px rgba(0,0,0,.4); }
+  #log { white-space: pre-line; color: #9fd0a0; margin-top: 10px; }
+</style>
+</head>
+<body>
+<h1>Store-Screenshots (1280×800, DE + EN, zahlenfrei)</h1>
+<button id="save">Alle speichern → dist/</button><span id="log"></span>
+<div id="out"></div>
+
+<script src="../src/models.js"></script>
+<script src="../src/render.js"></script>
+<script>
+(function () {
+  'use strict';
+  var W = 1280, H = 800;
+
+  var TEXT = {
+    de: {
+      heroTitle: 'Cursor Duck 🦆',
+      heroSub: 'Eine Ente schwimmt deinem Mauszeiger hinterher',
+      modelsTitle: 'Von der Stockente bis zur Galaxie-Ente',
+      modelsSub: 'Echte Enten, Fantasie-Modelle und Saison-Enten — plus Küken',
+      playTitle: 'Streicheln, füttern, spielen',
+      playSub: 'Herzchen, Brotkrumen, Fisch-Jagd, Tänzchen, Besuch von wilden Enten'
+    },
+    en: {
+      heroTitle: 'Cursor Duck 🦆',
+      heroSub: 'A duck that swims after your mouse pointer',
+      modelsTitle: 'From mallard to galaxy duck',
+      modelsSub: 'Real ducks, fantasy models and seasonal ducks — plus ducklings',
+      playTitle: 'Pet her, feed her, play with her',
+      playSub: 'Hearts, bread crumbs, fish hunts, dances and visits from wild ducks'
+    }
+  };
+
+  // ── gemeinsame Bausteine ────────────────────────────────────
+  function bg(x, waterTop) {
+    var sky = x.createLinearGradient(0, 0, 0, waterTop);
+    sky.addColorStop(0, '#ffffff');
+    sky.addColorStop(1, '#e8f4fd');
+    x.fillStyle = sky;
+    x.fillRect(0, 0, W, waterTop);
+    var water = x.createLinearGradient(0, waterTop, 0, H);
+    water.addColorStop(0, '#a8d4f2');
+    water.addColorStop(1, '#5f9fd4');
+    x.fillStyle = water;
+    x.fillRect(0, waterTop, W, H - waterTop);
+    x.strokeStyle = 'rgba(255,255,255,0.7)';
+    x.lineWidth = 3;
+    x.beginPath(); x.moveTo(0, waterTop); x.lineTo(W, waterTop); x.stroke();
+  }
+
+  function titles(x, t1, t2) {
+    x.fillStyle = '#1d2b3a';
+    x.font = '800 56px ui-rounded, system-ui, sans-serif';
+    x.textAlign = 'center';
+    x.fillText(t1, W / 2, 96);
+    x.fillStyle = '#46617c';
+    x.font = '500 27px ui-rounded, system-ui, sans-serif';
+    x.fillText(t2, W / 2, 146);
+  }
+
+  function ripple(x, cx, cy, r) {
+    x.strokeStyle = 'rgba(255,255,255,0.5)';
+    x.lineWidth = 2.5;
+    x.beginPath(); x.ellipse(cx, cy, r, r * 0.3, 0, 0, Math.PI * 2); x.stroke();
+    x.strokeStyle = 'rgba(56,116,170,0.25)';
+    x.beginPath(); x.ellipse(cx, cy + 3, r * 1.25, r * 0.36, 0, 0, Math.PI * 2); x.stroke();
+  }
+
+  function cursorArrow(x, cx, cy, s) {
+    x.save();
+    x.translate(cx, cy);
+    x.scale(s, s);
+    x.beginPath();
+    x.moveTo(0, 0); x.lineTo(0, 17); x.lineTo(4.2, 13.5); x.lineTo(7, 19.5);
+    x.lineTo(9.5, 18.3); x.lineTo(6.8, 12.5); x.lineTo(12, 12.2);
+    x.closePath();
+    x.fillStyle = '#ffffff';
+    x.strokeStyle = '#1d2b3a';
+    x.lineWidth = 1.4;
+    x.fill(); x.stroke();
+    x.restore();
+  }
+
+  function heart(x, cx, cy, s, alpha) {
+    x.save();
+    x.globalAlpha = alpha == null ? 1 : alpha;
+    x.fillStyle = '#ff5f8d';
+    x.beginPath();
+    x.moveTo(cx, cy + s * 0.75);
+    x.bezierCurveTo(cx - s * 1.3, cy - s * 0.25, cx - s * 0.55, cy - s * 1.1, cx, cy - s * 0.35);
+    x.bezierCurveTo(cx + s * 0.55, cy - s * 1.1, cx + s * 1.3, cy - s * 0.25, cx, cy + s * 0.75);
+    x.fill();
+    x.restore();
+  }
+
+  function crumb(x, cx, cy, s) {
+    x.fillStyle = '#e0b073';
+    x.strokeStyle = 'rgba(140,95,45,0.75)';
+    x.lineWidth = 2;
+    x.beginPath();
+    for (var k = 0; k <= 6; k++) {
+      var a = k / 6 * Math.PI * 2;
+      var r = s * (0.82 + 0.24 * Math.sin(k * 2.4));
+      var px = cx + Math.cos(a) * r, py = cy + Math.sin(a) * r * 0.8;
+      if (k === 0) x.moveTo(px, py); else x.lineTo(px, py);
+    }
+    x.closePath(); x.fill(); x.stroke();
+  }
+
+  function fishShadow(x, cx, cy, s) {
+    x.save();
+    x.globalAlpha = 0.45;
+    x.fillStyle = 'rgba(38,86,128,0.9)';
+    x.beginPath(); x.ellipse(cx, cy, s, s * 0.42, 0, 0, Math.PI * 2); x.fill();
+    x.beginPath();
+    x.moveTo(cx - s * 0.9, cy);
+    x.lineTo(cx - s * 1.5, cy - s * 0.42);
+    x.lineTo(cx - s * 1.5, cy + s * 0.42);
+    x.closePath(); x.fill();
+    x.restore();
+  }
+
+  function note(x, cx, cy, s, col) {
+    x.save();
+    x.fillStyle = col || 'rgba(50,62,82,0.75)';
+    x.translate(cx, cy);
+    x.beginPath(); x.ellipse(-s * 0.28, s * 0.42, s * 0.34, s * 0.26, -0.4, 0, Math.PI * 2); x.fill();
+    x.fillRect(-s * 0.02, -s * 0.62, s * 0.14, s * 1.1);
+    x.restore();
+  }
+
+  // ── Szenen ──────────────────────────────────────────────────
+  function sceneHero(x, L) {
+    bg(x, 250);
+    titles(x, L.heroTitle, L.heroSub);
+    // Kielwasser + Familie schwimmt dem Cursor hinterher
+    ripple(x, 560, 585, 60);
+    ripple(x, 480, 600, 40);
+    DuckRender.draw(x, DuckModels.get('mallard'),
+      { x: 640, y: 560, r: 105, dir: 1, t: 1.2, paddle: 2.2, headRot: -0.08, reflection: true });
+    var baby = DuckRender.babyOf(DuckModels.get('mallard'));
+    DuckRender.draw(x, baby, { x: 430, y: 590, r: 46, dir: 1, t: 0.6, paddle: 3.1, reflection: false });
+    DuckRender.draw(x, baby, { x: 290, y: 575, r: 46, dir: 1, t: 1.7, paddle: 1.4, eyeOpen: 1, reflection: false });
+    cursorArrow(x, 985, 430, 3.2);
+    ripple(x, 1000, 505, 26);
+  }
+
+  function sceneModels(x, L) {
+    bg(x, 190);
+    titles(x, L.modelsTitle, L.modelsSub);
+    var ids = ['mallard', 'rubber', 'mandarin', 'swan',
+               'pirate', 'wizard', 'neon', 'party',
+               'chef', 'cowboy', 'galaxy', 'golden'];
+    var cols = 4, cw = 272, ch = 168, gap = 24;
+    var x0 = (W - cols * cw - (cols - 1) * gap) / 2;
+    var y0 = 232;
+    for (var i = 0; i < ids.length; i++) {
+      var cx = x0 + (i % cols) * (cw + gap);
+      var cy = y0 + Math.floor(i / cols) * (ch + gap);
+      // Kachel
+      x.save();
+      x.beginPath();
+      var rr = 18;
+      x.roundRect(cx, cy, cw, ch, rr);
+      var tg = x.createLinearGradient(0, cy, 0, cy + ch);
+      tg.addColorStop(0, '#f4fbff');
+      tg.addColorStop(0.55, '#d8edfc');
+      tg.addColorStop(1, '#9fcbec');
+      x.fillStyle = tg;
+      x.fill();
+      x.strokeStyle = 'rgba(120,160,200,0.45)';
+      x.lineWidth = 1.5;
+      x.stroke();
+      x.clip();
+      DuckRender.draw(x, DuckModels.get(ids[i]),
+        { x: cx + cw / 2, y: cy + ch * 0.74, r: 42, dir: 1, t: i * 0.9, paddle: i, reflection: true });
+      x.restore();
+    }
+  }
+
+  function scenePlay(x, L) {
+    bg(x, 250);
+    titles(x, L.playTitle, L.playSub);
+    // Zwei Enten einander zugewandt, Herzchen, Noten
+    DuckRender.draw(x, DuckModels.get('mallard'),
+      { x: 470, y: 560, r: 95, dir: 1, t: 0.8, paddle: 1.2, eyeHappy: 1, blush: 0.7, headRot: -0.1, reflection: true });
+    DuckRender.draw(x, DuckModels.get('mallard-hen'),
+      { x: 810, y: 570, r: 88, dir: -1, t: 1.9, paddle: 2.4, eyeHappy: 1, beakOpen: 0.35, headRot: -0.12, reflection: true });
+    heart(x, 610, 385, 22);
+    heart(x, 665, 350, 15, 0.8);
+    heart(x, 560, 345, 12, 0.65);
+    note(x, 875, 420, 30);
+    note(x, 930, 390, 22, 'rgba(50,62,82,0.55)');
+    // Brotkrumen + Fisch
+    crumb(x, 1060, 590, 16);
+    crumb(x, 1110, 620, 12);
+    crumb(x, 1035, 635, 10);
+    ripple(x, 1070, 615, 46);
+    fishShadow(x, 250, 700, 42);
+    ripple(x, 250, 688, 34);
+  }
+
+  var SHOTS = [
+    { file: 'shot1-hero', draw: sceneHero },
+    { file: 'shot2-models', draw: sceneModels },
+    { file: 'shot3-play', draw: scenePlay }
+  ];
+
+  var out = document.getElementById('out');
+  var made = [];
+  ['de', 'en'].forEach(function (lang) {
+    SHOTS.forEach(function (s) {
+      var c = document.createElement('canvas');
+      c.width = W; c.height = H;
+      var x = c.getContext('2d');
+      s.draw(x, TEXT[lang]);
+      var fig = document.createElement('figure');
+      fig.appendChild(c);
+      var cap = document.createElement('figcaption');
+      cap.textContent = s.file + '-' + lang + '.png';
+      fig.appendChild(cap);
+      out.appendChild(fig);
+      made.push({ name: s.file + '-' + lang + '.png', canvas: c });
+    });
+  });
+
+  var log = document.getElementById('log');
+  document.getElementById('save').onclick = function () {
+    log.textContent = '';
+    made.forEach(function (m) {
+      fetch('http://127.0.0.1:8778/save?dir=dist&name=' + m.name,
+        { method: 'POST', body: m.canvas.toDataURL('image/png') })
+        .then(function (r) { return r.text(); })
+        .then(function (t) { log.textContent += t + '\n'; })
+        .catch(function (e) { log.textContent += 'Fehler ' + m.name + ': ' + e.message + '\n'; });
+    });
+  };
+})();
+</script>
+</body>
+</html>

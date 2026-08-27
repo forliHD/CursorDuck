@@ -150,10 +150,21 @@ input[type=range]::-webkit-slider-thumb {
 .ach::-webkit-scrollbar-button { display: none; height: 0; }
 .a {
   min-width: 0;
-  display: flex; align-items: center; gap: 5px;
+  display: flex; align-items: center; gap: 5px; flex-wrap: wrap;
   border: 1px solid var(--line); border-radius: 8px; padding: 4px 6px;
   font-size: 10.5px; color: var(--muted); opacity: .75;
+  cursor: pointer;
 }
+/* Klick auf einen Erfolg: Kachel geht über beide Spalten und zeigt,
+   wie man ihn holt */
+.a .desc {
+  display: none; flex-basis: 100%;
+  font-size: 10px; line-height: 1.4; white-space: normal;
+  color: var(--muted); margin: 2px 0 1px 18px;
+}
+.a.open { grid-column: 1 / -1; opacity: 1; }
+.a.open .desc { display: block; }
+.a.open .tx { white-space: normal; }
 .a .em { filter: grayscale(1); font-size: 13px; }
 .a .tx { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .a .pr { font-variant-numeric: tabular-nums; font-size: 9.5px; }

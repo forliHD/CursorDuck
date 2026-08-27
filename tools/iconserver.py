@@ -39,6 +39,9 @@ class Handler(SimpleHTTPRequestHandler):
         query = parse_qs(urlparse(self.path).query)
         name = (query.get("name") or ["icon.png"])[0]
         name = os.path.basename(name)
+        # Zielordner: icons/ (Standard) oder dist/ (Store-Material, z. B. Screenshots)
+        target = (query.get("dir") or ["icons"])[0]
+        base = os.path.join(ROOT, "dist") if target == "dist" else ICONS
         if not name.endswith(".png"):
             self.send_response(400)
             self._cors()
@@ -51,8 +54,8 @@ class Handler(SimpleHTTPRequestHandler):
         if "," in raw and raw.startswith("data:"):
             raw = raw.split(",", 1)[1]
 
-        os.makedirs(ICONS, exist_ok=True)
-        path = os.path.join(ICONS, name)
+        os.makedirs(base, exist_ok=True)
+        path = os.path.join(base, name)
         with open(path, "wb") as fh:
             fh.write(base64.b64decode(raw))
 

@@ -38,10 +38,11 @@ Fertig — die Ente schwimmt los, und eine Willkommensseite erklärt kurz die Ku
 | **Erschrecken** | Ganz schnell durch sie durchwischen → sie fährt hoch, Federn fliegen, empörtes Quaken. |
 | **Nickerchen** | 15 Sekunden Ruhe → Kopf ins Gefieder, Zzz. Wacht mit „!“ wieder auf. |
 | **Idle-Animationen** | Gründeln (Popo hoch, Kopf unter Wasser), Tauchen mit Blasen und Auftauch-Splash, Gefieder putzen, Flügelschlagen, Schütteln, Baden, Pirouetten, Umschauen, Wippen, Quaken mit Notenwölkchen. |
-| **Küken** | Bis zu 6 Küken schwimmen in einer Reihe auf Mamas Spur hinterher — mit eigenen kleinen Animationen und flauschig-gelbem Farbschema. |
+| **Küken** | Bis zu 6 Küken schwimmen in einer Reihe auf Mamas Spur hinterher — mit eigenen kleinen Animationen (inklusive Dösen) und flauschig-gelbem Farbschema. Die Familie hält sanft Abstand, kein Küken verschwindet hinter der Mama. |
+| **Küken-Nest** | Wird die Mama müde, bringt sie die Küken erst selbst zu Bett: Ein Nest taucht auf (es wächst mit Kükenzahl und Entengröße), sie wartet am Rand, stupst den Kleinen ein Gute-Nacht-Küsschen zu — und schläft dann daneben ein, gelegentlich Herzchen träumend. Wacht sie auf, versinkt das Nest blubbernd. |
 | **Anklicken** | Klick auf die Ente → sie quakt zurück. Doppelklick auf die Ente → Flügelschlagen. |
 
-## Die 33 Entenmodelle
+## Die Entenmodelle
 
 **Echte Enten:** Stockente (Erpel & Weibchen), Quietsche-Ente, Pekingente, Mandarinente,
 Brautente, Reiherente, Krickente, Laufente, Chonk-Ente, Küken, Schwan, Gans.
@@ -51,39 +52,47 @@ Königs-Ente, Ninja-Ente, Goth-Ente, Party-Ente (mit Konfetti), Chefkoch-Ente, Z
 Astro-Ente (Helm), Zombie-Ente, Engels-Ente (Heiligenschein), Teufels-Ente, Cowboy-Ente,
 Regenbogen-Ente, Galaxie-Ente (Sternenkörper), Goldene Ente.
 
-**Saisonal:** Kürbis-Ente (nur im Oktober) und Weihnachts-Ente (nur im Dezember)
-tauchen automatisch in ihrem Monat im Popup auf.
+**Saisonal:** Kürbis-Ente (Oktober), Weihnachts-Ente (Dezember) und Oster-Ente
+(drei Wochen vor bis eine Woche nach dem per Gauß-Formel berechneten
+Ostersonntag) tauchen automatisch in ihrem Zeitfenster im Popup auf.
+
+**Mit Sprüchen:** Die Visionärs-Ente (schwarzer Rollkragen, runde Brille)
+quakt nicht nur — ab und zu sagt sie Dinge wie „One more thing …",
+„You're holding it wrong." oder „Quack different." (zwölf Sprüche).
+Eigene Sprüche gehen über das `sayings`-Feld im Modell.
 
 Seltene Modelle sind im Popup markiert (blau = selten, lila = episch, gold = legendär).
 Der 🎲-Knopf zieht zufällig — Legendäre sind selten. Im Popup gibt es außerdem
-**22 Erfolge** (Streicheleinheiten, Fänge, Tänzchen, Besuche, „Landratte",
-„Platzt vor Glück" …).
+**35 Erfolge** — vom Streichel-Fan über „Identitätskrise" bis „Keynote-Fan";
+ein Klick auf einen Erfolg verrät, wie man ihn holt.
 
 ## Einstellungen (Popup)
 
 Größe, Tempo, Anzahl Küken, Verspieltheit, Sichtbarkeit, Ton an/aus, Wasser-Effekte,
-Spiegelung, Cursor-Picken, Brotkrumen-Füttern, „Auf dieser Seite pausieren“ — alles greift
-sofort, ohne Neuladen. Dazu 16 Knöpfe, um Kunststücke direkt auszulösen (inklusive
+Spiegelung, Cursor-Picken, Brotkrumen-Füttern, „Neues Zufallsmodell bei jedem
+Browserstart“, „Auf dieser Seite pausieren“ — alles greift sofort, ohne Neuladen. Dazu 16 Knöpfe, um Kunststücke direkt auszulösen (inklusive
 Füttern, Fisch-Jagd, Landgang und Besuch).
 
 Tastenkürzel: `Alt+Shift+D` (an/aus), `Alt+Shift+N` (nächstes Modell).
 
 Der Ton ist per Voreinstellung **aus**. Eingeschaltet quakt sie synthetisch (Web Audio,
-keine Sounddateien) — jedes Modell hat eine eigene Stimmlage, Küken piepsen hoch.
+keine Sounddateien) im Cartoon-Stil: Sägezahn-Träger mit Abwärts-Sweep, ~105-Hz-Knarren
+(Amplitudenmodulation), zwei Formanten und Rausch-Anlaut; Freude quakt zweisilbig.
+Jedes Modell hat eine eigene Stimmlage, Küken piepsen hoch.
 
 ## Aufbau
 
 ```
 manifest.json          Manifest V3
-src/models.js          31 Entenmodelle: Farben, Proportionen, Accessoires, Effekte
+src/models.js          Entenmodelle: Farben, Proportionen, Accessoires, Effekte
 src/render.js          Zeichnet eine Ente prozedural (Körper, Hals, Kopf, Schnabel,
-                       Flügel, 12 Hüte, 5 Brillen, Wasserlinie, Spiegelung, Unterwasser)
+                       Flügel, Hüte, Brillen, Wasserlinie, Spiegelung, Unterwasser)
 src/effects.js         Partikel: Ringe, Tropfen, Herzchen, Federn, Blasen, Noten,
                        Zzz, Konfetti, Funkeln
 src/engine.js          Schwimmphysik (mit Richtungs-Neigung), Verhaltens-Automat,
                        Streicheln, Füttern, Fisch-Jagd, Schwindel, Küken, Sound
 src/content.js         Bootstrap im Tab, Live-Updates aus dem Storage
-src/background.js      Service Worker: Defaults und Tastenkürzel
+src/background.js      Service Worker: Defaults, Tastenkürzel, Zufall pro Start
 popup/                 Einstellungen mit Live-Vorschau
 welcome/               Begrüßungsseite nach der Installation
 icons/                 App-Symbole (mit demselben Renderer erzeugt)
@@ -98,15 +107,18 @@ demo/grid.html          Alle Modelle seitenweise
 demo/poses.html         Ein Modell in allen Extremposen
 demo/extension-sim.html Content-Script gegen eine nachgebaute chrome.*-API
 demo/icons.html         Symbole rendern und speichern (braucht tools/iconserver.py)
+demo/shots.html         Store-Screenshots (DE + EN, zahlenfrei) → dist/
 ```
 
 Lokal starten:
 
 ```bash
-python3 -m http.server 8777
+python3 tools/iconserver.py
 ```
 
-Dann `http://localhost:8777/demo/index.html` öffnen.
+Dann `http://127.0.0.1:8778/demo/index.html` öffnen. (Der kleine Server
+liefert mit `Cache-Control: no-store` aus — der normale `http.server`
+serviert beim Entwickeln gern veraltete Scripts.)
 
 ## Technische Details
 
