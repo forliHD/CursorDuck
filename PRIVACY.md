@@ -1,8 +1,10 @@
+<a id="english"></a>
+
 # Privacy Policy — Cursor Duck
 
 *Last updated: 27 August 2026*
 
-**English** · [Deutsch ↓](#datenschutzerklärung--cursor-duck)
+**English** · [Deutsch ↓](#deutsch)
 
 ## In short
 
@@ -58,11 +60,13 @@ noted in the store listing.
 
 ---
 
+<a id="deutsch"></a>
+
 # Datenschutzerklärung — Cursor Duck
 
 *Stand: 27. August 2026*
 
-[↑ English](#privacy-policy--cursor-duck) · **Deutsch**
+[↑ English](#english) · **Deutsch**
 
 ## Kurzfassung
 
