@@ -28,8 +28,9 @@ ERLAUBT ist:
     innerhalb von GitHub);
  2. die private, unveränderte Installation der Erweiterung aus diesem
     Repository zu Test- und Lernzwecken;
- 3. die Nutzung der offiziell im Chrome Web Store veröffentlichten
-    Erweiterung gemäß deren Store-Bedingungen.
+ 3. die Nutzung der offiziell veröffentlichten Erweiterung aus einem
+    offiziellen Store (Chrome Web Store, Firefox Add-ons, Microsoft Edge
+    Add-ons) gemäß den jeweiligen Store-Bedingungen.
 
 Der Name „Cursor Duck" und die zugehörige Aufmachung dürfen nicht zur
 Kennzeichnung fremder Software verwendet werden.
@@ -59,8 +60,9 @@ PERMITTED:
     by the GitHub Terms of Service, such as forks within GitHub);
  2. private, unmodified installation of the extension from this
     repository for testing and learning purposes;
- 3. using the extension as officially published on the Chrome Web Store,
-    subject to the store's terms.
+ 3. using the extension as officially published in an official store
+    (Chrome Web Store, Firefox Add-ons, Microsoft Edge Add-ons), subject
+    to the respective store's terms.
 
 The name "Cursor Duck" and its distinctive appearance may not be used
 to brand third-party software.
