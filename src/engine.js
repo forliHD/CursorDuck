@@ -34,132 +34,399 @@
     sleepAfter: 15      // Sekunden Cursor-Stillstand bis zum Nickerchen
   };
 
-  // ── Sound (komplett synthetisch, keine Assets) ────────────────
-  function Sound() { this.ac = null; this.vol = 0.35; this.on = false; }
+  // ── Sound ─────────────────────────────────────────────────────
+  // The voices are real CC0 recordings shipped in audio/ (see
+  // audio/SOURCES.md), played through Web Audio; the synthesized versions
+  // below survive only as a fallback when the files cannot be fetched
+  // (e.g. the demo opened via file://). All voices feed one master bus:
+  // master gain (user volume) → soft compressor (acts as a limiter, so
+  // overlapping voices never clip) → speakers. The AudioContext can only
+  // start after a user gesture (browser autoplay policy); until then play
+  // calls are DROPPED instead of scheduled — Web Audio freezes currentTime
+  // while suspended, so queued sounds would all fire at once on the first
+  // click.
+  var SAMPLE_FILES = {
+    quack: 'quack.wav',
+    quackAlt1: 'quack-alt1.wav',   // real-duck quacks, mixed in for variety
+    quackAlt2: 'quack-alt2.wav',
+    splash: 'splash.wav', peck: 'peck.wav',
+    pop: 'pop.wav', coinsBig: 'coins-big.wav', coinsSmall: 'coins-small.wav'
+  };
+
+  function Sound() {
+    this.ac = null; this.master = null;
+    this.vol = 0.35; this.on = false;
+    this._noise = null;
+    this.base = null;       // URL prefix for the sample files (host sets it)
+    this.buffers = {};      // decoded samples by voice name
+    this._raw = null;       // fetched-but-not-yet-decoded ArrayBuffers
+    this._state = {};       // per voice: 'pending' | 'failed'
+    this._fetched = false;
+  }
+
+  // Fetch the sample files (no AudioContext needed yet). Safe to call
+  // often — runs once. Voices whose file fails fall back to synthesis;
+  // while a file is merely still loading the voice stays silent instead
+  // (better one missed quack than one synthesized one).
+  Sound.prototype.preload = function () {
+    if (!this.on || !this.base || this._fetched || typeof fetch !== 'function') return;
+    this._fetched = true;
+    this._raw = {};
+    var self = this;
+    for (var name in SAMPLE_FILES) {
+      (function (n) {
+        self._state[n] = 'pending';
+        fetch(self.base + SAMPLE_FILES[n]).then(function (r) {
+          if (!r.ok) throw new Error('http ' + r.status);
+          return r.arrayBuffer();
+        }).then(function (ab) {
+          self._raw[n] = ab;
+          self._decodeOne(n);
+        }).catch(function () { self._state[n] = 'failed'; });
+      })(name);
+    }
+  };
+
+  Sound.prototype._decodeOne = function (n) {
+    if (!this.ac || !this._raw || !this._raw[n] || this.buffers[n]) return;
+    var self = this;
+    var ab = this._raw[n];
+    this._raw[n] = null;                  // decodeAudioData detaches it
+    try {
+      this.ac.decodeAudioData(ab, function (buf) { self.buffers[n] = buf; },
+        function () { self._state[n] = 'failed'; });
+    } catch (e) { this._state[n] = 'failed'; }
+  };
+
+  // May this voice use the synth fallback? Only when no sample was
+  // requested at all or its load definitively failed.
+  Sound.prototype._canSynth = function (n) {
+    return this._state[n] !== 'pending';
+  };
+
+  Sound.prototype._decodeAll = function () {
+    for (var n in SAMPLE_FILES) this._decodeOne(n);
+  };
+
+  // Play one decoded sample through the master bus.
+  Sound.prototype._play = function (name, rate, gain, at) {
+    var buf = this.buffers[name];
+    if (!buf) return false;
+    var ac = this.ac;
+    var src = ac.createBufferSource();
+    src.buffer = buf;
+    src.playbackRate.value = rate || 1;
+    var g = ac.createGain();
+    g.gain.value = gain == null ? 1 : gain;
+    src.connect(g); g.connect(this.master);
+    src.start(at || ac.currentTime);
+    return true;
+  };
+
+  // Called from real user gestures (mousedown/keydown) and lazily before
+  // each play. Creating the context inside a gesture starts it running.
   Sound.prototype.unlock = function () {
-    if (this.ac || !this.on) return;
+    if (!this.on) return;
+    this.preload();
+    if (this.ac) {
+      if (this.ac.state === 'suspended') this.ac.resume();
+      return;
+    }
     try {
       var AC = root.AudioContext || root.webkitAudioContext;
-      if (AC) this.ac = new AC();
-    } catch (e) { /* egal */ }
+      if (!AC) return;
+      this.ac = new AC();
+      var comp = this.ac.createDynamicsCompressor();
+      comp.threshold.value = -16; comp.knee.value = 18; comp.ratio.value = 5;
+      comp.attack.value = 0.002; comp.release.value = 0.16;
+      this.master = this.ac.createGain();
+      this.master.gain.value = this.vol;
+      this.master.connect(comp);
+      comp.connect(this.ac.destination);
+      if (this.ac.state === 'suspended') this.ac.resume();
+      this._decodeAll();
+    } catch (e) { this.ac = null; this.master = null; }
   };
+
+  // Gatekeeper: returns a running context or null (→ skip this sound)
+  Sound.prototype._ready = function () {
+    if (!this.on) return null;
+    this.unlock();
+    var ac = this.ac;
+    if (!ac || ac.state !== 'running') return null;
+    this.master.gain.setTargetAtTime(this.vol, ac.currentTime, 0.04);
+    return ac;
+  };
+
   Sound.prototype._env = function (g, t0, peak, dur, attack) {
     g.gain.setValueAtTime(0.0001, t0);
     g.gain.exponentialRampToValueAtTime(Math.max(0.0002, peak), t0 + (attack || 0.008));
     g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
   };
-  // Eine Quack-Silbe im Cartoon-Stil: Sägezahn-Träger mit Abwärts-Sweep,
-  // ~105-Hz-Knarren (Amplitudenmodulation — das Syrinx-Rattern), zwei
-  // Formanten (nasales ~950 Hz + bissiges ~2400 Hz) und ein kurzer
-  // Rausch-Anlaut ("K"). Der berühmte Kino-Quack ist ein lizenzpflichtiges
-  // Sample — das hier ist unsere synthetische Verneigung davor.
+
+  // One shared noise buffer (0.5 s), sliced by the voices below
+  Sound.prototype._noiseSrc = function () {
+    var ac = this.ac;
+    if (!this._noise) {
+      var len = Math.floor(ac.sampleRate * 0.5);
+      this._noise = ac.createBuffer(1, len, ac.sampleRate);
+      var d = this._noise.getChannelData(0);
+      for (var i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+    }
+    var src = ac.createBufferSource();
+    src.buffer = this._noise;
+    src.loop = true;
+    src.loopStart = 0; src.loopEnd = 0.5;
+    return src;
+  };
+
+  // One quack syllable. The recipe: two softly detuned sawtooths plus a
+  // warm sub-triangle, a "qua-ack" pitch bend (up, settle, drop), a gentle
+  // ~90 Hz amplitude rasp (the syrinx grain), a nasal ~950 Hz formant with
+  // a quieter ~2.4 kHz bite — everything rolled off by a lowpass so it
+  // stays round instead of buzzy — and a tiny breathy "k" noise onset.
   Sound.prototype._syllable = function (t0, p, dur, joy, loud) {
     var ac = this.ac;
     var out = ac.createGain();
-    this._env(out, t0, this.vol * 0.95 * (loud || 1), dur + 0.07);
-    out.connect(ac.destination);
+    this._env(out, t0, 2.3 * (loud || 1), dur + 0.08, 0.014);
+    out.connect(this.master);
 
+    // Warmth: everything passes a mild lowpass before the output
+    var lp = ac.createBiquadFilter();
+    lp.type = 'lowpass'; lp.Q.value = 0.7;
+    lp.frequency.setValueAtTime(1900 * Math.sqrt(p), t0);
+    lp.frequency.exponentialRampToValueAtTime(1100 * Math.sqrt(p), t0 + dur);
+    lp.connect(out);
+
+    // Formants: nasal body + a much quieter bite on top
     var f1 = ac.createBiquadFilter();
-    f1.type = 'bandpass'; f1.Q.value = 6;
-    f1.frequency.setValueAtTime(1050 * p, t0);
-    f1.frequency.exponentialRampToValueAtTime(640 * p, t0 + dur * 0.85);
+    f1.type = 'bandpass'; f1.Q.value = 4.5;
+    f1.frequency.setValueAtTime(1000 * p, t0);
+    f1.frequency.exponentialRampToValueAtTime(680 * p, t0 + dur * 0.9);
+    var f1g = ac.createGain(); f1g.gain.value = 0.85;
+    f1.connect(f1g); f1g.connect(lp);
     var f2 = ac.createBiquadFilter();
-    f2.type = 'bandpass'; f2.Q.value = 9;
+    f2.type = 'bandpass'; f2.Q.value = 6;
     f2.frequency.value = 2400 * p;
-    var g1 = ac.createGain(); g1.gain.value = 1.0;
-    var g2 = ac.createGain(); g2.gain.value = 0.55;
-    f1.connect(g1); g1.connect(out);
-    f2.connect(g2); g2.connect(out);
+    var f2g = ac.createGain(); f2g.gain.value = 0.16;
+    f2.connect(f2g); f2g.connect(lp);
 
-    // Knarren: LFO moduliert die Lautstärke des Trägers
-    var am = ac.createGain(); am.gain.value = 0.55;
-    var lfo = ac.createOscillator(); lfo.type = 'triangle';
-    lfo.frequency.setValueAtTime(105 * Math.sqrt(p), t0);
-    var lfoG = ac.createGain(); lfoG.gain.value = 0.45;
-    lfo.connect(lfoG); lfoG.connect(am.gain);
-    am.connect(f1); am.connect(f2);
-    lfo.start(t0); lfo.stop(t0 + dur + 0.05);
+    // Direct (pre-formant) path keeps the fundamental audible
+    var body = ac.createGain(); body.gain.value = 0.5;
+    body.connect(lp);
 
-    for (var i = 0; i < 2; i++) {
-      var o = ac.createOscillator(); o.type = 'sawtooth';
-      var f0 = (joy ? 300 : 260) * p * (i ? 1.012 : 1);
-      o.frequency.setValueAtTime(f0 * 1.25, t0);
-      o.frequency.exponentialRampToValueAtTime(f0, t0 + 0.05);
-      o.frequency.exponentialRampToValueAtTime(f0 * 0.55, t0 + dur);
-      var og = ac.createGain(); og.gain.value = i ? 0.4 : 0.8;
+    // Gentle rasp: LFO wobbles the carrier level at ~90 Hz
+    var am = ac.createGain(); am.gain.value = 0.62;
+    var rasp = ac.createOscillator(); rasp.type = 'triangle';
+    rasp.frequency.setValueAtTime(88 * Math.sqrt(p), t0);
+    var raspG = ac.createGain(); raspG.gain.value = 0.30;
+    rasp.connect(raspG); raspG.connect(am.gain);
+    am.connect(f1); am.connect(f2); am.connect(body);
+    rasp.start(t0); rasp.stop(t0 + dur + 0.06);
+
+    // Vibrato shared by all carriers — the "cute" wobble
+    var vib = ac.createOscillator(); vib.frequency.value = 6.2;
+    var vibG = ac.createGain(); vibG.gain.value = 265 * p * 0.018;
+    vib.connect(vibG);
+    vib.start(t0); vib.stop(t0 + dur + 0.06);
+
+    var f0 = (joy ? 292 : 262) * p;
+    for (var i = 0; i < 3; i++) {
+      var o = ac.createOscillator();
+      o.type = i === 2 ? 'triangle' : 'sawtooth';
+      var base = i === 2 ? f0 * 0.5 : f0 * (i ? 1.007 : 0.995);
+      o.frequency.setValueAtTime(base * 1.18, t0);
+      o.frequency.exponentialRampToValueAtTime(base, t0 + 0.05);
+      o.frequency.setValueAtTime(base, t0 + Math.max(0.05, dur * 0.55));
+      o.frequency.exponentialRampToValueAtTime(base * 0.68, t0 + dur);
+      if (i !== 2) vibG.connect(o.frequency);
+      var og = ac.createGain();
+      og.gain.value = i === 2 ? 0.5 : (i ? 0.42 : 0.7);
       o.connect(og); og.connect(am);
-      o.start(t0); o.stop(t0 + dur + 0.04);
+      o.start(t0); o.stop(t0 + dur + 0.05);
     }
 
-    // Anlaut: kurzer Rauschimpuls in den oberen Formanten
-    var nl = Math.floor(ac.sampleRate * 0.028);
-    var nb = ac.createBuffer(1, nl, ac.sampleRate);
-    var nd = nb.getChannelData(0);
-    for (var ni = 0; ni < nl; ni++) nd[ni] = (Math.random() * 2 - 1) * (1 - ni / nl);
-    var ns = ac.createBufferSource(); ns.buffer = nb;
-    var ng = ac.createGain(); ng.gain.value = 0.5;
-    ns.connect(ng); ng.connect(f2);
-    ns.start(t0);
+    // Breathy "k" onset, highpassed so it reads as consonant, not hiss
+    var ns = this._noiseSrc();
+    var nf = ac.createBiquadFilter();
+    nf.type = 'highpass'; nf.frequency.value = 1600;
+    var ng = ac.createGain();
+    this._env(ng, t0, 0.18, 0.05, 0.003);
+    ns.connect(nf); nf.connect(ng); ng.connect(lp);
+    ns.start(t0, Math.random() * 0.3); ns.stop(t0 + 0.06);
   };
 
   Sound.prototype.quack = function (pitch, joy) {
-    if (!this.on) return;
-    this.unlock();
-    var ac = this.ac; if (!ac || ac.state === 'closed') return;
-    if (ac.state === 'suspended') ac.resume();
-    var t0 = ac.currentTime, p = pitch || 1;
-    this._syllable(t0, p, 0.24, joy, 1);
-    // Freude quakt zweisilbig: "quack-quack!"
-    if (joy) this._syllable(t0 + 0.19, p * 1.06, 0.17, true, 0.8);
-  };
-  Sound.prototype.splash = function (power) {
-    if (!this.on) return;
-    this.unlock();
-    var ac = this.ac; if (!ac || ac.state === 'closed') return;
-    if (ac.state === 'suspended') ac.resume();
-    var t0 = ac.currentTime, dur = 0.28;
-    var len = Math.floor(ac.sampleRate * dur);
-    var buf = ac.createBuffer(1, len, ac.sampleRate);
-    var d = buf.getChannelData(0);
-    for (var i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 2.2);
-    var src = ac.createBufferSource(); src.buffer = buf;
-    var hp = ac.createBiquadFilter(); hp.type = 'bandpass';
-    hp.frequency.setValueAtTime(1800, t0);
-    hp.frequency.exponentialRampToValueAtTime(600, t0 + dur);
-    hp.Q.value = 0.8;
-    var g2 = ac.createGain(); g2.gain.value = this.vol * 0.5 * (power || 1);
-    src.connect(hp); hp.connect(g2); g2.connect(ac.destination);
-    src.start(t0);
-  };
-  Sound.prototype.peck = function () {
-    if (!this.on) return;
-    this.unlock();
-    var ac = this.ac; if (!ac || ac.state === 'closed') return;
-    if (ac.state === 'suspended') ac.resume();
-    var t0 = ac.currentTime;
-    var o = ac.createOscillator(); o.type = 'triangle';
-    o.frequency.setValueAtTime(1700, t0);
-    o.frequency.exponentialRampToValueAtTime(700, t0 + 0.05);
-    var g = ac.createGain();
-    this._env(g, t0, this.vol * 0.5, 0.07, 0.004);
-    o.connect(g); g.connect(ac.destination);
-    o.start(t0); o.stop(t0 + 0.09);
+    var ac = this._ready(); if (!ac) return;
+    var p = pitch || 1;
+    if (this.buffers.quack) {
+      // mostly the main quack, sometimes one of the real-duck variants
+      var name = 'quack';
+      if (Math.random() < 0.35) {
+        var alts = [];
+        if (this.buffers.quackAlt1) alts.push('quackAlt1');
+        if (this.buffers.quackAlt2) alts.push('quackAlt2');
+        if (alts.length) name = alts[(Math.random() * alts.length) | 0];
+      }
+      // model pitch = playback rate; a little jitter keeps her lively
+      var qr = p * rand(0.96, 1.05);
+      this._play(name, qr, 1);
+      if (joy) {
+        // joy quacks twice, the second one a touch higher and quicker
+        var gap = Math.max(0.1, this.buffers[name].duration / qr * 0.82);
+        this._play(name, qr * 1.12, 0.85, ac.currentTime + gap);
+      }
+      return;
+    }
+    if (!this._canSynth('quack')) return;   // sample still loading
+    var t0 = ac.currentTime + 0.01;
+    if (joy) {
+      // Joy quacks in two syllables: "quack-quack!", second one higher
+      this._syllable(t0, p, 0.16, true, 0.95);
+      this._syllable(t0 + 0.155, p * 1.09, 0.14, true, 0.8);
+    } else {
+      this._syllable(t0, p, 0.21, false, 1);
+    }
   };
 
+  // Water splash. Sample path: bigger splashes play slower (deeper) and
+  // louder, small ones faster and softer. Synth fallback: a deep "bloop"
+  // body, a soft spray tail and a couple of high droplet plips.
+  Sound.prototype.splash = function (power) {
+    var ac = this._ready(); if (!ac) return;
+    var pw = power || 1;
+    if (this.buffers.splash) {
+      this._play('splash', clamp(1.26 - pw * 0.26, 0.82, 1.2) * rand(0.96, 1.04),
+        clamp(0.4 + pw * 0.5, 0.35, 1.05));
+      return;
+    }
+    if (!this._canSynth('splash')) return;
+    var t0 = ac.currentTime + 0.01;
+
+    var body = this._noiseSrc();
+    var blp = ac.createBiquadFilter();
+    blp.type = 'lowpass'; blp.Q.value = 1.1;
+    blp.frequency.setValueAtTime(780, t0);
+    blp.frequency.exponentialRampToValueAtTime(260, t0 + 0.22);
+    var bg = ac.createGain();
+    this._env(bg, t0, 1.3 * Math.pow(pw, 0.8), 0.24, 0.006);
+    body.connect(blp); blp.connect(bg); bg.connect(this.master);
+    body.start(t0, Math.random() * 0.3); body.stop(t0 + 0.3);
+
+    var spray = this._noiseSrc();
+    var sf = ac.createBiquadFilter();
+    sf.type = 'bandpass'; sf.Q.value = 1.0;
+    sf.frequency.setValueAtTime(3000, t0);
+    sf.frequency.exponentialRampToValueAtTime(1300, t0 + 0.3);
+    var sg = ac.createGain();
+    this._env(sg, t0 + 0.01, 0.36 * pw, 0.32, 0.02);
+    spray.connect(sf); sf.connect(sg); sg.connect(this.master);
+    spray.start(t0, Math.random() * 0.3); spray.stop(t0 + 0.38);
+
+    var nPlip = 2 + Math.round(pw * 2);
+    for (var i = 0; i < nPlip; i++) {
+      var pt = t0 + 0.05 + Math.random() * 0.22;
+      var o = ac.createOscillator(); o.type = 'sine';
+      var pf = 1300 + Math.random() * 1100;
+      o.frequency.setValueAtTime(pf, pt);
+      o.frequency.exponentialRampToValueAtTime(pf * 0.5, pt + 0.06);
+      var og = ac.createGain();
+      this._env(og, pt, 0.26 * pw, 0.07, 0.003);
+      o.connect(og); og.connect(this.master);
+      o.start(pt); o.stop(pt + 0.09);
+    }
+  };
+
+  // Beak tap on the cursor: a small dry "tok"
+  Sound.prototype.peck = function () {
+    var ac = this._ready(); if (!ac) return;
+    if (this.buffers.peck) {
+      this._play('peck', rand(0.92, 1.1), 0.8);
+      return;
+    }
+    if (!this._canSynth('peck')) return;
+    var t0 = ac.currentTime + 0.005;
+    var o1 = ac.createOscillator(); o1.type = 'sine';
+    o1.frequency.setValueAtTime(1150, t0);
+    o1.frequency.exponentialRampToValueAtTime(820, t0 + 0.04);
+    var g1 = ac.createGain();
+    this._env(g1, t0, 1.6, 0.055, 0.002);
+    o1.connect(g1); g1.connect(this.master);
+    o1.start(t0); o1.stop(t0 + 0.08);
+    var o2 = ac.createOscillator(); o2.type = 'sine';
+    o2.frequency.value = 2320;
+    var g2 = ac.createGain();
+    this._env(g2, t0, 0.5, 0.03, 0.002);
+    o2.connect(g2); g2.connect(this.master);
+    o2.start(t0); o2.stop(t0 + 0.05);
+    var ns = this._noiseSrc();
+    var nf = ac.createBiquadFilter(); nf.type = 'highpass'; nf.frequency.value = 2800;
+    var ng = ac.createGain();
+    this._env(ng, t0, 0.4, 0.015, 0.001);
+    ns.connect(nf); nf.connect(ng); ng.connect(this.master);
+    ns.start(t0, Math.random() * 0.3); ns.stop(t0 + 0.03);
+  };
+
+  // Cartoon pop (bursting after overfeeding)
   Sound.prototype.pop = function () {
-    // Kurzer Cartoon-Plopp (fürs Platzen nach Überfütterung)
-    if (!this.on) return;
-    this.unlock();
-    var ac = this.ac; if (!ac || ac.state === 'closed') return;
-    if (ac.state === 'suspended') ac.resume();
-    var t0 = ac.currentTime;
+    var ac = this._ready(); if (!ac) return;
+    if (this.buffers.pop) {
+      this._play('pop', rand(0.97, 1.04), 1);
+      return;
+    }
+    if (!this._canSynth('pop')) return;
+    var t0 = ac.currentTime + 0.005;
     var o = ac.createOscillator(); o.type = 'sine';
-    o.frequency.setValueAtTime(340, t0);
-    o.frequency.exponentialRampToValueAtTime(70, t0 + 0.11);
+    o.frequency.setValueAtTime(330, t0);
+    o.frequency.exponentialRampToValueAtTime(72, t0 + 0.12);
     var g = ac.createGain();
-    this._env(g, t0, this.vol * 0.9, 0.13, 0.003);
-    o.connect(g); g.connect(ac.destination);
-    o.start(t0); o.stop(t0 + 0.16);
+    this._env(g, t0, 2.6, 0.15, 0.003);
+    o.connect(g); g.connect(this.master);
+    o.start(t0); o.stop(t0 + 0.18);
+    var ns = this._noiseSrc();
+    var nf = ac.createBiquadFilter();
+    nf.type = 'bandpass'; nf.frequency.value = 900; nf.Q.value = 1.6;
+    var ng = ac.createGain();
+    this._env(ng, t0, 0.8, 0.03, 0.001);
+    ns.connect(nf); nf.connect(ng); ng.connect(this.master);
+    ns.start(t0, Math.random() * 0.3); ns.stop(t0 + 0.05);
+  };
+
+  // Coin jingle for the gold-hoard dive: the big bag-shake for the dive,
+  // a single clink for the hop out. Synth fallback: thump + sine clinks.
+  Sound.prototype.coins = function (power) {
+    var ac = this._ready(); if (!ac) return;
+    var pw = power || 1;
+    var name = pw >= 0.9 ? 'coinsBig' : 'coinsSmall';
+    if (!this.buffers[name]) name = pw >= 0.9 ? 'coinsSmall' : 'coinsBig';
+    if (this.buffers[name]) {
+      this._play(name, rand(0.96, 1.06), clamp(pw * 0.8, 0.35, 1));
+      return;
+    }
+    if (!this._canSynth(name)) return;
+    var t0 = ac.currentTime + 0.005;
+    if (pw >= 0.9) {
+      var th = ac.createOscillator(); th.type = 'sine';
+      th.frequency.setValueAtTime(190, t0);
+      th.frequency.exponentialRampToValueAtTime(110, t0 + 0.08);
+      var tg = ac.createGain();
+      this._env(tg, t0, 0.9, 0.1, 0.003);
+      th.connect(tg); tg.connect(this.master);
+      th.start(t0); th.stop(t0 + 0.12);
+    }
+    var n = 3 + Math.round(pw * 4);
+    for (var i = 0; i < n; i++) {
+      var ct = t0 + (i === 0 ? 0.01 : 0.02 + Math.random() * 0.34);
+      var base = 3400 + Math.random() * 2600;
+      for (var k = 0; k < 2; k++) {
+        var o = ac.createOscillator(); o.type = 'sine';
+        o.frequency.value = k ? base * 1.503 : base;
+        var og = ac.createGain();
+        this._env(og, ct, (k ? 0.14 : 0.3) * Math.min(1.2, pw), 0.1 + Math.random() * 0.06, 0.002);
+        o.connect(og); og.connect(this.master);
+        o.start(ct); o.stop(ct + 0.18);
+      }
+    }
   };
 
   // ── Verhaltens-Katalog ────────────────────────────────────────
@@ -237,10 +504,16 @@
 
   Duck.prototype.setState = function (s, dur) {
     if (this.state === s) return;
+    if (this.state === 'goldnap') this.gnInit = false;   // leaving mid-dive
     this.state = s;
     this.stTime = 0;
     this.stDur = dur || 1;
     this.actionTick = 0;
+  };
+
+  // Gold-hoard models take the scenic route into bed (dive first)
+  Duck.prototype.sleepState = function () {
+    return (this.model.goldNap && !this.baby) ? 'goldnap' : 'sleep';
   };
 
   Duck.prototype.say = function (txt, color) {
@@ -269,8 +542,9 @@
       blush: a.blush, sleep: a.sleep,
       wobble: a.wobble, beakOpen: a.beakOpen,
       walk: a.walk, hop: this.hopY,
-      water: !this.nesting,   // im Nest keine eigene Wasserlinie
-      reflection: this.e.cfg.reflection && !this.baby
+      // no own waterline while tucked into the nest or the gold hoard
+      water: !this.nesting && !this.hoardNap,
+      reflection: this.e.cfg.reflection && !this.baby && !this.hoardNap
     };
   };
 
@@ -451,7 +725,8 @@
     }
     // Cursor macht einen großen Sprung (Fenster/iframe gewechselt) → kurz aufmerken
     if (!this.baby && e.alertPing && dist > 260 &&
-        st !== 'sleep' && st !== 'pet' && st !== 'startle' && st !== 'burst') {
+        st !== 'sleep' && st !== 'goldnap' && st !== 'pet' &&
+        st !== 'startle' && st !== 'burst') {
       this.say('!', '#4a90d9');
     }
 
@@ -573,8 +848,12 @@
           this.actionTick = 1.6;
           var hz = this.headWorld();
           e.fx.zzz(hz.x + r * 0.3, hz.y - r * 0.5);
-          // nachts träumt sie in Sternchen
-          if (e.isNight()) {
+          if (this.hoardNap && e.hoard) {
+            // bedded in gold: she dreams in glitter
+            e.fx.sparkle(e.hoard.x + rand(-0.7, 0.7) * e.hoard.r,
+              e.hoard.y - rand(0.15, 0.8) * e.hoard.r, '#ffe9a8', rand(3, 6));
+          } else if (e.isNight()) {
+            // nachts träumt sie in Sternchen
             e.fx.sparkle(hz.x - r * rand(0.1, 0.6), hz.y - r * rand(0.6, 1.2), '#b9c8ff', rand(3, 5));
           }
           // und wenn die Küken im Nest liegen, träumt sie von ihnen
@@ -582,14 +861,90 @@
             e.fx.heart(e.nest.x + rand(-8, 8), e.nest.y - e.nest.r * 0.85, rand(4, 6) * cfg.size);
           }
         }
-        this.vx = approach(this.vx, 0, 1.5, dt);
-        this.vy = approach(this.vy, 0, 1.5, dt);
-        if (e.pointerIdle < 0.2 || dist > r * 4) {
+        if (this.hoardNap && e.hoard) {
+          // stay snuggled into the hoard's crater
+          this.vx = 0; this.vy = 0;
+          this.x = approach(this.x, e.hoard.x, 6, dt);
+          this.y = approach(this.y, e.hoard.y + 1, 6, dt);
+        } else {
+          this.vx = approach(this.vx, 0, 1.5, dt);
+          this.vy = approach(this.vy, 0, 1.5, dt);
+        }
+        if (e.pointerIdle < 0.2 || (!this.hoardNap && dist > r * 4)) {
+          if (this.hoardNap && e.hoard) {
+            // startled hop out of the coins (the hoard sinks on its own)
+            this.hopY = r * 0.8;
+            this.vx = (px > this.x ? 1 : -1) * 90;
+            e.fx.coinBurst(this.x, this.y - r * 0.5, 6, 0.7);
+            e.sound.coins(0.6);
+          }
           this.setState('wake', 0.7);
           this.say('!', '#ffb03d');
           e.sound.quack(this.model.quackPitch * 0.9);
         }
         break;
+
+      case 'goldnap': {
+        // Tycoon bedtime: a gold hoard rises beside her, she paddles over,
+        // takes a gleeful leap and dives in — Scrooge style — then sleeps
+        // buried in coins (the 'sleep' state with hoardNap set).
+        if (!this.gnInit) { this.gnInit = true; this.gnPhase = 'go'; this.gnSide = 0; }
+        if (e.pointerIdle < 0.2) {   // cursor moved → bedtime cancelled
+          this.setState('swim', 1);
+          break;
+        }
+        var hd = e.hoard;
+        if (!hd) {
+          // hoard spawns in the next engine step — drift until it's there
+          this.vx = approach(this.vx, 0, 3, dt);
+          this.vy = approach(this.vy, 0, 3, dt);
+          break;
+        }
+        if (!this.gnSide) this.gnSide = this.x < hd.x ? -1 : 1;
+        if (this.gnPhase === 'go') {
+          var gx = hd.x + this.gnSide * (hd.r * 1.08 + r * 0.5);
+          this.swim(dt, gx, hd.y, 5, 0.85);
+          if (Math.abs(hd.x - this.x) > r * 0.3) this.face = hd.x > this.x ? 1 : -1;
+          t.eyeHappy = hd.appear;        // she can hardly wait
+          t.headRot = -0.08;
+          if (hd.appear > 0.85 && Math.hypot(gx - this.x, hd.y - this.y) < r * 0.6) {
+            this.gnPhase = 'leap';
+            this.gnT = 0;
+            this.gnX0 = this.x; this.gnY0 = this.y;
+            this.vx = 0; this.vy = 0;
+            this.say('$', '#d9a316');
+            e.sound.quack(this.model.quackPitch * 1.2, true);
+          }
+        } else {
+          // ballistic little arc from the rim into the crater
+          var LT = 0.6;
+          this.gnT += dt;
+          var gk = clamp(this.gnT / LT, 0, 1);
+          var ge = gk * gk * (3 - 2 * gk);   // smoothstep
+          this.x = this.gnX0 + (hd.x - this.gnX0) * ge;
+          this.y = this.gnY0 + (hd.y + 1 - this.gnY0) * ge;
+          this.hopY = Math.sin(gk * Math.PI) * (r * 1.1 + hd.r * 0.45);
+          this.vx = 0; this.vy = 0;
+          t.walk = 1;                       // legs out, wings spread — wheee
+          t.wingFlap = Math.sin(gk * Math.PI);
+          t.eyeHappy = 1;
+          t.beakOpen = 0.4 * Math.sin(gk * Math.PI);
+          t.lean = -this.gnSide * 0.35 * Math.sin(gk * Math.PI);
+          if (gk >= 1) {
+            this.gnInit = false;
+            this.hoardNap = true;
+            this.hopY = 0;
+            this.a.squash = 1.16;           // landing squish
+            e.fx.coinBurst(hd.x, hd.y - hd.r * 0.35, 12, 1);
+            e.fx.ripple(hd.x, hd.y + hd.r * 0.2, 6, hd.r * 1.5, 1.0, 'rgba(255,255,255,0.45)', 1.8);
+            e.sound.coins(1.2);
+            e.stats.goldNaps = (e.stats.goldNaps || 0) + 1;
+            e.saveStats();
+            this.setState('sleep', 99);
+          }
+        }
+        break;
+      }
 
       case 'wake':
         t.eyeOpen = 1; t.wingFlap = clamp(1 - this.stTime * 2, 0, 1);
@@ -849,7 +1204,7 @@
           // Nest entsteht erst im nächsten Engine-Schritt — kurz treiben
           this.vx = approach(this.vx, 0, 3, dt);
           this.vy = approach(this.vy, 0, 3, dt);
-          if (!e.babies.length) this.setState('sleep', 99);
+          if (!e.babies.length) this.setState(this.sleepState(), 99);
           break;
         }
         var tSide = this.x < tn.x ? -1 : 1;
@@ -880,7 +1235,7 @@
             e.stats.sleeps = (e.stats.sleeps || 0) + 1;
             e.stats.nests = (e.stats.nests || 0) + 1;
             e.saveStats();
-            this.setState('sleep', 99);
+            this.setState(this.sleepState(), 99);
           }
         }
         break;
@@ -1229,7 +1584,7 @@
           } else {
             e.stats.sleeps = (e.stats.sleeps || 0) + 1;
             e.saveStats();
-            this.setState('sleep', 99);
+            this.setState(this.sleepState(), 99);
           }
           break;
         }
@@ -1371,6 +1726,7 @@
     this.visitor = null;      // wilde Ente auf der Durchreise
     this.visitorCd = rand(120, 300);
     this.nest = null;         // Küken-Nest, taucht auf wenn Mama schläft
+    this.hoard = null;        // gold pile for the tycoon's bedtime dive
     this._bound = {};
     this.setModel(this.cfg.model);
   }
@@ -1414,6 +1770,7 @@
     for (var k in cfg) if (cfg[k] !== undefined) this.cfg[k] = cfg[k];
     this.sound.on = !!this.cfg.sound;
     this.sound.vol = this.cfg.volume;
+    if (this.sound.on) this.sound.preload();   // fetch samples early
     if (modelChanged) this.setModel(this.cfg.model);
     else this.rebuildBabies();
     if (!this.cfg.enabled) this.stop(); else this.start();
@@ -1820,8 +2177,15 @@
       var dk = self.duck;
       if (dk) {
         if (dk.state === 'sleep' && Math.abs(kick) > 150) {
+          if (dk.hoardNap) {
+            dk.hopY = dk.radius() * 0.8;
+            self.fx.coinBurst(dk.x, dk.y - dk.radius() * 0.5, 6, 0.7);
+            self.sound.coins(0.6);
+          }
           dk.setState('wake', 0.7);
           dk.say('!', '#ffb03d');
+        } else if (dk.state === 'goldnap' && Math.abs(kick) > 150) {
+          dk.setState('swim', 1);   // dive plans cancelled by the earthquake
         }
         dk.vy += kick * 0.55;
         if (self.cfg.effects && Math.abs(kick) > 100 && Math.random() < 0.4) {
@@ -1969,7 +2333,10 @@
     this.duck.update(dt);
 
     // ── Küken-Nest: taucht auf, wenn Mama schläft (oder zudeckt) ──
-    var mamaSleeps = this.duck.state === 'sleep' || this.duck.state === 'tuckin';
+    // ('goldnap' counts too: the nest must not sink while mama is still
+    // busy diving into her gold next door)
+    var mamaSleeps = this.duck.state === 'sleep' || this.duck.state === 'tuckin' ||
+      this.duck.state === 'goldnap';
     if (mamaSleeps && this.babies.length && !this.nest) {
       var d0 = this.duck, nr0 = d0.radius();
       var nSide = d0.x > this.w / 2 ? -1 : 1;
@@ -2014,6 +2381,32 @@
           this.babies[nbi].nestTry = 0;
         }
       }
+    }
+
+    // ── Gold hoard: rises for the dive, sinks when the nap is over ──
+    var dk0 = this.duck;
+    var wantsHoard = !!(dk0.model.goldNap &&
+      (dk0.state === 'goldnap' || (dk0.state === 'sleep' && dk0.hoardNap)));
+    if (wantsHoard && !this.hoard) this.spawnHoard();
+    if (this.hoard) {
+      var hrd = this.hoard;
+      if (!wantsHoard && !hrd.sink) {
+        hrd.sink = true;
+        dk0.hoardNap = false;
+        if (this.cfg.effects) {
+          for (var hb = 0; hb < 4; hb++) {
+            this.fx.bubble(hrd.x + rand(-hrd.r, hrd.r) * 0.5, hrd.y + rand(-4, 4));
+          }
+          this.fx.sparkle(hrd.x, hrd.y - hrd.r * 0.4, '#ffe9a8', 5);
+        }
+      }
+      hrd.appear = approach(hrd.appear, hrd.sink ? 0 : 1, hrd.sink ? 5 : 2.6, dt);
+      // the pile glints while it is out
+      if (!hrd.sink && hrd.appear > 0.5 && this.cfg.effects && Math.random() < dt * 1.1) {
+        this.fx.sparkle(hrd.x + rand(-0.75, 0.75) * hrd.r,
+          hrd.y - rand(0.1, 0.85) * hrd.r, '#fff3c8', rand(2.5, 5));
+      }
+      if (hrd.sink && hrd.appear < 0.03) this.hoard = null;
     }
 
     // Küken folgen der Spur der Mama — außer das Nest ruft oder es
@@ -2095,8 +2488,9 @@
     var k = 1 - Math.exp(-30 * dt);
     var dState = this.duck.state;
     // Wenn Mama abgetaucht/geplatzt ist, gibt es nichts zu verdecken
+    // (im Goldhaufen ebenso — sonst schieben die Küken sie wieder raus)
     var duckSolid = dState !== 'dive' && dState !== 'peekaboo' &&
-      dState !== 'burst' && !this.duck.vanish;
+      dState !== 'burst' && !this.duck.vanish && !this.duck.hoardNap;
     for (var pass = 0; pass < 2; pass++) {
       for (var i = 0; i < group.length; i++) {
         for (var j = i + 1; j < group.length; j++) {
@@ -2233,8 +2627,11 @@
       var b = this.babies[i];
       if (!b.nesting) order.push({ y: b.y, k: 'b', o: b });
     }
-    order.push({ y: this.duck.y, k: 'd' });
+    // Im Goldhaufen bildet die Ente mit dem Haufen eine Einheit
+    // (Rückwand → Ente → Vorderrand), genau wie die Küken im Nest.
+    if (!(this.duck.hoardNap && this.hoard)) order.push({ y: this.duck.y, k: 'd' });
     if (this.nest) order.push({ y: this.nest.y, k: 'n' });
+    if (this.hoard) order.push({ y: this.hoard.y, k: 'g' });
     order.sort(function (p, q) { return p.y - q.y; });
 
     for (var oi = 0; oi < order.length; oi++) {
@@ -2242,6 +2639,7 @@
       if (it.k === 'v') DuckRender.draw(ctx, this.visitor.model, this.visitor.pose());
       else if (it.k === 'b') DuckRender.draw(ctx, it.o.model, it.o.pose());
       else if (it.k === 'd') DuckRender.draw(ctx, this.duck.model, this.duck.pose());
+      else if (it.k === 'g') this.drawHoard(ctx);
       else this.drawNest(ctx);
     }
     if (this.cfg.effects) this.fx.draw(ctx);
@@ -2327,6 +2725,131 @@
     ctx.restore();
   };
 
+  // ── Gold hoard (tycoon bedtime) ───────────────────────────────
+  Engine.prototype.spawnHoard = function () {
+    var d = this.duck, r = d.radius();
+    var side = d.x > this.w / 2 ? -1 : 1;
+    // keep clear of the nest so the pile never buries the ducklings
+    if (this.nest && !this.nest.sink) side = this.nest.x > d.x ? -1 : 1;
+    var hr = Math.max(30 * this.cfg.size, r * 1.55);
+    this.hoard = {
+      x: clamp(d.x + side * (r * 2.7 + hr * 0.5), hr + 24, this.w - hr - 24),
+      y: clamp(d.y, 80, this.h - 40),
+      r: hr, appear: 0, sink: false,
+      coins: [], front: []
+    };
+    // scatter the coins once at spawn so the pile doesn't shimmer
+    for (var i = 0; i < 15; i++) {
+      var u = rand(-1, 1);
+      var surf = Math.cos(u * Math.PI / 2);   // mound height at u (0..1)
+      this.hoard.coins.push({
+        dx: u * 1.12, dy: -surf * rand(0.25, 0.88),
+        s: rand(0.15, 0.23), rot: rand(-0.5, 0.5), tone: (Math.random() * 3) | 0
+      });
+    }
+    for (var j = 0; j < 8; j++) {
+      this.hoard.front.push({
+        dx: rand(-1.05, 1.05), dy: rand(-0.24, 0.1),
+        s: rand(0.17, 0.26), rot: rand(-0.5, 0.5), tone: (Math.random() * 3) | 0
+      });
+    }
+    if (this.cfg.effects) {
+      this.fx.ripple(this.hoard.x, this.hoard.y, 6, this.hoard.r * 1.4, 1.2, 'rgba(255,255,255,0.4)', 1.6);
+    }
+    return this.hoard;
+  };
+
+  function drawCoin(ctx, x, y, s, rot, tone) {
+    var tones = ['#f6c945', '#ffd75e', '#eab62f'];
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(rot);
+    ctx.fillStyle = tones[tone % 3];
+    ctx.beginPath(); ctx.ellipse(0, 0, s, s * 0.72, 0, 0, TAU); ctx.fill();
+    ctx.strokeStyle = 'rgba(146,96,14,0.55)';
+    ctx.lineWidth = Math.max(0.8, s * 0.2);
+    ctx.stroke();
+    ctx.strokeStyle = 'rgba(255,243,200,0.75)';
+    ctx.lineWidth = Math.max(0.6, s * 0.13);
+    ctx.beginPath(); ctx.ellipse(0, 0, s * 0.58, s * 0.4, 0, 0, TAU); ctx.stroke();
+    ctx.restore();
+  }
+
+  Engine.prototype.drawHoard = function (ctx) {
+    var h = this.hoard;
+    if (!h || h.appear < 0.02) return;
+    this.drawHoardPart(ctx, true);
+    if (this.duck.hoardNap) DuckRender.draw(ctx, this.duck.model, this.duck.pose());
+    this.drawHoardPart(ctx, false);
+  };
+
+  Engine.prototype.drawHoardPart = function (ctx, back) {
+    var h = this.hoard, ap = h.appear;
+    var r = h.r * (0.72 + 0.28 * ap);
+    var H = r * 0.92;                        // mound height
+    var y0 = h.y + (1 - ap) * h.r * 0.9;     // rises from below / sinks away
+    var x = h.x, i, c;
+    ctx.save();
+    ctx.globalAlpha *= Math.min(1, ap * 1.5) * this.cfg.opacity;
+    if (back) {
+      // contact ring on the water
+      ctx.strokeStyle = 'rgba(255,255,255,0.35)';
+      ctx.lineWidth = 1.6;
+      ctx.beginPath();
+      ctx.ellipse(x, y0 + r * 0.16, r * 1.42, r * 0.34, 0, 0, TAU);
+      ctx.stroke();
+      // the mound itself: two soft humps of gold
+      var mg = ctx.createLinearGradient(0, y0 - H, 0, y0 + r * 0.3);
+      mg.addColorStop(0, '#ffe27a');
+      mg.addColorStop(1, '#d9a521');
+      ctx.fillStyle = mg;
+      ctx.beginPath();
+      ctx.moveTo(x - r * 1.35, y0 + r * 0.02);
+      ctx.bezierCurveTo(x - r * 1.15, y0 - H * 0.45, x - r * 0.6, y0 - H * 0.98, x - r * 0.12, y0 - H * 0.99);
+      ctx.bezierCurveTo(x + r * 0.05, y0 - H * 1.06, x + r * 0.22, y0 - H * 0.92, x + r * 0.34, y0 - H * 0.78);
+      ctx.bezierCurveTo(x + r * 0.7, y0 - H * 0.6, x + r * 1.1, y0 - H * 0.25, x + r * 1.35, y0 + r * 0.02);
+      ctx.quadraticCurveTo(x, y0 + r * 0.3, x - r * 1.35, y0 + r * 0.02);
+      ctx.closePath();
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(150,100,20,0.4)';
+      ctx.lineWidth = 1.4;
+      ctx.stroke();
+      // a soft crater dimple, right where she lands
+      ctx.fillStyle = 'rgba(169,124,28,0.4)';
+      ctx.beginPath();
+      ctx.ellipse(x + r * 0.04, y0 - H * 0.7, r * 0.4, r * 0.13, -0.04, 0, TAU);
+      ctx.fill();
+      for (i = 0; i < h.coins.length; i++) {
+        c = h.coins[i];
+        drawCoin(ctx, x + c.dx * r, y0 + c.dy * r, c.s * r, c.rot, c.tone);
+      }
+      // fixed glints on the summit
+      ctx.fillStyle = 'rgba(255,248,216,0.9)';
+      DuckRender.star(ctx, x - r * 0.55, y0 - H * 0.72, r * 0.09);
+      DuckRender.star(ctx, x + r * 0.5, y0 - H * 0.5, r * 0.07);
+    } else {
+      // front rim: a lower ridge of coins the duck sinks in behind
+      var fg = ctx.createLinearGradient(0, y0 - H * 0.42, 0, y0 + r * 0.32);
+      fg.addColorStop(0, '#f6ce56');
+      fg.addColorStop(1, '#c8961d');
+      ctx.fillStyle = fg;
+      ctx.beginPath();
+      ctx.moveTo(x - r * 1.3, y0 + r * 0.06);
+      ctx.bezierCurveTo(x - r * 0.9, y0 - H * 0.3, x - r * 0.3, y0 - H * 0.38, x, y0 - H * 0.36);
+      ctx.bezierCurveTo(x + r * 0.35, y0 - H * 0.4, x + r * 0.9, y0 - H * 0.26, x + r * 1.3, y0 + r * 0.06);
+      ctx.quadraticCurveTo(x, y0 + r * 0.34, x - r * 1.3, y0 + r * 0.06);
+      ctx.closePath();
+      ctx.fill();
+      for (i = 0; i < h.front.length; i++) {
+        c = h.front[i];
+        drawCoin(ctx, x + c.dx * r, y0 + c.dy * r, c.s * r, c.rot, c.tone);
+      }
+      ctx.fillStyle = 'rgba(255,248,216,0.9)';
+      DuckRender.star(ctx, x + r * 0.85, y0 - r * 0.02, r * 0.08);
+    }
+    ctx.restore();
+  };
+
   // ── Debug/Steuer-API ──────────────────────────────────────────
   // Deterministisch weiterrechnen (für Tests/Screenshots, unabhängig von rAF)
   Engine.prototype.simulate = function (seconds, dt) {
@@ -2360,10 +2883,18 @@
       if (!this.visitor) this.spawnVisitor();
       return action;
     }
-    if (action === 'sleep' && this.babies.length) {
-      // Mit Küken läuft das Einschlafen übers Gute-Nacht-Ritual
-      this.duck.tuckKiss = this.duck.tuckHeart = false;
-      this.duck.setState('tuckin', 99);
+    if (action === 'sleep') {
+      // Pretend the cursor has been resting for a bit — otherwise the
+      // mouse move onto the trigger button wakes her up the same instant.
+      this.pointerIdle = Math.max(this.pointerIdle, 1);
+      if (this.babies.length) {
+        // Mit Küken läuft das Einschlafen übers Gute-Nacht-Ritual
+        this.duck.tuckKiss = this.duck.tuckHeart = false;
+        this.duck.setState('tuckin', 99);
+        return action;
+      }
+      // Tycoon route: dive into the gold hoard first
+      this.duck.setState(this.duck.sleepState(), 99);
       return action;
     }
     if (action === 'waddle') {

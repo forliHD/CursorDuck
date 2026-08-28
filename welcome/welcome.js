@@ -27,6 +27,8 @@
 
   function start(settings) {
     var engine = new window.CursorDuckEngine(settings);
+    engine.sound.base = '../audio/';   // real samples on this page too
+    engine.sound.preload();
     engine.mount(document.body);
     engine.start();
     window.__duck = engine;

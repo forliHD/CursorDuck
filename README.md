@@ -40,6 +40,7 @@ her tricks.
 | **Idle animations** | Dabbling (tail up, head underwater), diving with bubbles and a surfacing splash, preening, wing flapping, shaking, bathing, pirouettes, looking around, bobbing, quacking with music notes. |
 | **Ducklings** | Up to 6 ducklings swim in a row along mama's trail — with their own little animations (including dozing off) and a fluffy yellow color scheme. The family gently keeps its distance, so no duckling disappears behind mama. |
 | **Duckling nest** | When mama gets sleepy she first puts the ducklings to bed: a nest appears (it grows with the number of ducklings and the duck size), she waits at the rim, gives the little ones a good-night nudge — then falls asleep beside them, occasionally dreaming little hearts. When she wakes up, the nest sinks away with a bubble. |
+| **Gold-hoard nap** | The tycoon duck doesn't simply doze off: a little pile of gold coins rises from the water, she paddles over, takes a gleeful running jump and dives in headfirst — coins fly, gold clinks — then sleeps buried in her riches, dreaming in glitter. On waking she hops out and the hoard sinks away. |
 | **Clicking** | Click the duck → she quacks back. Double-click the duck → wing flapping. |
 
 ## The duck models
@@ -50,7 +51,8 @@ tufted duck, teal, runner duck, chonk duck, duckling, swan, goose.
 **Fantasy:** debug duck (with glasses), cyber duck (neon visor), ghost duck, pirate duck,
 royal duck, ninja duck, goth duck, party duck (with confetti), chef duck, wizard duck,
 astro duck (helmet), zombie duck, angel duck (halo), devil duck, cowboy duck,
-rainbow duck, galaxy duck (starry body), golden duck.
+tycoon duck (top hat, monocle — and a gold hoard to nap in), rainbow duck,
+galaxy duck (starry body), golden duck.
 
 **Seasonal:** pumpkin duck (October), Christmas duck (December) and Easter duck
 (from three weeks before until one week after Easter Sunday, computed with Gauss's
@@ -74,10 +76,16 @@ to trigger tricks directly (including feeding, fish hunt, shore leave and visito
 
 Keyboard shortcuts: `Alt+Shift+D` (on/off), `Alt+Shift+N` (next model).
 
-Sound is **off** by default. Switched on, she quacks synthetically (Web Audio, no sound
-files) in cartoon style: a sawtooth carrier with a downward sweep, ~105 Hz rasp
-(amplitude modulation), two formants and a noise onset; joy quacks in two syllables.
-Every model has its own pitch, ducklings peep high.
+Sound is **off** by default. Switched on, she plays real recordings — eight small
+CC0-licensed samples bundled with the extension (a snappy quack plus two real-duck
+variants she mixes in at random, a water splash, a beak “tok”, a cartoon cork pop and
+two coin jingles; sources in `audio/SOURCES.md`).
+Everything runs through one Web Audio master bus with volume control (popup slider) and
+a soft compressor, so overlapping sounds never clip. Every model keeps its own pitch via
+playback rate — ducklings peep high, the goose honks low — with a little random
+variation so no two quacks are identical; joy quacks twice. A fully synthesized fallback
+kicks in only if the files cannot load. (Browsers unlock audio after the first click —
+until then she stays polite and mute.)
 
 ## Technical details
 

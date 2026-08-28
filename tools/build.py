@@ -20,7 +20,7 @@ import zipfile
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DIST = os.path.join(ROOT, "dist")
-DIRS = ["icons", "src", "popup", "welcome", "_locales"]
+DIRS = ["icons", "src", "popup", "welcome", "_locales", "audio"]
 
 GECKO_ID = "cursor-duck@forlihd"
 # 140 = erste Version mit data_collection_permissions-Unterstützung
@@ -32,6 +32,12 @@ def firefox_manifest(m):
     fx["manifest_version"] = 2
     # MV3 "action" heißt in MV2 "browser_action"
     fx["browser_action"] = fx.pop("action")
+    # MV2 web_accessible_resources ist eine flache Liste (MV3: Objekte)
+    if "web_accessible_resources" in fx:
+        flat = []
+        for entry in fx["web_accessible_resources"]:
+            flat.extend(entry.get("resources", []))
+        fx["web_accessible_resources"] = flat
     # Firefox nutzt Event-Pages statt Service Worker; models.js kommt hier
     # über das scripts-Array (der MV3-Worker lädt es per importScripts)
     fx["background"] = {"scripts": ["src/models.js", "src/background.js"], "persistent": False}

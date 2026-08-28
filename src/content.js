@@ -58,6 +58,11 @@
       var opts = {};
       for (var k in DEFAULTS) opts[k] = cfg[k];
       engine = new window.CursorDuckEngine(opts);
+      // sound samples live in the extension package (web_accessible_resources)
+      try {
+        engine.sound.base = chrome.runtime.getURL('audio/');
+        engine.sound.preload();
+      } catch (e) { /* keeps the synth fallback */ }
       engine.stats = stats || { pets: 0, pecks: 0 };
       engine.onStats = throttle(function (s) {
         try {

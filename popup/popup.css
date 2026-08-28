@@ -62,10 +62,12 @@ h1 { font-size: 17px; margin: 0; letter-spacing: -0.2px; }
 
 main { padding: 12px 14px 14px; }
 section {
-  background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+  background: var(--card); border: 1px solid var(--line); border-radius: 13px;
   padding: 10px 12px; margin-bottom: 10px;
+  box-shadow: 0 2px 10px rgba(31, 60, 95, .05);
 }
 h2 { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin: 0 0 8px; }
+h2 .ico { font-size: 12px; margin-right: 2px; }
 .sec-head { display: flex; align-items: center; justify-content: space-between; }
 .sec-head h2 { margin-bottom: 8px; }
 .ghost {
@@ -96,7 +98,8 @@ h2 { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: v
   display: block; font-size: 9.5px; color: var(--muted); line-height: 1.15;
   padding: 0 2px 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
-.m:hover { border-color: #9dc9ee; }
+.m { transition: transform .12s, border-color .12s; }
+.m:hover { border-color: #9dc9ee; transform: translateY(-1px); }
 .m.on { border-color: var(--accent); background: linear-gradient(#dcefff, #bfe0f8); }
 @media (prefers-color-scheme: dark) { .m.on { background: linear-gradient(#26445e, #1d3346); } }
 .m.tier-rare::after, .m.tier-epic::after, .m.tier-legendary::after {
@@ -113,25 +116,29 @@ h2 { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: v
 .slider b { color: var(--ink); font-variant-numeric: tabular-nums; font-weight: 600; }
 input[type=range] {
   -webkit-appearance: none; width: 100%; height: 4px; border-radius: 2px;
-  background: var(--line); outline: none;
+  background: var(--line); outline: none;   /* JS malt den gefüllten Anteil */
 }
 input[type=range]::-webkit-slider-thumb {
   -webkit-appearance: none; width: 15px; height: 15px; border-radius: 50%;
   background: var(--accent); cursor: pointer; border: 2px solid var(--card);
   box-shadow: 0 1px 3px rgba(0,0,0,.2);
+  transition: transform .1s;
 }
+input[type=range]::-webkit-slider-thumb:hover { transform: scale(1.15); }
 
 /* Checkboxen */
 .checks label, .site label {
   display: flex; align-items: center; gap: 8px; padding: 5px 0; cursor: pointer; font-size: 12.5px;
 }
 .checks input, .site input { accent-color: var(--accent); width: 15px; height: 15px; }
+.checks label:hover, .site label:hover { color: var(--accent); }
 
 /* Kunststücke */
 .tricks { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; }
 .tricks button {
   border: 1px solid var(--line); background: var(--accent-soft); color: var(--ink);
   border-radius: 8px; padding: 5px 2px; font: inherit; font-size: 11px; cursor: pointer;
+  transition: background .12s, color .12s, transform .08s;
 }
 .tricks button:hover { background: var(--accent); color: #fff; border-color: var(--accent); }
 .tricks button:active { transform: translateY(1px); }

@@ -55,6 +55,7 @@
     rainbow: 0,      // Regenbogen-Körperverlauf
     stars: 0,        // Sternen-Körper (Galaxy)
     confetti: 0,     // Konfetti beim Quaken
+    goldNap: 0,      // naps in a little gold hoard (engine state 'goldnap')
     quackPitch: 1.0  // Stimmlage
   };
 
@@ -318,6 +319,18 @@
                 'Boom!', "You're holding it wrong.", 'Real artists ship.',
                 'Stay hungry. Stay foolish.', "There's a quack for that.",
                 'Simplicity quacks.']
+    }),
+    duck({
+      // Old-money magnate: top hat, monocle, red tailcoat over white
+      // feathers. Instead of a plain nap it first summons a little gold
+      // hoard and dives in headfirst (engine state 'goldnap').
+      id: 'tycoon', name: 'Milliardärs-Ente', emoji: '💰', tier: 'epic',
+      body: '#c4392c', bodyDark: '#992a20', belly: '#e26a55',
+      head: '#f6f0e2', headDark: '#d8cfba',
+      beak: '#f0a63c', beakDark: '#cd8420',
+      wing: '#b53327', wingBar: '#e8c33c', tail: '#a92e22', foot: '#f0a63c',
+      hat: 'tophat', glasses: 'monocle',
+      goldNap: 1, sparkle: 0.2, quackPitch: 0.82
     }),
     duck({
       id: 'rainbow', name: 'Regenbogen-Ente', emoji: '🌈', tier: 'legendary',

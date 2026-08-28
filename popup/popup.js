@@ -76,16 +76,17 @@
     ['speed', function (v) { return v.toFixed(1) + '×'; }],
     ['ducklings', function (v) { return String(v | 0); }],
     ['playfulness', function (v) { return v.toFixed(1) + '×'; }],
-    ['opacity', function (v) { return Math.round(v * 100) + ' %'; }]
+    ['opacity', function (v) { return Math.round(v * 100) + ' %'; }],
+    ['volume', function (v) { return Math.round(v * 100) + ' %'; }]
   ];
   var CHECKS = ['peck', 'feed', 'effects', 'reflection', 'sound', 'randomOnStart'];
   var TRICKS = [
-    ['quack', 'Quaken'], ['flap', 'Flattern'], ['preen', 'Putzen'],
-    ['dabble', 'Gründeln'], ['dive', 'Tauchen'], ['spin', 'Pirouette'],
-    ['bathe', 'Baden'], ['shake', 'Schütteln'], ['sleep', 'Nickerchen'],
-    ['crumbs', 'Füttern'], ['fish', 'Fisch-Jagd'], ['dizzy', 'Schwindel'],
-    ['dance', 'Tänzchen'], ['peekaboo', 'Kuckuck'], ['waddle', 'Landgang'],
-    ['visitor', 'Besuch']
+    ['quack', 'Quaken', '📣'], ['flap', 'Flattern', '🪶'], ['preen', 'Putzen', '🧼'],
+    ['dabble', 'Gründeln', '🙃'], ['dive', 'Tauchen', '🤿'], ['spin', 'Pirouette', '🌀'],
+    ['bathe', 'Baden', '🛁'], ['shake', 'Schütteln', '💦'], ['sleep', 'Nickerchen', '😴'],
+    ['crumbs', 'Füttern', '🍞'], ['fish', 'Fisch-Jagd', '🐟'], ['dizzy', 'Schwindel', '😵'],
+    ['dance', 'Tänzchen', '💃'], ['peekaboo', 'Kuckuck', '🫣'], ['waddle', 'Landgang', '🚶'],
+    ['visitor', 'Besuch', '💕']
   ];
 
   // [Stat-Schlüssel, Ziel, Emoji, i18n-Key, Name (Fallback), Erklärung (Fallback)]
@@ -151,6 +152,14 @@
       };
       wrap.appendChild(d);
     });
+  }
+
+  // fill the range track up to the thumb (plain tracks look unfinished)
+  function paintRange(el) {
+    var min = parseFloat(el.min) || 0, max = parseFloat(el.max) || 1;
+    var pct = ((parseFloat(el.value) - min) / (max - min)) * 100;
+    el.style.background = 'linear-gradient(to right, var(--accent) ' + pct +
+      '%, var(--line) ' + pct + '%)';
   }
 
   function save(patch) {
@@ -235,7 +244,7 @@
         save({ model: m.id });
         wrap.querySelectorAll('.m').forEach(function (el) { el.classList.remove('on'); });
         d.classList.add('on');
-        document.getElementById('modelName').textContent = modelName(m);
+        document.getElementById('modelName').textContent = m.emoji + '\u2002' + modelName(m);
       };
       wrap.appendChild(d);
     });
@@ -252,9 +261,11 @@
       var el = document.getElementById(id), out = document.getElementById(id + 'V');
       el.value = cfg[id];
       out.textContent = fmt(parseFloat(cfg[id]));
+      paintRange(el);
       el.oninput = function () {
         var v = parseFloat(el.value);
         out.textContent = fmt(v);
+        paintRange(el);
         save(id === 'ducklings' ? { ducklings: v | 0 } : (function () { var o = {}; o[id] = v; return o; })());
       };
     });
@@ -268,14 +279,14 @@
     document.getElementById('randomBtn').onclick = function () {
       var id = DuckModels.randomId();
       save({ model: id });
-      document.getElementById('modelName').textContent = modelName(DuckModels.get(id));
+      document.getElementById('modelName').textContent = DuckModels.get(id).emoji + '\u2002' + modelName(DuckModels.get(id));
       buildModels();
     };
 
     var tr = document.getElementById('tricks');
     TRICKS.forEach(function (a) {
       var b = document.createElement('button');
-      b.textContent = MSG('trick_' + a[0]) || a[1];
+      b.textContent = (a[2] ? a[2] + ' ' : '') + (MSG('trick_' + a[0]) || a[1]);
       b.onclick = function () { send({ type: 'duck:trigger', action: a[0], dur: a[0] === 'sleep' ? 8 : 2.4 }); };
       tr.appendChild(b);
     });
@@ -294,7 +305,7 @@
   // ── Start ───────────────────────────────────────────────────
   chrome.storage.sync.get(DEFAULTS, function (loaded) {
     cfg = loaded;
-    document.getElementById('modelName').textContent = modelName(DuckModels.get(cfg.model));
+    document.getElementById('modelName').textContent = DuckModels.get(cfg.model).emoji + '\u2002' + modelName(DuckModels.get(cfg.model));
     buildModels();
     bind();
   });

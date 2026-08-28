@@ -23,8 +23,10 @@ When a new UI string is added, add it to **both** locale files in the same commi
 ## Product
 
 A browser extension (Chrome, Firefox, Edge) that draws a duck following the
-mouse cursor. Everything is rendered procedurally onto a canvas — **no image or
-audio assets at all**. Sounds are synthesized with Web Audio.
+mouse cursor. Everything is rendered procedurally onto a canvas — **no image
+assets at all**. Sounds are small bundled **CC0 recordings** in `audio/`
+(played via Web Audio; a synthesized fallback covers load failures). Every
+audio file must be CC0/public domain and documented in `audio/SOURCES.md`.
 
 ## Code
 

@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "__MSG_appName__",
-  "version": "1.4.0",
+  "version": "1.5.0",
   "description": "__MSG_appDesc__",
   "default_locale": "en",
   "icons": {
@@ -24,6 +24,12 @@
     "service_worker": "src/background.js"
   },
   "permissions": ["storage", "activeTab"],
+  "web_accessible_resources": [
+    {
+      "resources": ["audio/*"],
+      "matches": ["<all_urls>"]
+    }
+  ],
   "content_scripts": [
     {
       "matches": ["<all_urls>"],

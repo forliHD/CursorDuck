@@ -89,6 +89,9 @@
     <p><b>Füttern:</b> Doppelklick irgendwo ins „Wasser" → Brotkrumen. Sie schwimmt hin und pickt sie einzeln auf.</p>
     <p><b>Fisch-Jagd:</b> Ab und zu zieht ein Fischschatten vorbei — sie jagt ihn und schnappt zu (klappt nicht immer).</p>
     <p><b>Schwindel:</b> Den Cursor ein paarmal schnell um die Ente kreisen lassen → ihr wird schwummrig 😵.</p>
+    <p><b>Goldhaufen:</b> Wähl die 💰&nbsp;Milliardärs-Ente und lass sie einschlafen (oder drück „Schlafen") →
+    ein Goldhaufen taucht auf und sie springt kopfüber hinein.</p>
+    <p><b>Sounds:</b> Alle Geräusche einzeln anhören im <a href="sounds.html">Sound-Studio&nbsp;🔊</a>.</p>
   </div>
 
   <div class="card">
@@ -143,6 +146,7 @@
 <script>
 (function () {
   var engine = new CursorDuckEngine({ model: 'mallard', sound: false });
+  engine.sound.base = '../audio/';   // real samples (synth only as fallback)
   engine.mount(document.body);
   engine.start();
   window.__duck = engine;   // Test-Handle

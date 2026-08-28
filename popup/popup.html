@@ -23,14 +23,14 @@
   <main>
     <section>
       <div class="sec-head">
-        <h2 data-i18n="secModel">Entenmodell</h2>
+        <h2><span class="ico">🦆</span> <span data-i18n="secModel">Entenmodell</span></h2>
         <button id="randomBtn" class="ghost" data-i18n="btnRandom">🎲 Zufall</button>
       </div>
       <div id="models" class="models"></div>
     </section>
 
     <section>
-      <h2 data-i18n="secSettings">Einstellungen</h2>
+      <h2><span class="ico">🎚️</span> <span data-i18n="secSettings">Einstellungen</span></h2>
       <label class="slider">
         <span><span data-i18n="lblSize">Größe</span> <b id="sizeV">1.0×</b></span>
         <input type="range" id="size" min="0.5" max="2.2" step="0.05">
@@ -51,6 +51,10 @@
         <span><span data-i18n="lblOpacity">Sichtbarkeit</span> <b id="opacityV">100 %</b></span>
         <input type="range" id="opacity" min="0.2" max="1" step="0.05">
       </label>
+      <label class="slider">
+        <span><span data-i18n="lblVolume">Lautstärke</span> <b id="volumeV">35 %</b></span>
+        <input type="range" id="volume" min="0" max="1" step="0.05">
+      </label>
     </section>
 
     <section class="checks">
@@ -63,12 +67,12 @@
     </section>
 
     <section>
-      <h2 data-i18n="secTricks">Kunststückchen</h2>
+      <h2><span class="ico">🎪</span> <span data-i18n="secTricks">Kunststückchen</span></h2>
       <div class="tricks" id="tricks"></div>
     </section>
 
     <section>
-      <h2 data-i18n="secAchievements">Erfolge</h2>
+      <h2><span class="ico">🏆</span> <span data-i18n="secAchievements">Erfolge</span></h2>
       <div class="ach" id="achievements"></div>
     </section>
 

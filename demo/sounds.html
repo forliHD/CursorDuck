@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Cursor Duck — Sound-Studio 🔊</title>
+<style>
+  :root {
+    --bg: #eef4fb; --ink: #1d2b3a; --muted: #63758a;
+    --card: #ffffff; --line: #d9e3f0; --accent: #2f7fd6;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; min-height: 100vh;
+    font: 15px/1.6 ui-rounded, -apple-system, "Segoe UI", system-ui, sans-serif;
+    color: var(--ink);
+    background:
+      radial-gradient(1200px 700px at 15% -10%, #dcecff 0%, transparent 60%),
+      radial-gradient(900px 600px at 110% 20%, #fff6dc 0%, transparent 55%),
+      var(--bg);
+  }
+  header { padding: 44px 32px 8px; text-align: center; }
+  h1 { font-size: 34px; margin: 0 0 6px; letter-spacing: -0.5px; }
+  .sub { color: var(--muted); margin: 0; }
+  main { max-width: 640px; margin: 0 auto; padding: 20px 24px 90px; }
+  .card {
+    background: var(--card); border: 1px solid var(--line); border-radius: 16px;
+    padding: 18px 22px; margin: 14px 0; box-shadow: 0 6px 24px rgba(31,60,95,0.06);
+  }
+  h2 { font-size: 17px; margin: 0 0 10px; }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; }
+  button {
+    padding: 9px 14px; border-radius: 10px; border: 1px solid var(--line);
+    background: #f7fafd; cursor: pointer; font-size: 14px; font-family: inherit;
+  }
+  button:hover { background: var(--accent); color: #fff; border-color: var(--accent); }
+  label { display: block; margin: 4px 0 2px; color: var(--muted); font-size: 13px; }
+  input[type=range] { width: 100%; }
+  .val { float: right; color: var(--ink); font-variant-numeric: tabular-nums; }
+  .hint { color: var(--muted); font-size: 13px; margin-top: 10px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Sound-Studio 🔊🦆</h1>
+  <p class="sub">Alle Geräusche der Ente — echte CC0-Aufnahmen aus <code>audio/</code> (Quellen: <code>audio/SOURCES.md</code>).</p>
+  <p class="sub" id="status">Lade Samples …</p>
+</header>
+
+<main>
+  <div class="card">
+    <label>Lautstärke <span class="val" id="volV">35 %</span></label>
+    <input type="range" id="vol" min="0" max="1" step="0.05" value="0.35">
+  </div>
+
+  <div class="card">
+    <h2>Quaken</h2>
+    <div class="row">
+      <button data-s="quack" data-p="1">Quack</button>
+      <button data-s="quack" data-p="1" data-joy="1">Freude (2×)</button>
+      <button data-s="quack" data-p="0.7">Tief (Gans)</button>
+      <button data-s="quack" data-p="0.82">Milliardärin</button>
+      <button data-s="quack" data-p="1.45">Hoch (Quietsche)</button>
+      <button data-s="quack" data-p="1.9">Küken</button>
+      <button data-s="alt" data-n="quackAlt1">Echte Ente A</button>
+      <button data-s="alt" data-n="quackAlt2">Echte Ente B</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Wasser</h2>
+    <div class="row">
+      <button data-s="splash" data-p="0.5">Splash klein</button>
+      <button data-s="splash" data-p="1">Splash mittel</button>
+      <button data-s="splash" data-p="1.4">Splash groß</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Sonstiges</h2>
+    <div class="row">
+      <button data-s="peck">Picken (tok)</button>
+      <button data-s="pop">Platzen (plopp)</button>
+      <button data-s="coins" data-p="1.2">Goldhaufen 💰</button>
+      <button data-s="coins" data-p="0.6">Münzen leise</button>
+    </div>
+    <p class="hint">Browser geben Ton erst nach der ersten Nutzer-Geste frei —
+    der erste Klick auf einen Knopf schaltet ihn scharf.</p>
+  </div>
+</main>
+
+<script src="../src/models.js"></script>
+<script src="../src/render.js"></script>
+<script src="../src/effects.js"></script>
+<script src="../src/engine.js"></script>
+<script>
+(function () {
+  // Engine only as a sound host — no canvas, no duck on this page
+  var engine = new CursorDuckEngine({ sound: true, volume: 0.35 });
+  engine.sound.base = '../audio/';
+  engine.sound.preload();
+  window.__sound = engine.sound;   // test handle
+
+  // Show whether the real samples arrived or the synth fallback is active
+  var statusEl = document.getElementById('status');
+  var tries = 0;
+  var TOTAL = Object.keys(engine.sound._state).length || 8;
+  (function poll() {
+    var have = Object.keys(engine.sound.buffers).length;
+    var raw = engine.sound._raw ? Object.keys(engine.sound._raw).filter(function (k) {
+      return engine.sound._raw[k];
+    }).length : 0;
+    if (have >= TOTAL) { statusEl.textContent = '✅ Alle ' + TOTAL + ' Samples geladen.'; return; }
+    if (have + raw >= TOTAL) { statusEl.textContent = '✅ Samples geladen (' + have + ' dekodiert) — erster Klick schaltet den Ton frei.'; }
+    else if (tries > 20) { statusEl.textContent = '⚠️ Samples nicht ladbar (file://?) — synthetischer Fallback aktiv.'; return; }
+    tries++;
+    setTimeout(poll, 250);
+  })();
+
+  var vol = document.getElementById('vol');
+  var volV = document.getElementById('volV');
+  vol.oninput = function () {
+    engine.sound.vol = parseFloat(vol.value);
+    volV.textContent = Math.round(vol.value * 100) + ' %';
+  };
+
+  document.querySelectorAll('button[data-s]').forEach(function (b) {
+    b.onclick = function () {
+      var s = b.dataset.s, p = parseFloat(b.dataset.p || '1');
+      if (s === 'quack') engine.sound.quack(p, !!b.dataset.joy);
+      else if (s === 'splash') engine.sound.splash(p);
+      else if (s === 'peck') engine.sound.peck();
+      else if (s === 'pop') engine.sound.pop();
+      else if (s === 'coins') engine.sound.coins(p);
+      else if (s === 'alt') {
+        var a2 = engine.sound._ready();
+        if (a2) engine.sound._play(b.dataset.n, 1, 1);
+      }
+    };
+  });
+})();
+</script>
+</body>
+</html>

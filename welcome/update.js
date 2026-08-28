@@ -23,12 +23,14 @@
 
   function start(settings) {
     var engine = new window.CursorDuckEngine(settings);
+    engine.sound.base = '../audio/';   // real samples on this page too
+    engine.sound.preload();
     engine.mount(document.body);
     engine.start();
     window.__duck = engine;
-    // Direkt was zeigen: die neue Ente stellt sich vor, dann Nickerchen
-    // mit Küken-Nest (Mausbewegung weckt alle wieder auf)
-    setTimeout(function () { engine.setModel('visionary'); }, 1800);
+    // Show off right away: the tycoon duck introduces herself, then gets
+    // sleepy and dives into her gold hoard (moving the mouse wakes her)
+    setTimeout(function () { engine.setModel('tycoon'); }, 1800);
     setTimeout(function () { engine.trigger('quack'); }, 2600);
     setTimeout(function () { engine.trigger('sleep', 99); }, 7000);
   }

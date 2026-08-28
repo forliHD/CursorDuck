@@ -103,6 +103,31 @@
     }
   };
 
+  // A flipping gold coin, tossed on a little arc (gold-hoard dive)
+  FX.prototype.coin = function (x, y, vx, vy, size) {
+    return this.add({
+      k: 'coin', x: x, y: y, vx: vx, vy: vy,
+      size: size || 3.5 + Math.random() * 2,
+      life: 0.75 + Math.random() * 0.45,
+      rot: Math.random() * TAU, vrot: 6 + Math.random() * 10
+    });
+  };
+
+  // Fountain of coins bursting out of the hoard
+  FX.prototype.coinBurst = function (x, y, n, power) {
+    power = power || 1;
+    for (var i = 0; i < (n || 10); i++) {
+      var a = -Math.PI / 2 + (Math.random() - 0.5) * 2.0;
+      var sp = (90 + Math.random() * 170) * power;
+      this.coin(x + (Math.random() - 0.5) * 18, y,
+        Math.cos(a) * sp, Math.sin(a) * sp);
+    }
+    for (var s = 0; s < 5; s++) {
+      this.sparkle(x + (Math.random() - 0.5) * 30, y - Math.random() * 20,
+        '#ffe9a8', 3 + Math.random() * 4);
+    }
+  };
+
   FX.prototype.puff = function (x, y, color) {
     for (var i = 0; i < 7; i++) {
       var a = Math.random() * TAU;
@@ -130,6 +155,10 @@
           break;
         case 'confetti':
           p.vy += 380 * dt; p.vx *= (1 - 1.2 * dt);
+          p.x += p.vx * dt; p.y += p.vy * dt; p.rot += p.vrot * dt;
+          break;
+        case 'coin':
+          p.vy += 560 * dt; p.vx *= (1 - 0.8 * dt);
           p.x += p.vx * dt; p.y += p.vy * dt; p.rot += p.vrot * dt;
           break;
         case 'feather':
@@ -284,6 +313,28 @@
           ctx.rotate(p.rot);
           ctx.fillStyle = p.color;
           ctx.fillRect(-p.size * 0.5, -p.size * 0.32, p.size, p.size * 0.64);
+          break;
+        case 'coin':
+          // spin around the vertical axis: width breathes with the flip
+          ctx.globalAlpha = fade;
+          ctx.translate(p.x, p.y);
+          ctx.rotate(Math.sin(p.rot * 0.35) * 0.4);
+          var flip = Math.cos(p.rot);
+          var cw = p.size * Math.max(0.22, Math.abs(flip));
+          ctx.fillStyle = flip >= 0 ? '#f6c945' : '#dfa826';
+          ctx.beginPath();
+          ctx.ellipse(0, 0, cw, p.size, 0, 0, TAU);
+          ctx.fill();
+          ctx.strokeStyle = 'rgba(146,96,14,0.7)';
+          ctx.lineWidth = Math.max(0.8, p.size * 0.22);
+          ctx.stroke();
+          if (Math.abs(flip) > 0.55) {
+            ctx.strokeStyle = 'rgba(255,240,180,0.8)';
+            ctx.lineWidth = Math.max(0.6, p.size * 0.14);
+            ctx.beginPath();
+            ctx.ellipse(0, 0, cw * 0.55, p.size * 0.55, 0, 0, TAU);
+            ctx.stroke();
+          }
           break;
         case 'puff':
           ctx.globalAlpha = fade * 0.55;
