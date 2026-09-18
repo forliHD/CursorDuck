@@ -42,6 +42,8 @@ her tricks.
 | **Duckling nest** | When mama gets sleepy she first puts the ducklings to bed: a nest appears (it grows with the number of ducklings and the duck size), she waits at the rim, gives the little ones a good-night nudge — then falls asleep beside them, occasionally dreaming little hearts. When she wakes up, the nest sinks away with a bubble. |
 | **Gold-hoard nap** | The tycoon duck doesn't simply doze off: a little pile of gold coins rises from the water, she paddles over, takes a gleeful running jump and dives in headfirst — coins fly, gold clinks — then sleeps buried in her riches, dreaming in glitter. On waking she hops out and the hoard sinks away. |
 | **Clicking** | Click the duck → she quacks back. Double-click the duck → wing flapping. |
+| **Music & video** | When a video or audio track with sound plays on the page (embedded players included), she dances along in rounds, the ducklings bob to the beat, and a sleeping duck wakes up for the first beat. Pause the player and she stops. Muted autoplay videos don't count. |
+| **Wardrobe** | 14 hats and 5 pairs of glasses can be put on any model — top hat, crown, halo, ninja mask, sunglasses, monocle … Each piece is unlocked by an achievement (the lock tells you which one); the popup previews every piece on your current duck. |
 
 ## The duck models
 
@@ -64,15 +66,18 @@ quack — every now and then she says things like “One more thing …”,
 
 Rare models are marked in the popup (blue = rare, purple = epic, gold = legendary).
 The 🎲 button picks at random — legendaries are rare. The popup also holds
-**35 achievements** — from petting fan through “Identity crisis” to “Keynote fan”;
-clicking an achievement reveals how to earn it.
+**59 achievements in bronze, silver, gold and diamond tiers** — from petting fan through
+“Identity crisis” and “Croesus” to “Duck whisperer”; clicking an achievement reveals how
+to earn it, and the header counts what you've collected.
 
 ## Settings (popup)
 
-Size, speed, number of ducklings, playfulness, opacity, sound on/off, water effects,
+Size, speed, distance to the cursor (so she never sits on the text you're reading),
+number of ducklings, playfulness, opacity, sound on/off with volume, water effects,
 reflection, cursor pecking, crumb feeding, “new random model on every browser start”,
-“pause on this site” — everything applies instantly, without reloading. Plus 16 buttons
-to trigger tricks directly (including feeding, fish hunt, shore leave and visitors).
+“pause on this site” with an editable list of paused sites (a domain covers its
+subdomains) — everything applies instantly, without reloading. Plus 16 buttons to
+trigger tricks directly (including feeding, fish hunt, shore leave and visitors).
 
 Keyboard shortcuts: `Alt+Shift+D` (on/off), `Alt+Shift+N` (next model).
 

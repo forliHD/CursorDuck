@@ -9,6 +9,17 @@
 
   var isExt = typeof chrome !== 'undefined' && chrome.storage && chrome.runtime && chrome.runtime.id;
 
+  // Is a video/audio with sound playing in this document? Muted autoplay
+  // hero videos don't count — nobody dances to those.
+  function mediaPlayingHere() {
+    var els = document.querySelectorAll('video, audio');
+    for (var i = 0; i < els.length; i++) {
+      var m = els[i];
+      if (!m.paused && !m.ended && !m.muted && m.volume > 0 && m.readyState >= 2) return true;
+    }
+    return false;
+  }
+
   // ── Sub-Frames: Cursorposition an das Top-Fenster melden ──────
   if (window.top !== window.self) {
     var lastSend = 0;
@@ -20,6 +31,16 @@
         window.parent.postMessage({ __cursorDuck: 1, x: ev.clientX, y: ev.clientY }, '*');
       } catch (e) { /* cross-origin, egal */ }
     }, { passive: true, capture: true });
+    // Embedded players (YouTube & Co.) live in iframes: heartbeat while
+    // playing, one final "off" when the media stops
+    var mediaWas = false;
+    setInterval(function () {
+      var on = mediaPlayingHere();
+      if (on || mediaWas) {
+        try { window.top.postMessage({ __cursorDuck: 1, media: on }, '*'); } catch (e) { /* egal */ }
+      }
+      mediaWas = on;
+    }, 1000);
     return;
   }
 
@@ -48,9 +69,19 @@
     });
   }
 
+  // "example.com" pauses the whole site: www., subdomains, any case.
+  // (Exact matching used to leave www./non-www. twins unpaused.)
+  function normHost(h) { return String(h || '').toLowerCase().replace(/^www\./, ''); }
+  function hostBlocked(list) {
+    var nh = normHost(host);
+    for (var i = 0; i < (list || []).length; i++) {
+      var e = normHost(list[i]);
+      if (e && (nh === e || nh.slice(-e.length - 1) === '.' + e)) return true;
+    }
+    return false;
+  }
   function siteAllowed(cfg) {
-    var list = cfg.disabledHosts || [];
-    return list.indexOf(host) === -1;
+    return !hostBlocked(cfg.disabledHosts);
   }
 
   function boot() {
@@ -78,6 +109,26 @@
     });
   }
 
+  // ── Media watch: own document + sub-frame heartbeats → engine.setMedia ──
+  var frameMedia = [];   // [{ win, t }] sub-frames that reported playing media
+  window.addEventListener('message', function (ev) {
+    var d = ev.data;
+    if (!d || d.__cursorDuck !== 1 || d.media === undefined) return;
+    for (var i = frameMedia.length - 1; i >= 0; i--) {
+      if (frameMedia[i].win === ev.source) frameMedia.splice(i, 1);
+    }
+    if (d.media) frameMedia.push({ win: ev.source, t: Date.now() });
+  }, false);
+  setInterval(function () {
+    if (!engine) return;
+    var now = Date.now(), any = mediaPlayingHere();
+    for (var i = frameMedia.length - 1; i >= 0; i--) {
+      if (now - frameMedia[i].t > 2500) frameMedia.splice(i, 1);   // stale heartbeat
+      else any = true;
+    }
+    engine.setMedia(any);
+  }, 1000);
+
   function throttle(fn, ms) {
     var t = 0, pending = null;
     return function (arg) {
@@ -93,7 +144,7 @@
     var patch = {};
     for (var k in changes) {
       if (k === 'disabledHosts') {
-        blocked = (changes[k].newValue || []).indexOf(host) !== -1;
+        blocked = hostBlocked(changes[k].newValue);
         continue;
       }
       if (k === 'stats') { engine.stats = changes[k].newValue || engine.stats; continue; }

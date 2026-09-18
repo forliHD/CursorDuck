@@ -394,6 +394,34 @@
     })
   ];
 
+  // ── Wardrobe ──────────────────────────────────────────────────
+  // Accessories the user can put on any model (drawn by render.js).
+  // Each one is unlocked by an achievement: `stat` must reach `goal`;
+  // `ach` names the popup's achievement key so the lock can say which one.
+  // `name` is the German fallback like the models' names; the popup shows
+  // the localized `wear_<id>` string when available.
+  var WARDROBE = [
+    { id: 'cap',      kind: 'hat',     name: 'Kappe',           stat: 'pecks',         goal: 25,  ach: 'achPecks1' },
+    { id: 'party',    kind: 'hat',     name: 'Partyhut',        stat: 'dances',        goal: 5,   ach: 'achDance1' },
+    { id: 'cowboy',   kind: 'hat',     name: 'Cowboyhut',       stat: 'waddles',       goal: 5,   ach: 'achWaddle' },
+    { id: 'santa',    kind: 'hat',     name: 'Weihnachtsmütze', stat: 'sleeps',        goal: 10,  ach: 'achSleep' },
+    { id: 'halo',     kind: 'hat',     name: 'Heiligenschein',  stat: 'nests',         goal: 5,   ach: 'achNest' },
+    { id: 'tophat',   kind: 'hat',     name: 'Zylinder',        stat: 'goldNaps',      goal: 1,   ach: 'achGold1' },
+    { id: 'bunny',    kind: 'hat',     name: 'Hasenohren',      stat: 'visits',        goal: 10,  ach: 'achVisit2' },
+    { id: 'chef',     kind: 'hat',     name: 'Kochmütze',       stat: 'crumbs',        goal: 100, ach: 'achCrumbs2' },
+    { id: 'astro',    kind: 'hat',     name: 'Astro-Helm',      stat: 'bursts',        goal: 10,  ach: 'achBurst2' },
+    { id: 'wizard',   kind: 'hat',     name: 'Zauberhut',       stat: 'dizzy',         goal: 25,  ach: 'achDizzy2' },
+    { id: 'ninja',    kind: 'hat',     name: 'Ninja-Maske',     stat: 'peekaboos',     goal: 25,  ach: 'achPeek2' },
+    { id: 'horns',    kind: 'hat',     name: 'Hörnchen',        stat: 'startles',      goal: 50,  ach: 'achStartle2' },
+    { id: 'pirate',   kind: 'hat',     name: 'Piratenhut',      stat: 'fish',          goal: 100, ach: 'achFish3' },
+    { id: 'crown',    kind: 'hat',     name: 'Krone',           stat: 'pets',          goal: 500, ach: 'achPets3' },
+    { id: 'sun',      kind: 'glasses', name: 'Sonnenbrille',    stat: 'pets',          goal: 10,  ach: 'achPets1' },
+    { id: 'round',    kind: 'glasses', name: 'Runde Brille',    stat: 'modelSwitches', goal: 10,  ach: 'achStyle' },
+    { id: 'eyepatch', kind: 'glasses', name: 'Augenklappe',     stat: 'fish',          goal: 25,  ach: 'achFish2' },
+    { id: 'monocle',  kind: 'glasses', name: 'Monokel',         stat: 'goldNaps',      goal: 10,  ach: 'achGold2' },
+    { id: 'visor',    kind: 'glasses', name: 'Visor',           stat: 'surfs',         goal: 100, ach: 'achSurf2' }
+  ];
+
   var BY_ID = {};
   for (var i = 0; i < MODELS.length; i++) BY_ID[MODELS[i].id] = MODELS[i];
 
@@ -445,6 +473,7 @@
 
   root.DuckModels = {
     list: MODELS, get: get, byId: BY_ID, randomId: randomId,
-    isAvailable: isAvailable, easterSunday: easterSunday, BASE: BASE
+    isAvailable: isAvailable, easterSunday: easterSunday, BASE: BASE,
+    wardrobe: WARDROBE
   };
 })(typeof window !== 'undefined' ? window : this);

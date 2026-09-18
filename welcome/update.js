@@ -28,11 +28,14 @@
     engine.mount(document.body);
     engine.start();
     window.__duck = engine;
-    // Show off right away: the tycoon duck introduces herself, then gets
-    // sleepy and dives into her gold hoard (moving the mouse wakes her)
+    // Show off right away: the tycoon duck introduces herself, dances to
+    // "music" for a bit, then gets sleepy and dives into her gold hoard
+    // (moving the mouse wakes her)
     setTimeout(function () { engine.setModel('tycoon'); }, 1800);
     setTimeout(function () { engine.trigger('quack'); }, 2600);
-    setTimeout(function () { engine.trigger('sleep', 99); }, 7000);
+    setTimeout(function () { engine.setMedia(true); }, 4200);
+    setTimeout(function () { engine.setMedia(false); }, 13000);
+    setTimeout(function () { engine.trigger('sleep', 99); }, 15000);
   }
 
   if (isExt) {

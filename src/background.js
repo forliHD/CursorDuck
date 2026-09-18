@@ -17,6 +17,7 @@ const DEFAULTS = {
   model: 'mallard',
   size: 1.0,
   speed: 1.0,
+  distance: 1.0,
   ducklings: 0,
   playfulness: 1.0,
   sound: false,
@@ -28,6 +29,8 @@ const DEFAULTS = {
   feed: true,
   sleepAfter: 15,
   randomOnStart: false,   // bei jedem Browserstart ein neues Zufallsmodell
+  hat: '',                // Garderobe: '' = wie das Modell, 'none' = ohne, sonst Hut-Art
+  glasses: '',
   disabledHosts: []
 };
 
@@ -36,7 +39,7 @@ const MODEL_IDS = [
   'mallard', 'mallard-hen', 'rubber', 'pekin', 'mandarin', 'wood', 'tufted', 'teal',
   'runner', 'chonk', 'duckling', 'swan', 'goose', 'debug', 'neon', 'ghost', 'pirate',
   'royal', 'ninja', 'goth', 'party', 'chef', 'wizard', 'astro', 'zombie', 'angel',
-  'devil', 'cowboy', 'visionary', 'rainbow', 'galaxy', 'golden'
+  'devil', 'cowboy', 'visionary', 'tycoon', 'rainbow', 'galaxy', 'golden'
 ];
 
 // Browserstart: Wer das Zufalls-Abo hat, bekommt eine frische Ente.

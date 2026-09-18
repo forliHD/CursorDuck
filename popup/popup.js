@@ -4,16 +4,85 @@
   'use strict';
 
   var DEFAULTS = {
-    enabled: true, model: 'mallard', size: 1.0, speed: 1.0, ducklings: 0,
+    enabled: true, model: 'mallard', size: 1.0, speed: 1.0, distance: 1.0, ducklings: 0,
     playfulness: 1.0, sound: false, volume: 0.35, effects: true,
     reflection: true, opacity: 1.0, peck: true, feed: true, sleepAfter: 15,
-    randomOnStart: false, disabledHosts: []
+    hat: '', glasses: '', randomOnStart: false, disabledHosts: []
   };
 
   var cfg = null;
   var activeTab = null;
   var hostName = '';
   var babyCache = {};
+
+  // ── Garderobe ───────────────────────────────────────────────
+  // Same override rule as engine.dress(): '' = the model's own accessory,
+  // 'none' = bare, anything else a kind from render.js.
+  var statsCache = null;
+  function dressed(m, hat, gl) {
+    if (!hat && !gl) return m;
+    var d = {};
+    for (var k in m) d[k] = m[k];
+    if (hat) d.hat = hat === 'none' ? null : hat;
+    if (gl) d.glasses = gl === 'none' ? null : gl;
+    return d;
+  }
+  var heroCache = { key: '', m: null };
+  function heroModel() {
+    var key = cfg.model + '|' + (cfg.hat || '') + '|' + (cfg.glasses || '');
+    if (heroCache.key !== key) {
+      heroCache.key = key;
+      heroCache.m = dressed(DuckModels.get(cfg.model), cfg.hat, cfg.glasses);
+    }
+    return heroCache.m;
+  }
+  function renderWardrobe() {
+    if (!cfg || !statsCache) return;
+    var base = DuckModels.get(cfg.model);
+    var unlocked = 0, total = 0;
+    [['hat', 'wearHats'], ['glasses', 'wearGlasses']].forEach(function (pair) {
+      var kind = pair[0], wrap = document.getElementById(pair[1]);
+      if (!wrap) return;
+      wrap.textContent = '';
+      var items = [{ id: '', name: MSG('wearDefault') || 'Wie das Modell' },
+                   { id: 'none', name: MSG('wearNone') || 'Ohne' }];
+      DuckModels.wardrobe.forEach(function (w) {
+        if (w.kind === kind) items.push({ id: w.id, name: MSG('wear_' + w.id) || w.name, w: w });
+      });
+      items.forEach(function (it) {
+        var locked = !!(it.w && (statsCache[it.w.stat] || 0) < it.w.goal);
+        if (it.w) { total++; if (!locked) unlocked++; }
+        var d = document.createElement('div');
+        d.className = 'w' + ((cfg[kind] || '') === it.id ? ' on' : '') + (locked ? ' locked' : '');
+        // the tile shows the current model wearing this piece (plus whatever
+        // is selected in the other row), so combinations are visible at once
+        var c = document.createElement('canvas');
+        var W = 62, H = 46, dpr = Math.min(2, devicePixelRatio || 1);
+        c.width = W * dpr; c.height = H * dpr;
+        var x = c.getContext('2d');
+        x.setTransform(dpr, 0, 0, dpr, 0, 0);
+        var dm = dressed(base, kind === 'hat' ? it.id : cfg.hat, kind === 'glasses' ? it.id : cfg.glasses);
+        DuckRender.draw(x, dm, { x: W / 2, y: H - 9, r: 15, t: 1.4, dir: 1, reflection: false });
+        var sp = document.createElement('span'); sp.textContent = it.name;
+        d.appendChild(c); d.appendChild(sp);
+        if (locked) {
+          var lk = document.createElement('span'); lk.className = 'lock'; lk.textContent = '🔒';
+          d.appendChild(lk);
+          d.title = (MSG('wearLocked') || 'Freischalten mit: ') + achName(it.w.ach);
+        } else {
+          d.title = it.name;
+          d.onclick = function () {
+            var o = {}; o[kind] = it.id;
+            save(o);
+            renderWardrobe();
+          };
+        }
+        wrap.appendChild(d);
+      });
+    });
+    var cnt = document.getElementById('wearCount');
+    if (cnt) cnt.textContent = unlocked + '/' + total;
+  }
 
   // Außerhalb der Extension (Vorschau im Browser) auf localStorage zurückfallen,
   // damit sich das Popup auch ohne chrome-APIs ansehen lässt.
@@ -71,9 +140,52 @@
   }
   applyI18n();
 
+  // ── Einklappbare Sektionen ──────────────────────────────────
+  // Zustand liegt im localStorage des Popups (reine UI-Vorliebe, muss
+  // nicht zwischen Geräten wandern). Ohne gespeicherten Zustand sind nur
+  // Modell, Einstellungen und Seiten offen — der Rest wartet hinter dem Pfeil.
+  var UI_KEY = 'cursorduck-ui';
+  var DEFAULT_COLLAPSED = { wardrobe: 1, behaviour: 1, tricks: 1, achievements: 1 };
+  function loadUi() {
+    try { return JSON.parse(localStorage.getItem(UI_KEY)) || {}; } catch (e) { return {}; }
+  }
+  function saveUi(ui) {
+    try { localStorage.setItem(UI_KEY, JSON.stringify(ui)); } catch (e) { /* privater Modus o. ä. */ }
+  }
+  (function initCollapsibles() {
+    var ui = loadUi();
+    var saved = ui.collapsed || {};
+    document.querySelectorAll('section[data-sec]').forEach(function (sec) {
+      var key = sec.dataset.sec;
+      var h = sec.querySelector('h2.sec-toggle');
+      if (!h) return;
+      var collapsed = (key in saved) ? !!saved[key] : !!DEFAULT_COLLAPSED[key];
+      function set(c) {
+        sec.classList.toggle('collapsed', c);
+        h.setAttribute('aria-expanded', String(!c));
+      }
+      set(collapsed);
+      h.setAttribute('role', 'button');
+      h.tabIndex = 0;
+      function toggle() {
+        var now = !sec.classList.contains('collapsed');
+        set(now);
+        var u = loadUi();
+        u.collapsed = u.collapsed || {};
+        u.collapsed[key] = now ? 1 : 0;
+        saveUi(u);
+      }
+      h.onclick = toggle;
+      h.onkeydown = function (ev) {
+        if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); toggle(); }
+      };
+    });
+  })();
+
   var SLIDERS = [
     ['size', function (v) { return v.toFixed(1) + '×'; }],
     ['speed', function (v) { return v.toFixed(1) + '×'; }],
+    ['distance', function (v) { return v.toFixed(1) + '×'; }],
     ['ducklings', function (v) { return String(v | 0); }],
     ['playfulness', function (v) { return v.toFixed(1) + '×'; }],
     ['opacity', function (v) { return Math.round(v * 100) + ' %'; }],
@@ -89,54 +201,89 @@
     ['visitor', 'Besuch', '💕']
   ];
 
-  // [Stat-Schlüssel, Ziel, Emoji, i18n-Key, Name (Fallback), Erklärung (Fallback)]
-  // Ein Klick auf einen Erfolg klappt die Erklärung auf.
+  // [Stat-Schlüssel, Ziel, Emoji, i18n-Key, Name (Fallback), Erklärung (Fallback), Stufe]
+  // Stufen: bronze → silver → gold → diamond. Ein Klick klappt die Erklärung auf.
   var ACHIEVEMENTS = [
-    ['pets', 10, '🫶', 'achPets1', 'Streichel-Fan', 'Streichle die Ente 10-mal so lange, bis die Herzchen sprühen.'],
-    ['pets', 100, '💖', 'achPets2', 'Schmuse-Profi', '100 volle Streicheleinheiten — sie erkennt deine Maus am Geräusch.'],
-    ['pets', 500, '🧸', 'achPets3', 'Lieblingsmensch', '500 Streicheleinheiten. Zugegeben: Eigentlich hat sie DICH gezähmt.'],
-    ['pecks', 25, '🐦', 'achPecks1', 'Pick-Pick', 'Halt die Maus still, bis sie den Cursor 25-mal angepickt hat.'],
-    ['pecks', 200, '🪵', 'achPecks2', 'Ehrenspecht', '200 Pickser gegen deinen Cursor. Der arme Zeiger.'],
-    ['pecks', 1000, '⛏️', 'achPecks3', 'Presslufthammer', '1000 Pickser. Beantrage besser einen neuen Cursor.'],
-    ['fish', 1, '🐟', 'achFish1', 'Erster Fang', 'Ihr erster gefangener Fisch. Sie war sehr stolz.'],
-    ['fish', 25, '🎣', 'achFish2', 'Meisterangler', '25 Fische geschnappt — im Teich erzählt man sich Geschichten.'],
-    ['fish', 100, '🦈', 'achFish3', 'Schrecken der Meere', '100 Fische. Die Fische haben inzwischen einen Steckbrief von ihr.'],
-    ['fishEscaped', 10, '🐠', 'achFishEsc', 'Der war SO groß!', '10 Fische sind ihr entwischt. Jeder einzelne war natürlich riesig.'],
-    ['crumbs', 20, '🍞', 'achCrumbs1', 'Brotpatron', 'Wirf per Doppelklick Brotkrumen ins Wasser — 20 wurden verputzt.'],
-    ['crumbs', 100, '🥖', 'achCrumbs2', 'Bäcker-Liebling', '100 Krumen serviert. Beim Bäcker grüßt man dich mit Vornamen.'],
-    ['crumbs', 500, '🏭', 'achCrumbs3', 'Großbäckerei', '500 Krumen. Du fütterst nicht mehr — du belieferst.'],
-    ['bursts', 3, '🎈', 'achBurst', 'Platzt vor Glück', 'Füttere sie 3-mal so voll, dass es PLOPP macht. Keine Sorge, sie kommt wieder.'],
-    ['bursts', 10, '💥', 'achBurst2', 'Plopp-Stammkundin', '10 Plopps. Die Federn haben inzwischen eine eigene Flugroute.'],
-    ['dances', 5, '💃', 'achDance1', 'Tanzpartner', 'Wackel den Cursor schnell neben ihr hin und her — 5 Tänzchen getanzt.'],
-    ['dances', 25, '🕺', 'achDance2', 'Discokugel', '25 Tänzchen. Der Teich gilt jetzt offiziell als Club.'],
-    ['visits', 1, '💕', 'achVisit1', 'Neue Freundin', 'Der erste Besuch einer wilden Ente — Quak-Duett und Tänzchen inklusive.'],
-    ['visits', 10, '🏡', 'achVisit2', 'Beliebtes Ufer', '10 Besuche. Es hat sich offenbar rumgesprochen.'],
-    ['visits', 50, '🎪', 'achVisit3', 'Enten-Festival', '50 Besuche. Streng genommen veranstaltest du inzwischen ein Festival.'],
-    ['startles', 10, '😱', 'achStartle', 'Buh!', 'Wisch 10-mal blitzschnell durch sie durch — Federn flogen.'],
-    ['dizzy', 5, '🎠', 'achDizzy', 'Karussellfahrt', 'Kreise den Cursor schnell um sie herum, bis ihr 5-mal schwummrig wurde.'],
-    ['dizzy', 25, '🌀', 'achDizzy2', 'Waschmaschine', '25 Schleudergänge. Sie sieht bis heute Sternchen.'],
-    ['peekaboos', 5, '🫣', 'achPeek', 'Guck-guck!', 'Leg den Cursor ruhig auf ihr ab — 5-mal Kuckuck gespielt.'],
-    ['sleeps', 10, '😴', 'achSleep', 'Sandmännchen', 'Lass sie 10-mal ungestört einschlafen. Zzz.'],
-    ['sleeps', 50, '🛌', 'achSleep2', 'Murmeltier', '50 Nickerchen. Und täglich grüßt die Ente.'],
-    ['nests', 5, '🪺', 'achNest', 'Gute-Nacht-Geschichte', 'Bring die Küken 5-mal ins Nest — Mama stupst sie höchstpersönlich zu Bett.'],
-    ['surfs', 25, '🏄', 'achSurf', 'Wellenreiterin', 'Scroll kräftig durch die Seite — 25-mal ritt die Familie die Strömung.'],
-    ['surfs', 100, '🌊', 'achSurf2', 'Tsunami-Reiterin', '100 Wellen. Dein Scrollrad verlangt Gefahrenzulage.'],
-    ['modelSwitches', 10, '👗', 'achStyle', 'Modenschau', 'Wechsle 10-mal das Entenmodell im Popup.'],
-    ['modelSwitches', 100, '🎭', 'achStyle2', 'Identitätskrise', '100 Modellwechsel. Wer bin ich — und wenn ja, wie viele Enten?'],
-    ['legendary', 1, '✨', 'achLegend', 'Es glitzert!', 'Wähle eine legendäre Ente: Regenbogen, Galaxie oder Gold.'],
-    ['quotes', 10, '🎤', 'achQuote', 'Keynote-Fan', 'Hör dir 10 Sprüche der Visionärs-Ente an. One more thing …'],
-    ['waddles', 5, '🚶', 'achWaddle', 'Landratte', 'Sieh ihr 5-mal beim Landgang zu — oder stups ihn im Popup an.'],
-    ['waddles', 25, '🥾', 'achWaddle2', 'Wanderverein', '25 Landgänge. Die Watschelrunde ist jetzt ein eingetragener Verein.']
+    ['pets', 10, '🫶', 'achPets1', 'Streichel-Fan', 'Streichle die Ente 10-mal so lange, bis die Herzchen sprühen.', 'bronze'],
+    ['pets', 100, '💖', 'achPets2', 'Schmuse-Profi', '100 volle Streicheleinheiten — sie erkennt deine Maus am Geräusch.', 'silver'],
+    ['pets', 500, '🧸', 'achPets3', 'Lieblingsmensch', '500 Streicheleinheiten. Zugegeben: Eigentlich hat sie DICH gezähmt.', 'gold'],
+    ['pets', 2500, '🪄', 'achPets4', 'Entenflüsterer', '2500 Streicheleinheiten. Sie hört inzwischen auf deinen Namen — und du auf ihren.', 'diamond'],
+    ['pecks', 25, '🐦', 'achPecks1', 'Pick-Pick', 'Halt die Maus still, bis sie den Cursor 25-mal angepickt hat.', 'bronze'],
+    ['pecks', 200, '🪵', 'achPecks2', 'Ehrenspecht', '200 Pickser gegen deinen Cursor. Der arme Zeiger.', 'silver'],
+    ['pecks', 1000, '⛏️', 'achPecks3', 'Presslufthammer', '1000 Pickser. Beantrage besser einen neuen Cursor.', 'gold'],
+    ['pecks', 5000, '🏗️', 'achPecks4', 'Bohrinsel', '5000 Pickser. Der Cursor hat Löcher. Wir zählen trotzdem weiter.', 'diamond'],
+    ['fish', 1, '🐟', 'achFish1', 'Erster Fang', 'Ihr erster gefangener Fisch. Sie war sehr stolz.', 'bronze'],
+    ['fish', 25, '🎣', 'achFish2', 'Meisterangler', '25 Fische geschnappt — im Teich erzählt man sich Geschichten.', 'silver'],
+    ['fish', 100, '🦈', 'achFish3', 'Schrecken der Meere', '100 Fische. Die Fische haben inzwischen einen Steckbrief von ihr.', 'gold'],
+    ['fish', 500, '🐋', 'achFish4', 'Fischmarkt', '500 Fische. Der Teich hat jetzt einen Wikipedia-Artikel über sie.', 'diamond'],
+    ['fishEscaped', 10, '🐠', 'achFishEsc', 'Der war SO groß!', '10 Fische sind ihr entwischt. Jeder einzelne war natürlich riesig.', 'bronze'],
+    ['fishEscaped', 100, '🧜', 'achFishEsc2', 'Anglerlatein', '100 entwischte Fische — jeder davon in der Erzählung mindestens hüfthoch.', 'silver'],
+    ['crumbs', 20, '🍞', 'achCrumbs1', 'Brotpatron', 'Wirf per Doppelklick Brotkrumen ins Wasser — 20 wurden verputzt.', 'bronze'],
+    ['crumbs', 100, '🥖', 'achCrumbs2', 'Bäcker-Liebling', '100 Krumen serviert. Beim Bäcker grüßt man dich mit Vornamen.', 'silver'],
+    ['crumbs', 500, '🏭', 'achCrumbs3', 'Großbäckerei', '500 Krumen. Du fütterst nicht mehr — du belieferst.', 'gold'],
+    ['crumbs', 2500, '🌾', 'achCrumbs4', 'Brotimperium', '2500 Krumen. Du hast jetzt offiziell eine Lieferkette.', 'diamond'],
+    ['bursts', 3, '🎈', 'achBurst', 'Platzt vor Glück', 'Füttere sie 3-mal so voll, dass es PLOPP macht. Keine Sorge, sie kommt wieder.', 'bronze'],
+    ['bursts', 10, '💥', 'achBurst2', 'Plopp-Stammkundin', '10 Plopps. Die Federn haben inzwischen eine eigene Flugroute.', 'silver'],
+    ['bursts', 50, '🎆', 'achBurst3', 'Feuerwerkerin', '50 Plopps. Die Federn kommen mit eigenem Wetterbericht.', 'gold'],
+    ['dances', 5, '💃', 'achDance1', 'Tanzpartner', 'Wackel den Cursor schnell neben ihr hin und her — 5 Tänzchen getanzt.', 'bronze'],
+    ['dances', 25, '🕺', 'achDance2', 'Discokugel', '25 Tänzchen. Der Teich gilt jetzt offiziell als Club.', 'silver'],
+    ['dances', 100, '🪩', 'achDance3', 'Tanzlehrerin', '100 Tänzchen. Sie gibt jetzt Kurse — Anmeldung am Teichrand.', 'gold'],
+    ['visits', 1, '💕', 'achVisit1', 'Neue Freundin', 'Der erste Besuch einer wilden Ente — Quak-Duett und Tänzchen inklusive.', 'bronze'],
+    ['visits', 10, '🏡', 'achVisit2', 'Beliebtes Ufer', '10 Besuche. Es hat sich offenbar rumgesprochen.', 'silver'],
+    ['visits', 50, '🎪', 'achVisit3', 'Enten-Festival', '50 Besuche. Streng genommen veranstaltest du inzwischen ein Festival.', 'gold'],
+    ['visits', 200, '🌆', 'achVisit4', 'Enten-Metropole', '200 Besuche. Der Teich hat Stoßzeiten und ein Verkehrskonzept.', 'diamond'],
+    ['startles', 10, '😱', 'achStartle', 'Buh!', 'Wisch 10-mal blitzschnell durch sie durch — Federn flogen.', 'bronze'],
+    ['startles', 50, '👻', 'achStartle2', 'Schreckgespenst', '50-mal durch sie durchgewischt. Sie zuckt schon, wenn du nur die Maus anfasst.', 'silver'],
+    ['startles', 250, '🫨', 'achStartle3', 'Nervenbündel', '250 Schrecken. Sie hat jetzt eine Therapeutin — auch eine Ente.', 'gold'],
+    ['dizzy', 5, '🎠', 'achDizzy', 'Karussellfahrt', 'Kreise den Cursor schnell um sie herum, bis ihr 5-mal schwummrig wurde.', 'bronze'],
+    ['dizzy', 25, '🌀', 'achDizzy2', 'Waschmaschine', '25 Schleudergänge. Sie sieht bis heute Sternchen.', 'silver'],
+    ['dizzy', 100, '🚀', 'achDizzy3', 'Zentrifuge', '100 Schleudergänge. Die Sternchen kreisen jetzt von allein.', 'gold'],
+    ['peekaboos', 5, '🫣', 'achPeek', 'Guck-guck!', 'Leg den Cursor ruhig auf ihr ab — 5-mal Kuckuck gespielt.', 'bronze'],
+    ['peekaboos', 25, '🙈', 'achPeek2', 'Versteckspiel-Profi', '25-mal Kuckuck. Sie hat feste Verstecke und wechselt sie regelmäßig.', 'silver'],
+    ['peekaboos', 100, '🥷', 'achPeek3', 'Jetzt siehst du mich', '100 Kuckucks. Angeblich war sie die ganze Zeit da.', 'gold'],
+    ['sleeps', 10, '😴', 'achSleep', 'Sandmännchen', 'Lass sie 10-mal ungestört einschlafen. Zzz.', 'bronze'],
+    ['sleeps', 50, '🛌', 'achSleep2', 'Murmeltier', '50 Nickerchen. Und täglich grüßt die Ente.', 'silver'],
+    ['sleeps', 250, '🌙', 'achSleep3', 'Dornröschen', '250 Nickerchen. Beim nächsten Mal bitte leise: Sie träumt gerade von dir.', 'gold'],
+    ['goldNaps', 1, '💰', 'achGold1', 'Geldbad', 'Die Milliardärs-Ente ist zum ersten Mal in ihren Goldhaufen gesprungen.', 'bronze'],
+    ['goldNaps', 10, '🪙', 'achGold2', 'Goldkind', '10 Goldbäder. Die Münzen haben inzwischen ihren Abdruck.', 'silver'],
+    ['goldNaps', 50, '🏦', 'achGold3', 'Krösus', '50-mal im Gold geschlafen. Sie zählt es nachts nach — jede Münze.', 'gold'],
+    ['nests', 5, '🪺', 'achNest', 'Gute-Nacht-Geschichte', 'Bring die Küken 5-mal ins Nest — Mama stupst sie höchstpersönlich zu Bett.', 'bronze'],
+    ['nests', 25, '🍼', 'achNest2', 'Kita-Leitung', '25-mal die Küken ins Nest gebracht. Mit Gute-Nacht-Lied, versteht sich.', 'silver'],
+    ['nests', 100, '👑', 'achNest3', 'Entenmutter des Jahres', '100 Nest-Abende. Die Küken haben eine Dankesrede vorbereitet.', 'gold'],
+    ['surfs', 25, '🏄', 'achSurf', 'Wellenreiterin', 'Scroll kräftig durch die Seite — 25-mal ritt die Familie die Strömung.', 'bronze'],
+    ['surfs', 100, '🌊', 'achSurf2', 'Tsunami-Reiterin', '100 Wellen. Dein Scrollrad verlangt Gefahrenzulage.', 'silver'],
+    ['surfs', 500, '🌪️', 'achSurf3', 'Big-Wave-Surferin', '500 Wellen. Dein Scrollrad ist jetzt olympisch zertifiziert.', 'gold'],
+    ['modelSwitches', 10, '👗', 'achStyle', 'Modenschau', 'Wechsle 10-mal das Entenmodell im Popup.', 'bronze'],
+    ['modelSwitches', 100, '🎭', 'achStyle2', 'Identitätskrise', '100 Modellwechsel. Wer bin ich — und wenn ja, wie viele Enten?', 'silver'],
+    ['modelSwitches', 500, '🪞', 'achStyle3', 'Tausend Gesichter', '500 Modellwechsel. Der Spiegel hat aufgegeben.', 'gold'],
+    ['legendary', 1, '✨', 'achLegend', 'Es glitzert!', 'Wähle eine legendäre Ente: Regenbogen, Galaxie oder Gold.', 'gold'],
+    ['quotes', 10, '🎤', 'achQuote', 'Keynote-Fan', 'Hör dir 10 Sprüche der Visionärs-Ente an. One more thing …', 'bronze'],
+    ['quotes', 50, '📱', 'achQuote2', 'Keynote-Stammgast', '50 Sprüche. Du hast Frontrow-Tickets für jede Präsentation.', 'silver'],
+    ['quotes', 200, '💫', 'achQuote3', 'Reality Distortion Field', '200 Sprüche. Du glaubst inzwischen alles, was sie sagt.', 'gold'],
+    ['waddles', 5, '🚶', 'achWaddle', 'Landratte', 'Sieh ihr 5-mal beim Landgang zu — oder stups ihn im Popup an.', 'bronze'],
+    ['waddles', 25, '🥾', 'achWaddle2', 'Wanderverein', '25 Landgänge. Die Watschelrunde ist jetzt ein eingetragener Verein.', 'silver'],
+    ['waddles', 100, '🏃', 'achWaddle3', 'Watschel-Marathon', '100 Landgänge. 42,195 Kilometer — in Entenschritten.', 'gold']
   ];
+
+  // achievement display name by key (localized, German fallback from the list)
+  function achName(key) {
+    for (var i = 0; i < ACHIEVEMENTS.length; i++) {
+      if (ACHIEVEMENTS[i][3] === key) return MSG(key) || ACHIEVEMENTS[i][4];
+    }
+    return MSG(key) || key;
+  }
 
   function renderAchievements(stats) {
     var wrap = document.getElementById('achievements');
     if (!wrap) return;
     wrap.textContent = '';
+    var earned = 0;
     ACHIEVEMENTS.forEach(function (a) {
-      var val = stats[a[0]] || 0, goal = a[1], done = val >= goal;
+      var val = stats[a[0]] || 0, goal = a[1], done = val >= goal, tier = a[6] || 'bronze';
+      if (done) earned++;
       var d = document.createElement('div');
-      d.className = 'a' + (done ? ' done' : '');
+      d.className = 'a t-' + tier + (done ? ' done' : '');
+      d.title = MSG('tier' + tier.charAt(0).toUpperCase() + tier.slice(1)) || tier;
       var em = document.createElement('span'); em.className = 'em'; em.textContent = a[2];
       var tx = document.createElement('span'); tx.className = 'tx'; tx.textContent = MSG(a[3]) || a[4];
       var pr = document.createElement('span'); pr.className = 'pr';
@@ -151,6 +298,53 @@
         if (!was) d.classList.add('open');
       };
       wrap.appendChild(d);
+    });
+    var cnt = document.getElementById('achCount');
+    if (cnt) cnt.textContent = earned + '/' + ACHIEVEMENTS.length;
+  }
+
+  // ── Pausierte Seiten ──────────────────────────────────────
+  // "example.com" deckt www. und alle Subdomains ab — dieselbe Regel wie
+  // im Content-Script, sonst zeigt das Häkchen etwas anderes als die Ente tut.
+  function normHost(h) { return String(h || '').toLowerCase().replace(/^www\./, ''); }
+  function hostMatches(entry, h) {
+    var e = normHost(entry), n = normHost(h);
+    return !!e && !!n && (n === e || n.slice(-e.length - 1) === '.' + e);
+  }
+  function isPaused(list, h) {
+    return (list || []).some(function (e) { return hostMatches(e, h); });
+  }
+  function setHosts(list) {
+    save({ disabledHosts: list });
+    renderSites();
+    syncSiteBox();
+  }
+  function syncSiteBox() {
+    var so = document.getElementById('siteOff');
+    so.checked = isPaused(cfg && cfg.disabledHosts, hostName);
+    so.disabled = !hostName;
+  }
+  function renderSites() {
+    var wrap = document.getElementById('siteList');
+    if (!wrap) return;
+    wrap.textContent = '';
+    var list = (cfg && cfg.disabledHosts) || [];
+    if (!list.length) {
+      var none = document.createElement('div');
+      none.className = 'site-none';
+      none.textContent = MSG('sitesNone') || 'Noch keine Seite pausiert.';
+      wrap.appendChild(none);
+      return;
+    }
+    list.forEach(function (h) {
+      var row = document.createElement('div'); row.className = 'site-row';
+      var name = document.createElement('span'); name.textContent = h; name.title = h;
+      var x = document.createElement('button');
+      x.type = 'button'; x.className = 'site-x'; x.textContent = '×';
+      x.title = MSG('sitesRemove') || 'Entfernen';
+      x.onclick = function () { setHosts(list.filter(function (e) { return e !== h; })); };
+      row.appendChild(name); row.appendChild(x);
+      wrap.appendChild(row);
     });
   }
 
@@ -181,7 +375,7 @@
     requestAnimationFrame(drawHero);
     if (!cfg) return;
     var t = (ts - t0) / 1000;
-    var m = DuckModels.get(cfg.model);
+    var m = heroModel();
     hctx.setTransform(1, 0, 0, 1, 0, 0);
     hctx.clearRect(0, 0, hero.width, hero.height);
     // Wasser
@@ -245,6 +439,7 @@
         wrap.querySelectorAll('.m').forEach(function (el) { el.classList.remove('on'); });
         d.classList.add('on');
         document.getElementById('modelName').textContent = m.emoji + '\u2002' + modelName(m);
+        renderWardrobe();
       };
       wrap.appendChild(d);
     });
@@ -280,6 +475,7 @@
       var id = DuckModels.randomId();
       save({ model: id });
       document.getElementById('modelName').textContent = DuckModels.get(id).emoji + '\u2002' + modelName(DuckModels.get(id));
+      renderWardrobe();
       buildModels();
     };
 
@@ -292,13 +488,27 @@
     });
 
     var so = document.getElementById('siteOff');
-    so.checked = (cfg.disabledHosts || []).indexOf(hostName) !== -1;
+    syncSiteBox();
     so.onchange = function () {
       var list = (cfg.disabledHosts || []).slice();
-      var i = list.indexOf(hostName);
-      if (so.checked && i === -1) list.push(hostName);
-      if (!so.checked && i !== -1) list.splice(i, 1);
-      save({ disabledHosts: list });
+      if (so.checked) {
+        if (!isPaused(list, hostName)) list.push(normHost(hostName));
+      } else {
+        // alle Einträge raus, die diese Seite pausieren (auch die Domain darüber)
+        list = list.filter(function (e) { return !hostMatches(e, hostName); });
+      }
+      setHosts(list);
+    };
+    renderSites();
+    document.getElementById('siteAdd').onsubmit = function (ev) {
+      ev.preventDefault();
+      var inp = document.getElementById('siteInput');
+      var h = normHost(inp.value.trim().replace(/^[a-z]+:\/\//i, '').split(/[\/?#]/)[0]);
+      if (!h) return;
+      var list = (cfg.disabledHosts || []).slice();
+      if (list.indexOf(h) === -1) list.push(h);
+      inp.value = '';
+      setHosts(list);
     };
   }
 
@@ -308,6 +518,7 @@
     document.getElementById('modelName').textContent = DuckModels.get(cfg.model).emoji + '\u2002' + modelName(DuckModels.get(cfg.model));
     buildModels();
     bind();
+    renderWardrobe();
   });
 
   chrome.storage.local.get({ stats: { pets: 0, pecks: 0, fish: 0, crumbs: 0, dances: 0, visits: 0 } }, function (o) {
@@ -315,6 +526,8 @@
     document.getElementById('pecks').textContent = o.stats.pecks || 0;
     document.getElementById('fishN').textContent = o.stats.fish || 0;
     renderAchievements(o.stats);
+    statsCache = o.stats;
+    renderWardrobe();
   });
 
   chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
@@ -322,9 +535,8 @@
     try {
       hostName = new URL(activeTab.url).hostname;
     } catch (e) { hostName = ''; }
-    document.getElementById('host').textContent = hostName || 'dieser Seite';
-    var so = document.getElementById('siteOff');
-    if (cfg) so.checked = (cfg.disabledHosts || []).indexOf(hostName) !== -1;
-    if (!hostName) so.disabled = true;
+    document.getElementById('host').textContent = hostName || (MSG('hostFallback') || 'dieser Seite');
+    if (cfg) syncSiteBox();
+    else document.getElementById('siteOff').disabled = !hostName;
   });
 })();

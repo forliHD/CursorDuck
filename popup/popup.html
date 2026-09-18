@@ -21,16 +21,29 @@
   </header>
 
   <main>
-    <section>
+    <section data-sec="model">
       <div class="sec-head">
-        <h2><span class="ico">🦆</span> <span data-i18n="secModel">Entenmodell</span></h2>
+        <h2 class="sec-toggle"><span class="ico">🦆</span> <span data-i18n="secModel">Entenmodell</span></h2>
         <button id="randomBtn" class="ghost" data-i18n="btnRandom">🎲 Zufall</button>
       </div>
-      <div id="models" class="models"></div>
+      <div class="sec-body">
+        <div id="models" class="models"></div>
+      </div>
     </section>
 
-    <section>
-      <h2><span class="ico">🎚️</span> <span data-i18n="secSettings">Einstellungen</span></h2>
+    <section data-sec="wardrobe">
+      <h2 class="sec-toggle"><span class="ico">🎩</span> <span data-i18n="secWardrobe">Garderobe</span> <span class="cnt" id="wearCount"></span></h2>
+      <div class="sec-body">
+        <div class="wear-head" data-i18n="wearHats">Hüte</div>
+        <div id="wearHats" class="wear"></div>
+        <div class="wear-head" data-i18n="wearGlasses">Brillen</div>
+        <div id="wearGlasses" class="wear"></div>
+      </div>
+    </section>
+
+    <section data-sec="settings">
+      <h2 class="sec-toggle"><span class="ico">🎚️</span> <span data-i18n="secSettings">Einstellungen</span></h2>
+      <div class="sec-body">
       <label class="slider">
         <span><span data-i18n="lblSize">Größe</span> <b id="sizeV">1.0×</b></span>
         <input type="range" id="size" min="0.5" max="2.2" step="0.05">
@@ -38,6 +51,10 @@
       <label class="slider">
         <span><span data-i18n="lblSpeed">Tempo</span> <b id="speedV">1.0×</b></span>
         <input type="range" id="speed" min="0.4" max="2.2" step="0.05">
+      </label>
+      <label class="slider">
+        <span><span data-i18n="lblDistance">Abstand zum Cursor</span> <b id="distanceV">1.0×</b></span>
+        <input type="range" id="distance" min="1" max="3" step="0.1">
       </label>
       <label class="slider">
         <span><span data-i18n="lblDucklings">Küken</span> <b id="ducklingsV">0</b></span>
@@ -55,29 +72,45 @@
         <span><span data-i18n="lblVolume">Lautstärke</span> <b id="volumeV">35 %</b></span>
         <input type="range" id="volume" min="0" max="1" step="0.05">
       </label>
+      </div>
     </section>
 
-    <section class="checks">
+    <section class="checks" data-sec="behaviour">
+      <h2 class="sec-toggle"><span class="ico">🪄</span> <span data-i18n="secBehaviour">Verhalten</span></h2>
+      <div class="sec-body">
       <label><input type="checkbox" id="peck"> <span data-i18n="chkPeck">Pickt den Cursor an</span></label>
       <label><input type="checkbox" id="feed"> <span data-i18n="chkFeed">Brotkrumen per Doppelklick 🍞</span></label>
       <label><input type="checkbox" id="effects"> <span data-i18n="chkEffects">Wasser-Effekte &amp; Splashes</span></label>
       <label><input type="checkbox" id="reflection"> <span data-i18n="chkReflection">Spiegelung im Wasser</span></label>
       <label><input type="checkbox" id="sound"> <span data-i18n="chkSound">Quaken hörbar 🔊</span></label>
       <label><input type="checkbox" id="randomOnStart"> <span data-i18n="chkRandomStart">Neues Zufallsmodell bei jedem Browserstart 🎲</span></label>
+      </div>
     </section>
 
-    <section>
-      <h2><span class="ico">🎪</span> <span data-i18n="secTricks">Kunststückchen</span></h2>
-      <div class="tricks" id="tricks"></div>
+    <section data-sec="tricks">
+      <h2 class="sec-toggle"><span class="ico">🎪</span> <span data-i18n="secTricks">Kunststückchen</span></h2>
+      <div class="sec-body">
+        <div class="tricks" id="tricks"></div>
+      </div>
     </section>
 
-    <section>
-      <h2><span class="ico">🏆</span> <span data-i18n="secAchievements">Erfolge</span></h2>
-      <div class="ach" id="achievements"></div>
+    <section data-sec="achievements">
+      <h2 class="sec-toggle"><span class="ico">🏆</span> <span data-i18n="secAchievements">Erfolge</span> <span class="cnt" id="achCount"></span></h2>
+      <div class="sec-body">
+        <div class="ach" id="achievements"></div>
+      </div>
     </section>
 
-    <section class="site">
+    <section class="site" data-sec="sites">
+      <h2 class="sec-toggle"><span class="ico">🌐</span> <span data-i18n="sitesHeading">Pausierte Seiten</span></h2>
+      <div class="sec-body">
       <label><input type="checkbox" id="siteOff"> <span id="siteLabel">Auf <b id="host">dieser Seite</b> pausieren</span></label>
+      <div class="site-list" id="siteList"></div>
+      <form class="site-add" id="siteAdd">
+        <input type="text" id="siteInput" placeholder="example.com" autocomplete="off" spellcheck="false">
+        <button type="submit" class="ghost" data-i18n="sitesAdd">Hinzufügen</button>
+      </form>
+      </div>
     </section>
 
     <footer>

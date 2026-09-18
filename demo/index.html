@@ -121,6 +121,9 @@
   <label>Tempo <span class="val" id="speedV">1.0</span></label>
   <input type="range" id="speed" min="0.4" max="2.2" step="0.05" value="1">
 
+  <label>Abstand zum Cursor <span class="val" id="distanceV">1.0</span></label>
+  <input type="range" id="distance" min="1" max="3" step="0.1" value="1">
+
   <label>Küken <span class="val" id="ducklingsV">0</span></label>
   <input type="range" id="ducklings" min="0" max="6" step="1" value="0">
 
@@ -135,7 +138,7 @@
 
   <label style="margin-top:10px">Animation testen</label>
   <div class="row" id="actions"></div>
-  <div class="row"><button id="randomModel">🎲 Zufallsente</button></div>
+  <div class="row"><button id="randomModel">🎲 Zufallsente</button><button id="mediaBtn">🎵 Musik an</button></div>
   <p style="margin:8px 0 0;color:var(--muted)" id="stats">🫶 0 &nbsp; 🐦 0</p>
 </div>
 
@@ -162,7 +165,7 @@
   sel.onchange = function () { engine.apply({ model: sel.value }); renderGallerySelection(); };
 
   // Slider
-  [['size', 1], ['speed', 1], ['ducklings', 0], ['playfulness', 1]].forEach(function (pair) {
+  [['size', 1], ['speed', 1], ['distance', 1], ['ducklings', 0], ['playfulness', 1]].forEach(function (pair) {
     var id = pair[0], el = document.getElementById(id), out = document.getElementById(id + 'V');
     if (!out) out = document.getElementById(id.slice(0, 5) + 'V');
     el.oninput = function () {
@@ -197,6 +200,12 @@
     b.onclick = function () { engine.trigger(a[0], a[0] === 'sleep' ? 99 : 2.2); };
     rowEl.appendChild(b);
   });
+  // Simulates "a video with sound is playing on the page"
+  var mediaBtn = document.getElementById('mediaBtn');
+  mediaBtn.onclick = function () {
+    engine.setMedia(!engine.mediaOn);
+    mediaBtn.textContent = engine.mediaOn ? '⏸ Musik aus' : '🎵 Musik an';
+  };
   document.getElementById('randomModel').onclick = function () {
     var id = DuckModels.randomId();
     sel.value = id; engine.apply({ model: id });

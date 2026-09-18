@@ -22,6 +22,7 @@
     model: 'mallard',
     size: 1.0,          // 0.5 – 2.0
     speed: 1.0,         // 0.4 – 2.0
+    distance: 1.0,      // 1 – 3: how far she keeps from the cursor (text stays readable)
     ducklings: 0,       // 0 – 6
     playfulness: 1.0,   // wie oft Idle-Aktionen kommen
     sound: false,
@@ -31,7 +32,9 @@
     opacity: 1.0,
     peck: true,
     feed: true,         // Brotkrumen per Doppelklick
-    sleepAfter: 15      // Sekunden Cursor-Stillstand bis zum Nickerchen
+    sleepAfter: 15,     // Sekunden Cursor-Stillstand bis zum Nickerchen
+    hat: '',            // wardrobe: '' = the model's own, 'none' = bare, else a hat kind
+    glasses: ''         // same for glasses
   };
 
   // ── Sound ─────────────────────────────────────────────────────
@@ -661,7 +664,8 @@
     var dx = px - this.x, dy = py - this.y;
     var dist = Math.sqrt(dx * dx + dy * dy);
     var r = this.radius();
-    var stopDist = r * 1.9;
+    // user-set keep-away distance so she doesn't sit on the text being read
+    var stopDist = r * 1.9 * (this.baby ? 1 : clamp(cfg.distance || 1, 1, 3));
     var st = this.state;
 
     // ── Streicheln erkennen ─────────────────────────────────
@@ -795,6 +799,42 @@
           e.sound.quack(this.model.quackPitch * 1.5);
         }
       }
+    }
+
+    // ── Page media playing → she grooves along ───────────────
+    // Dances in rounds with short breathers; the first beat even wakes
+    // her, and when the music stops so does she.
+    if (!this.baby) {
+      if (e.mediaOn) {
+        if (e.mediaPing) {
+          e.mediaPing = false;
+          if (st === 'sleep' || st === 'goldnap' || st === 'tuckin') {
+            if (this.hoardNap && e.hoard) {
+              this.hopY = r * 0.8;
+              e.fx.coinBurst(this.x, this.y - r * 0.5, 6, 0.7);
+              e.sound.coins(0.6);
+            }
+            this.setState('wake', 0.7);
+            this.say('♪', '#4a90d9');
+            st = 'wake';
+          }
+          this.grooveCd = 0.8;
+        }
+        this.grooveCd = (this.grooveCd || 0) - dt;
+        // music beats preening & co.: any interruptible pastime gives way
+        var groovy = st === 'idle' || (INTERRUPTIBLE[st] && st !== 'dance') ||
+          (st === 'swim' && dist < stopDist * 2.5);
+        if (groovy && this.grooveCd <= 0) {
+          this.mediaDance = true;
+          this.setState('dance', rand(3.2, 4.6));
+          st = 'dance';
+        }
+      } else if (this.mediaDance && st === 'dance') {
+        this.mediaDance = false;
+        this.setState('idle', 1);
+        st = 'idle';
+      }
+      if (st !== 'dance') this.mediaDance = false;
     }
 
     switch (st) {
@@ -1152,6 +1192,7 @@
           e.sound.quack(this.model.quackPitch * 1.15, true);
           e.stats.dances = (e.stats.dances || 0) + 1;
           e.saveStats();
+          if (this.mediaDance) this.grooveCd = rand(1.2, 3.5);   // breather before the next round
           this.setState('idle', 1);
         }
         break;
@@ -1558,7 +1599,14 @@
       case 'idle':
         // Kopf folgt dem Cursor (Drehen übernimmt der Block vor dem Automaten)
         t.headRot = this.lookAng;
-        this.swim(dt, px, py, stopDist, 0.6);
+        if (cfg.distance > 1.05 && dist < stopDist * 0.7) {
+          // keep-away distance set: after a peck (or a cursor stop right on
+          // her) she backs off again instead of parking on the text
+          var bx = (this.x - px) / (dist || 1), by = (this.y - py) / (dist || 1);
+          this.swim(dt, px + bx * stopDist, py + by * stopDist, 4, 0.5);
+        } else {
+          this.swim(dt, px, py, stopDist, 0.6);
+        }
         this.nextIdle -= dt * cfg.playfulness;
         this.peckCd -= dt;
 
@@ -1576,7 +1624,7 @@
           }
         }
         if (dist > stopDist * 1.6) { this.setState('swim', 1); break; }
-        if (e.pointerIdle > cfg.sleepAfter * (e.isNight() ? 0.5 : 1)) {
+        if (e.pointerIdle > cfg.sleepAfter * (e.isNight() ? 0.5 : 1) && !e.mediaOn) {
           if (e.babies.length) {
             // Erst die Küken ins Nest bringen, dann selbst schlafen
             this.tuckKiss = this.tuckHeart = false;
@@ -1588,7 +1636,8 @@
           }
           break;
         }
-        if (cfg.peck && this.peckCd <= 0 && dist < r * 3.4 && e.pointerIdle > 0.6) {
+        // peck reach grows with the keep-away distance, else she'd never get a turn
+        if (cfg.peck && this.peckCd <= 0 && dist < Math.max(r * 3.4, stopDist * 1.8) && e.pointerIdle > 0.6) {
           this.peckDone = false;
           this.setState('peck', 0.62);
           break;
@@ -1727,9 +1776,31 @@
     this.visitorCd = rand(120, 300);
     this.nest = null;         // Küken-Nest, taucht auf wenn Mama schläft
     this.hoard = null;        // gold pile for the tycoon's bedtime dive
+    this.mediaOn = false;     // page plays video/audio with sound → she grooves
+    this.mediaPing = false;   // one-frame rising-edge signal for the duck
     this._bound = {};
     this.setModel(this.cfg.model);
   }
+
+  // Page media (video/audio with sound) started or stopped — reported by
+  // the host page, which knows the DOM; the duck dances while it plays.
+  Engine.prototype.setMedia = function (on) {
+    on = !!on;
+    if (on && !this.mediaOn) this.mediaPing = true;
+    this.mediaOn = on;
+  };
+
+  // Wardrobe: cfg.hat / cfg.glasses override the model's own accessory
+  // ('' = as the model, 'none' = bare, else a kind drawn by render.js).
+  Engine.prototype.dress = function (m) {
+    var hat = this.cfg.hat, gl = this.cfg.glasses;
+    if (!hat && !gl) return m;
+    var d = {};
+    for (var k in m) d[k] = m[k];
+    if (hat) d.hat = hat === 'none' ? null : hat;
+    if (gl) d.glasses = gl === 'none' ? null : gl;
+    return d;
+  };
 
   Engine.prototype.setModel = function (id) {
     var mid = (id === 'random' || !id) ? DuckModels.randomId() : id;
@@ -1743,9 +1814,9 @@
       this.saveStats();
     }
     if (this.duck) {
-      this.duck.model = m;
+      this.duck.model = this.dress(m);
     } else {
-      this.duck = new Duck(this, m, false);
+      this.duck = new Duck(this, this.dress(m), false);
       this.duck.x = this.px - 80;
       this.duck.y = this.py + 40;
     }
@@ -1767,12 +1838,17 @@
 
   Engine.prototype.apply = function (cfg) {
     var modelChanged = cfg.model !== undefined && cfg.model !== this.cfg.model;
+    var wardrobeChanged = cfg.hat !== undefined || cfg.glasses !== undefined;
     for (var k in cfg) if (cfg[k] !== undefined) this.cfg[k] = cfg[k];
     this.sound.on = !!this.cfg.sound;
     this.sound.vol = this.cfg.volume;
     if (this.sound.on) this.sound.preload();   // fetch samples early
-    if (modelChanged) this.setModel(this.cfg.model);
-    else this.rebuildBabies();
+    if (modelChanged) {
+      this.setModel(this.cfg.model);
+    } else {
+      if (wardrobeChanged && this.duck) this.duck.model = this.dress(DuckModels.get(this.modelId));
+      this.rebuildBabies();
+    }
     if (!this.cfg.enabled) this.stop(); else this.start();
   };
 
@@ -2205,7 +2281,8 @@
     // Cursor-Position aus iframes einsammeln
     b.msg = function (ev) {
       var data = ev.data;
-      if (!data || data.__cursorDuck !== 1) return;
+      // media reports from sub-frames carry no coordinates — the host handles those
+      if (!data || data.__cursorDuck !== 1 || data.x === undefined) return;
       var frames = document.getElementsByTagName('iframe');
       for (var i = 0; i < frames.length; i++) {
         if (frames[i].contentWindow === ev.source) {
@@ -2242,6 +2319,7 @@
 
   // ── Loop ──────────────────────────────────────────────────────
   Engine.prototype.start = function () {
+    this.halted = false;
     if (this.running) return;
     if (this.host) this.host.style.setProperty('display', 'block', 'important');
     this.running = true;
@@ -2259,10 +2337,16 @@
     this.raf = requestAnimationFrame(loop);
   };
 
+  // pause/resume follow tab visibility; stop() is the user-level off switch
+  // (disabled or site paused). A stopped engine must survive tab switches —
+  // resume() used to restart it, which un-paused sites after every switch.
   Engine.prototype.pause = function () { this.running = false; if (this.raf) cancelAnimationFrame(this.raf); };
-  Engine.prototype.resume = function () { if (this.cfg.enabled) { this.last = 0; this.start(); } };
+  Engine.prototype.resume = function () {
+    if (this.cfg.enabled && !this.halted) { this.last = 0; this.start(); }
+  };
   Engine.prototype.stop = function () {
     this.pause();
+    this.halted = true;
     if (this.host) this.host.style.setProperty('display', 'none', 'important');
   };
   Engine.prototype.destroy = function () {
@@ -2583,6 +2667,12 @@
       else if (this.babyAct === 'quack') { t.beakOpen = Math.max(0, Math.sin(k * 12)) * 0.8; }
       else if (this.babyAct === 'look') { t.headRot = Math.sin(e.time * 3) * 0.3; }
       else if (this.babyAct === 'doze') { t.eyeOpen = 0.05; t.headRot = 0.15; }
+    }
+
+    // page media playing: the little ones bob to the beat, too
+    if (e.mediaOn && !this.nesting && !this.eating) {
+      t.squash = 1 + Math.sin(e.time * 7.5 + this.phase) * 0.06;
+      t.headRot = Math.sin(e.time * 3.75 + this.phase) * 0.14;
     }
 
     // sanftes Ein-/Ausblenden der Schlafpose (Kopf rutscht ins Gefieder)
