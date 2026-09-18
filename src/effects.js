@@ -9,6 +9,16 @@
 
   var TAU = Math.PI * 2;
 
+  // Font strings for text particles, quantized to half pixels and cached:
+  // building a fresh string per particle per frame made the browser
+  // re-parse the font every time.
+  var FONT_CACHE = {};
+  function font(weight, size) {
+    var q = Math.round(size * 2) / 2;
+    var key = weight + '|' + q;
+    return FONT_CACHE[key] || (FONT_CACHE[key] = weight + ' ' + q + 'px ui-rounded, system-ui, sans-serif');
+  }
+
   function FX() {
     this.parts = [];
     this.max = 260;
@@ -269,13 +279,13 @@
         case 'zzz':
           ctx.globalAlpha = fade * 0.9;
           ctx.fillStyle = p.color;
-          ctx.font = '700 ' + (p.size * (1 + f * 0.5)).toFixed(1) + 'px ui-rounded, system-ui, sans-serif';
+          ctx.font = font('700', p.size * (1 + f * 0.5));
           ctx.fillText('z', p.x + Math.sin(p.age * 3 + p.wob) * 6, p.y);
           break;
         case 'text':
           ctx.globalAlpha = fade;
           ctx.fillStyle = p.color;
-          ctx.font = '900 ' + (p.size * (1 + (1 - fade) * 0.3)).toFixed(1) + 'px ui-rounded, system-ui, sans-serif';
+          ctx.font = font('900', p.size * (1 + (1 - fade) * 0.3));
           ctx.textAlign = 'center';
           ctx.fillText(p.txt, p.x, p.y);
           break;

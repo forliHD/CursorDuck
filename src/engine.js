@@ -2269,6 +2269,9 @@
     s.setProperty('margin', '0', 'important');
     s.setProperty('padding', '0', 'important');
     s.setProperty('background', 'transparent', 'important');
+    // paint/layout isolation: the overlay never invalidates the page's own
+    // layout or paint, and the page can't affect ours
+    s.setProperty('contain', 'layout paint style', 'important');
 
     var shadow = host.attachShadow ? host.attachShadow({ mode: 'open' }) : host;
     var canvas = document.createElement('canvas');
@@ -2280,6 +2283,14 @@
     this.canvas = canvas;
     this.ctx = canvas.getContext('2d');
     this.resize();
+    // Size changes arrive asynchronously from the browser instead of being
+    // polled: reading clientWidth every few frames forced a synchronous
+    // layout of the whole page on busy sites — a steady source of jank.
+    if (typeof ResizeObserver === 'function') {
+      var self = this;
+      this._ro = new ResizeObserver(function () { self.resize(); });
+      this._ro.observe(host);
+    }
     this.bindInput();
     return this;
   };
@@ -2294,7 +2305,12 @@
     if (!w || !h) { w = this.w || 800; h = this.h || 600; }
     this.w = w;
     this.h = h;
+    // Retina crispness where it's cheap, but cap the overlay at ~6 megapixels:
+    // a full-screen 5K canvas at 2× would be 15 MP to composite every frame.
+    // Laptop screens stay at full 2×; only very large displays scale down.
     var dpr = Math.min(2, root.devicePixelRatio || 1);
+    var cap = Math.sqrt(6e6 / Math.max(1, this.w * this.h));
+    dpr = Math.max(1, Math.min(dpr, cap));
     this.dpr = dpr;
     if (this.canvas) {
       this.canvas.width = Math.round(this.w * dpr);
@@ -2457,6 +2473,7 @@
   Engine.prototype.destroy = function () {
     this.stop();
     this.unbindInput();
+    if (this._ro) { this._ro.disconnect(); this._ro = null; }
     if (this.host && this.host.parentNode) this.host.parentNode.removeChild(this.host);
   };
 
@@ -2465,12 +2482,16 @@
 
     // Größe gelegentlich nachziehen: Seiten, die im Hintergrund ohne Layout
     // laden, oder Scrollbars, die auftauchen, lösen kein resize-Event aus.
-    this.sizeCheck = (this.sizeCheck || 0) + 1;
-    if (this.sizeCheck >= 30) {
-      this.sizeCheck = 0;
-      var cw = this.host ? this.host.clientWidth : root.innerWidth;
-      var ch = this.host ? this.host.clientHeight : root.innerHeight;
-      if (cw && ch && (Math.abs(cw - this.w) > 1 || Math.abs(ch - this.h) > 1)) this.resize();
+    // (Only as a fallback without ResizeObserver — reading clientWidth
+    // forces a synchronous page layout, which is exactly what stutters.)
+    if (!this._ro) {
+      this.sizeCheck = (this.sizeCheck || 0) + 1;
+      if (this.sizeCheck >= 30) {
+        this.sizeCheck = 0;
+        var cw = this.host ? this.host.clientWidth : root.innerWidth;
+        var ch = this.host ? this.host.clientHeight : root.innerHeight;
+        if (cw && ch && (Math.abs(cw - this.w) > 1 || Math.abs(ch - this.h) > 1)) this.resize();
+      }
     }
 
     // Zeigergeschwindigkeit
