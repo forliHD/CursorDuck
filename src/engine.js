@@ -16,6 +16,8 @@
   function approach(cur, tgt, rate, dt) {
     return cur + (tgt - cur) * (1 - Math.exp(-rate * dt));
   }
+  // party palette for the disco ball, its spots and the colored notes
+  var DISCO_COLS = ['#ff5fa2', '#59d7ff', '#ffe066', '#7cf29a', '#c58bff', '#ff9f43'];
 
   var DEFAULTS = {
     enabled: true,
@@ -1169,30 +1171,40 @@
       }
 
       case 'dance': {
-        // Tänzchen: wippen, wackeln, Nötchen — und im Takt umdrehen
-        var dbeat = this.stTime * 7.5;
+        // Tänzchen: wippen, wackeln, Nötchen — und im Takt umdrehen.
+        // Under the disco ball it turns wild: faster beat, hops, wing
+        // flaps, colored notes and confetti — and it keeps going while
+        // the ball is down.
+        var wild = e.discoOn ? 1 : 0;
+        if (wild && this.stTime > this.stDur - 0.6) this.stDur += 1.5;
+        var dbeat = this.stTime * (7.5 + wild * 3.5);
         var denv = Math.min(1, this.stTime * 3) * clamp((this.stDur - this.stTime) * 2, 0, 1);
-        t.squash = 1 + Math.sin(dbeat) * 0.07 * denv;
-        t.wobble = Math.sin(dbeat * 0.5) * 0.55 * denv;
+        t.squash = 1 + Math.sin(dbeat) * (0.07 + wild * 0.05) * denv;
+        t.wobble = Math.sin(dbeat * 0.5) * (0.55 + wild * 0.3) * denv;
         t.wingLift = 0.3 + Math.max(0, Math.sin(dbeat)) * 0.4 * denv;
         t.headRot = -0.12 + Math.sin(dbeat + 1.2) * 0.16 * denv;
         t.beakOpen = Math.max(0, Math.sin(dbeat)) * 0.2 * denv;
         t.eyeHappy = 1;
-        this.face = Math.sin(this.stTime * 2.6) >= 0 ? 1 : -1;
+        if (wild) {
+          t.wingFlap = Math.max(0, Math.sin(dbeat)) * 0.9 * denv;
+          this.hopY = Math.max(0, Math.sin(dbeat)) * r * 0.32 * denv;
+        }
+        this.face = Math.sin(this.stTime * (2.6 + wild * 2.2)) >= 0 ? 1 : -1;
         this.vx = approach(this.vx, 0, 3, dt);
         this.vy = approach(this.vy, 0, 3, dt);
         this.actionTick -= dt;
         if (this.actionTick <= 0) {
-          this.actionTick = 0.42;
+          this.actionTick = wild ? 0.2 : 0.42;
           var hn = this.headWorld();
-          e.fx.note(hn.x + rand(-r * 0.4, r * 0.4), hn.y - r * 0.5);
+          e.fx.note(hn.x + rand(-r * 0.4, r * 0.4), hn.y - r * 0.5, wild ? pick(DISCO_COLS) : undefined);
           if (Math.random() < 0.4) e.fx.ripple(this.x, this.y, 4, 30, 0.8, 'rgba(255,255,255,0.4)', 1.5);
+          if (wild && Math.random() < 0.22) e.fx.confetti(hn.x, hn.y - r * 0.4);
         }
         if (this.stTime > this.stDur) {
           e.sound.quack(this.model.quackPitch * 1.15, true);
           e.stats.dances = (e.stats.dances || 0) + 1;
           e.saveStats();
-          if (this.mediaDance) this.grooveCd = rand(1.2, 3.5);   // breather before the next round
+          if (this.mediaDance) this.grooveCd = e.discoOn ? 0.05 : rand(1.2, 3.5);   // breather before the next round
           this.setState('idle', 1);
         }
         break;
@@ -1778,16 +1790,109 @@
     this.hoard = null;        // gold pile for the tycoon's bedtime dive
     this.mediaOn = false;     // page plays video/audio with sound → she grooves
     this.mediaPing = false;   // one-frame rising-edge signal for the duck
+    this.mediaReal = false;   // what the host page last reported
+    this.mediaHoldT = 0;      // trigger('disco') pretends music for a while
+    this.disco = null;        // the disco ball, while it hangs over the party
+    this.discoOn = false;     // true while the ball is down → everybody goes wild
+    this.discoCd = 0;         // seconds of music until the next ball drops
     this._bound = {};
     this.setModel(this.cfg.model);
   }
 
   // Page media (video/audio with sound) started or stopped — reported by
   // the host page, which knows the DOM; the duck dances while it plays.
+  // trigger('disco') can hold "music on" for a while without real media.
   Engine.prototype.setMedia = function (on) {
-    on = !!on;
-    if (on && !this.mediaOn) this.mediaPing = true;
-    this.mediaOn = on;
+    this.mediaReal = !!on;
+    var want = this.mediaReal || this.mediaHoldT > 0;
+    if (want && !this.mediaOn) {
+      this.mediaPing = true;
+      this.discoCd = rand(6, 12);   // first ball drops soon after the music starts
+    }
+    this.mediaOn = want;
+  };
+
+  // The disco ball: sinks in on a string above the family, throws colored
+  // spots on the water and turns the groove into a proper party for a
+  // few seconds, then lifts out again.
+  Engine.prototype.spawnDisco = function () {
+    var d = this.duck, r = d.radius();
+    this.disco = {
+      x: d.x, y: Math.max(r * 0.8 + 20, d.y - r * 4.6),
+      appear: 0, spin: 0, t: 0, dur: rand(7, 9.5)
+    };
+    this.discoOn = false;
+    if (this.cfg.effects) this.fx.sparkle(d.x, this.disco.y, '#ffffff', 8);
+    d.say('🪩', '#c58bff');
+    this.sound.quack(d.model.quackPitch * 1.2, true);
+    return this.disco;
+  };
+
+  // colored spots wandering over the water around the dancers (under the ducks)
+  Engine.prototype.drawDiscoLights = function (ctx) {
+    var d = this.disco;
+    if (!d || d.appear < 0.02) return;
+    var duck = this.duck, r = duck.radius();
+    var cx = d.x, cy = duck.y + r * 0.1;
+    ctx.save();
+    ctx.globalAlpha = 0.42 * d.appear * this.cfg.opacity;
+    for (var i = 0; i < 8; i++) {
+      var a = d.spin * 0.9 + i * TAU / 8;
+      var rad = r * (2.7 + 0.7 * Math.sin(d.spin * 1.7 + i));
+      var sx = cx + Math.cos(a) * rad, sy = cy + Math.sin(a) * rad * 0.45;
+      ctx.fillStyle = DISCO_COLS[i % DISCO_COLS.length];
+      ctx.beginPath();
+      ctx.ellipse(sx, sy, r * 0.5, r * 0.18, 0, 0, TAU);
+      ctx.fill();
+    }
+    ctx.restore();
+  };
+
+  // the mirror ball itself, hanging from the top edge (over the ducks)
+  Engine.prototype.drawDiscoBall = function (ctx) {
+    var d = this.disco;
+    if (!d || d.appear < 0.02) return;
+    var R = Math.max(9, this.duck.radius() * 0.42);
+    var by = d.y - (1 - d.appear) * 160;   // drops in from above, lifts out again
+    ctx.save();
+    ctx.globalAlpha *= Math.min(1, d.appear * 1.6) * this.cfg.opacity;
+    ctx.strokeStyle = 'rgba(60,70,90,0.55)';
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.moveTo(d.x, Math.min(0, by - 400));
+    ctx.lineTo(d.x, by - R);
+    ctx.stroke();
+    var g = ctx.createRadialGradient(d.x - R * 0.35, by - R * 0.35, R * 0.1, d.x, by, R);
+    g.addColorStop(0, '#ffffff');
+    g.addColorStop(0.5, '#cfd6e0');
+    g.addColorStop(1, '#6d7889');
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.arc(d.x, by, R, 0, TAU); ctx.fill();
+    // mirror facets scroll around the ball; a few of them catch a color
+    ctx.save();
+    ctx.beginPath(); ctx.arc(d.x, by, R, 0, TAU); ctx.clip();
+    var tile = R * 0.34;
+    var scroll = (d.spin * 1.5) % 1;
+    for (var row = -3; row <= 3; row++) {
+      var yy = by + row * tile;
+      var sc = Math.cos(row / 3.4);
+      for (var col = -5; col <= 5; col++) {
+        var xx = d.x + (col + scroll) * tile * sc;
+        var bright = 0.3 + 0.7 * Math.abs(Math.sin(col * 0.9 + row * 0.6 + d.spin * 4));
+        ctx.fillStyle = ((col + row + 9) % 4 === 0)
+          ? DISCO_COLS[(col + row + 9) % DISCO_COLS.length]
+          : 'rgba(255,255,255,' + (bright * 0.6).toFixed(2) + ')';
+        ctx.globalAlpha = ((col + row + 9) % 4 === 0) ? 0.55 : 1;
+        ctx.fillRect(xx - tile * 0.45 * sc, yy - tile * 0.45, tile * 0.9 * sc, tile * 0.9);
+      }
+    }
+    ctx.restore();
+    ctx.strokeStyle = 'rgba(70,80,100,0.5)';
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.arc(d.x, by, R, 0, TAU); ctx.stroke();
+    ctx.fillStyle = 'rgba(255,255,255,0.95)';
+    DuckRender.star(ctx, d.x + Math.cos(d.spin * 2) * R * 0.5, by + Math.sin(d.spin * 2) * R * 0.5, R * 0.28);
+    ctx.restore();
   };
 
   // Wardrobe: cfg.hat / cfg.glasses override the model's own accessory
@@ -2414,6 +2519,37 @@
       }
     }
 
+    // ── Disco ball: drops in now and then while the music plays ──
+    if (this.mediaHoldT > 0) {
+      this.mediaHoldT -= dt;
+      if (this.mediaHoldT <= 0) this.setMedia(this.mediaReal);
+    }
+    if (this.mediaOn && !this.disco && this.cfg.effects) {
+      this.discoCd -= dt;
+      if (this.discoCd <= 0) this.spawnDisco();
+    }
+    if (this.disco) {
+      var dsc = this.disco, dk1 = this.duck, dr1 = dk1.radius();
+      dsc.t += dt;
+      dsc.spin += dt * 1.4;
+      var ending = !this.mediaOn || dsc.t > dsc.dur ||
+        dk1.state === 'sleep' || dk1.state === 'pet' || dk1.state === 'burst';
+      dsc.appear = approach(dsc.appear, ending ? 0 : 1, ending ? 3 : 3.5, dt);
+      dsc.x = approach(dsc.x, dk1.x, 2.5, dt);
+      dsc.y = approach(dsc.y, Math.max(dr1 * 0.8 + 20, dk1.y - dr1 * 4.6), 2.5, dt);
+      this.discoOn = !ending && dsc.appear > 0.5;
+      if (this.discoOn && Math.random() < dt * 2.5) {
+        this.fx.sparkle(dsc.x + rand(-2.5, 2.5) * dr1, dk1.y - rand(0.5, 3) * dr1,
+          pick(DISCO_COLS), rand(3, 6));
+      }
+      if (ending && dsc.appear < 0.03) {
+        this.disco = null;
+        this.discoCd = rand(22, 45);
+      }
+    } else {
+      this.discoOn = false;
+    }
+
     this.duck.update(dt);
 
     // ── Küken-Nest: taucht auf, wenn Mama schläft (oder zudeckt) ──
@@ -2669,10 +2805,25 @@
       else if (this.babyAct === 'doze') { t.eyeOpen = 0.05; t.headRot = 0.15; }
     }
 
-    // page media playing: the little ones bob to the beat, too
-    if (e.mediaOn && !this.nesting && !this.eating) {
+    // page media playing: the little ones bob to the beat, too — and under
+    // the disco ball each one hops on its own beat (a wave through the row)
+    var br = this.radius();
+    if (e.discoOn && !this.nesting && !this.eating) {
+      var db = e.time * 11 + this.phase * 2;
+      t.wingFlap = Math.abs(Math.sin(db));
+      t.squash = 1 + Math.sin(db) * 0.08;
+      t.headRot = Math.sin(db * 0.5) * 0.25;
+      this.hopY = Math.max(0, Math.sin(db)) * br * 0.5;
+      this.babyActT = 0;
+      if (Math.random() < dt * 1.2) e.fx.note(this.x + rand(-6, 6), this.y - br * 1.6, pick(DISCO_COLS));
+      if (Math.random() < dt * 0.12) e.sound.quack(this.model.quackPitch);
+    } else if (e.mediaOn && !this.nesting && !this.eating) {
       t.squash = 1 + Math.sin(e.time * 7.5 + this.phase) * 0.06;
       t.headRot = Math.sin(e.time * 3.75 + this.phase) * 0.14;
+      t.wingFlap = Math.max(0, Math.sin(e.time * 3.75 + this.phase)) * 0.25;
+      this.hopY *= Math.max(0, 1 - dt * 14);
+    } else {
+      this.hopY *= Math.max(0, 1 - dt * 14);
     }
 
     // sanftes Ein-/Ausblenden der Schlafpose (Kopf rutscht ins Gefieder)
@@ -2707,6 +2858,7 @@
 
     // Fisch & Brotkrumen liegen im/auf dem Wasser → unter die Enten
     if (this.fish || this.crumbs.length) this.drawExtras(ctx);
+    if (this.disco) this.drawDiscoLights(ctx);
 
     // Tiefensortierung: wer weiter unten schwimmt, ist weiter vorn —
     // so verdeckt nie die falsche Ente die andere. Das Nest bildet mit
@@ -2733,6 +2885,7 @@
       else this.drawNest(ctx);
     }
     if (this.cfg.effects) this.fx.draw(ctx);
+    if (this.disco) this.drawDiscoBall(ctx);   // hangs above everything
   };
 
   // ── Küken-Nest zeichnen ───────────────────────────────────────
@@ -2990,6 +3143,13 @@
     if (action === 'waddle') {
       this.duck.wadInit = this.duck.wadQuacked = this.duck.wadSplash = false;
       this.duck.setState('waddle', 6.15);
+      return action;
+    }
+    if (action === 'disco') {
+      // party on demand: pretend the music plays for a bit, drop the ball now
+      this.mediaHoldT = 11;
+      this.setMedia(this.mediaReal);
+      if (!this.disco) this.spawnDisco();
       return action;
     }
     if (action === 'burst') {

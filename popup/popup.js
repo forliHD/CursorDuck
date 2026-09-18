@@ -198,7 +198,7 @@
     ['bathe', 'Baden', '🛁'], ['shake', 'Schütteln', '💦'], ['sleep', 'Nickerchen', '😴'],
     ['crumbs', 'Füttern', '🍞'], ['fish', 'Fisch-Jagd', '🐟'], ['dizzy', 'Schwindel', '😵'],
     ['dance', 'Tänzchen', '💃'], ['peekaboo', 'Kuckuck', '🫣'], ['waddle', 'Landgang', '🚶'],
-    ['visitor', 'Besuch', '💕']
+    ['visitor', 'Besuch', '💕'], ['disco', 'Disco', '🪩']
   ];
 
   // [Stat-Schlüssel, Ziel, Emoji, i18n-Key, Name (Fallback), Erklärung (Fallback), Stufe]

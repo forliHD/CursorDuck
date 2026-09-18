@@ -138,7 +138,7 @@
 
   <label style="margin-top:10px">Animation testen</label>
   <div class="row" id="actions"></div>
-  <div class="row"><button id="randomModel">🎲 Zufallsente</button><button id="mediaBtn">🎵 Musik an</button></div>
+  <div class="row"><button id="randomModel">🎲 Zufallsente</button><button id="mediaBtn">🎵 Musik an</button><button id="discoBtn">🪩 Disco</button></div>
   <p style="margin:8px 0 0;color:var(--muted)" id="stats">🫶 0 &nbsp; 🐦 0</p>
 </div>
 
@@ -206,6 +206,7 @@
     engine.setMedia(!engine.mediaOn);
     mediaBtn.textContent = engine.mediaOn ? '⏸ Musik aus' : '🎵 Musik an';
   };
+  document.getElementById('discoBtn').onclick = function () { engine.trigger('disco'); };
   document.getElementById('randomModel').onclick = function () {
     var id = DuckModels.randomId();
     sel.value = id; engine.apply({ model: id });
