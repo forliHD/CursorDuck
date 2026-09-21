@@ -723,8 +723,11 @@
     // ── Aufmerksamer Blick: Kopfwinkel zum Cursor ──────────
     // Im lokalen Rahmen der Ente (+x = Blickrichtung): deutlich sichtbare
     // Kopfneigung zum Cursor. Zustände dürfen das überschreiben.
-    var lookX = (px - this.x) * (this.dirF >= 0 ? 1 : -1);
-    var lookY = py - (this.y - r * 1.55);
+    // Beim Tippen/Markieren guckt sie stattdessen zum Text (nur Mama).
+    var lx = (e.typeT > 0 && !this.baby) ? e.typeX : px;
+    var ly = (e.typeT > 0 && !this.baby) ? e.typeY : py;
+    var lookX = (lx - this.x) * (this.dirF >= 0 ? 1 : -1);
+    var lookY = ly - (this.y - r * 1.55);
     this.lookAng = clamp(Math.atan2(lookY, Math.max(lookX, r * 0.8)), -0.55, 0.6);
 
     // ── Abgehängt? Spielerei abbrechen und hinterher ───────
@@ -1647,7 +1650,7 @@
           }
         }
         if (dist > stopDist * 1.6) { this.setState('swim', 1); break; }
-        if (e.pointerIdle > cfg.sleepAfter * (e.isNight() ? 0.5 : 1) && !e.mediaOn) {
+        if (e.pointerIdle > cfg.sleepAfter * (e.isNight() ? 0.5 : 1) && !e.mediaOn && e.typeT <= 0) {
           if (e.babies.length) {
             // Erst die Küken ins Nest bringen, dann selbst schlafen
             this.tuckKiss = this.tuckHeart = false;
@@ -1783,6 +1786,10 @@
     this.ppx = this.px; this.ppy = this.py;
     this.pointerSpeed = 0;
     this.pointerIdle = 0;
+    this.typeT = 0;           // Mitlesen: Blickziel, solange getippt wird
+    this.typeX = 0; this.typeY = 0;
+    this._selCd = 0;          // Knabber-Cooldown für Textselektionen
+    this._lastTap = 0; this._lastTapX = 0; this._lastTapY = 0;   // Doppel-Tap
     this.alertT = 0;          // kurz erhöhtes Tempo nach Cursor-Sprung
     this.alertPing = false;   // Ein-Frame-Signal für die "!"-Reaktion
     this.fx = new DuckFX();
@@ -1821,6 +1828,60 @@
       this.discoCd = rand(6, 12);   // first ball drops soon after the music starts
     }
     this.mediaOn = want;
+  };
+
+  // Mitlesen: Bei Tastaturaktivität schaut sie zum Textfeld statt zum
+  // Cursor (und nickt nicht ein — Tippen ist Aktivität). Das Rechteck wird
+  // nur beim ersten Anschlag einer Tipp-Phase vermessen (kein Layout
+  // pro Tastendruck); Passwortfelder sind ausgenommen (Fokus-Modus).
+  Engine.prototype.pokeTyping = function () {
+    if (this.typeT <= 0) {
+      try {
+        var ae = document.activeElement;
+        if (ae) {
+          var tag = (ae.tagName || '').toUpperCase();
+          var editable = tag === 'INPUT' || tag === 'TEXTAREA' || ae.isContentEditable === true;
+          if (editable && String(ae.type || '').toLowerCase() !== 'password') {
+            var r = ae.getBoundingClientRect ? ae.getBoundingClientRect() : null;
+            if (r && r.width > 0) {
+              this.typeX = r.left + r.width / 2;
+              this.typeY = r.top + r.height / 2;
+            }
+          }
+        }
+      } catch (e) { /* Blick bleibt beim Cursor */ }
+    }
+    this.typeT = 2.2;
+  };
+
+  // Selektions-Snack: Markiert der Nutzer Text in ihrer Nähe, knabbert sie
+  // virtuell am Rand (Partikel + "nom"). Nur Geometrie — der markierte
+  // Text selbst wird nie gelesen.
+  Engine.prototype.pokeSelection = function () {
+    if (!this.running || this._selCd > 0) return;
+    var d = this.duck;
+    if (!d) return;
+    try {
+      var sel = document.getSelection();
+      if (!sel || sel.isCollapsed || sel.rangeCount < 1) return;
+      var r = sel.getRangeAt(0).getBoundingClientRect();
+      if (!r || r.width < 4) return;
+      var x = r.left + r.width / 2, y = r.top + r.height / 2;
+      if (Math.hypot(x - d.x, y - d.y) > 420) return;
+      if (d.state === 'dive' || d.state === 'waddle' || d.state === 'burst' ||
+          d.state === 'sleep' || d.state === 'goldnap') return;
+      this._selCd = 4;
+      d.face = d.x <= x ? 1 : -1;
+      this.typeX = x; this.typeY = y; this.typeT = 1.6;   // kurz hingucken
+      d.say('nom', '#c98a2e');
+      this.sound.peck();
+      if (this.cfg.effects) {
+        var step = Math.min(30, r.width / 3);
+        for (var i = -1; i <= 1; i++) {
+          this.fx.sparkle(x + i * step, y - 4, '#ffffff', 4);
+        }
+      }
+    } catch (e) { /* Deko darf nie stören */ }
   };
 
   // The disco ball: sinks in on a string above the family, throws colored
@@ -2373,6 +2434,31 @@
     b.vis = function () {
       if (document.hidden) self.pause(); else self.resume();
     };
+    // Tippen (Mitlesen) und Markieren (Selektions-Snack)
+    b.key = function () {
+      self.sound.unlock();
+      self.pokeTyping();
+    };
+    b.sel = function () { self.pokeSelection(); };
+    // Touch: Position folgen, Tap = Quaken, Doppel-Tap = Flattern/Füttern —
+    // läuft bewusst über die Maus-Pfade, damit Taps exakt wie Klicks wirken.
+    b.touch = function (ev) {
+      self.sound.unlock();
+      var t = ev.changedTouches && ev.changedTouches[0];
+      if (!t || t.clientX === undefined) return;
+      self.setPointer(t.clientX, t.clientY);
+      if (ev.touches && ev.touches.length > 1) return;   // Pinch & Co.: nur Position
+      var now = Date.now();
+      var dbl = now - self._lastTap < 350 &&
+        Math.hypot(t.clientX - self._lastTapX, t.clientY - self._lastTapY) < 40;
+      self._lastTap = now; self._lastTapX = t.clientX; self._lastTapY = t.clientY;
+      b.down({ clientX: t.clientX, clientY: t.clientY });
+      if (dbl) b.dbl({ clientX: t.clientX, clientY: t.clientY });
+    };
+    b.touchMove = function (ev) {
+      var t = ev.changedTouches && ev.changedTouches[0];
+      if (t && t.clientX !== undefined) self.setPointer(t.clientX, t.clientY);
+    };
     // Scroll-Strömung: Scrollen erzeugt eine kurze "Strömung", die die
     // Enten mitzieht (Seite runter → Wasser zieht nach oben und umgekehrt).
     b.pageScroll = function () {
@@ -2429,11 +2515,14 @@
     root.addEventListener('pointermove', b.move, { passive: true, capture: true });
     root.addEventListener('mousedown', b.down, { passive: true, capture: true });
     root.addEventListener('dblclick', b.dbl, { passive: true, capture: true });
+    root.addEventListener('touchstart', b.touch, { passive: true, capture: true });
+    root.addEventListener('touchmove', b.touchMove, { passive: true, capture: true });
+    root.addEventListener('keydown', b.key, { passive: true, capture: true });
+    document.addEventListener('selectionchange', b.sel, false);
     root.addEventListener('resize', b.resize, { passive: true });
     root.addEventListener('scroll', b.pageScroll, { passive: true });
     root.addEventListener('message', b.msg, false);
     document.addEventListener('visibilitychange', b.vis, false);
-    root.addEventListener('keydown', function () { self.sound.unlock(); }, { passive: true, once: true });
   };
 
   Engine.prototype.unbindInput = function () {
@@ -2443,6 +2532,10 @@
     root.removeEventListener('pointermove', b.move, true);
     root.removeEventListener('mousedown', b.down, true);
     root.removeEventListener('dblclick', b.dbl, true);
+    root.removeEventListener('touchstart', b.touch, true);
+    root.removeEventListener('touchmove', b.touchMove, true);
+    root.removeEventListener('keydown', b.key, true);
+    document.removeEventListener('selectionchange', b.sel);
     root.removeEventListener('resize', b.resize);
     root.removeEventListener('scroll', b.pageScroll);
     root.removeEventListener('message', b.msg);
@@ -2512,6 +2605,8 @@
     this.pointerSpeed = this.pointerSpeed * 0.6 + inst * 0.4;
     this.ppx = this.px; this.ppy = this.py;
     if (inst < 6) this.pointerIdle += dt; else this.pointerIdle = 0;
+    this.typeT = Math.max(0, this.typeT - dt);
+    this._selCd = Math.max(0, this._selCd - dt);
 
     // Cursor teleportiert (anderes Fenster, unskriptbares iframe, Randwechsel):
     // kurz "Alert" — die Ente merkt auf und holt schneller auf.
