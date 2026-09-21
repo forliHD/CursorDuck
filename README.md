@@ -83,8 +83,8 @@ number of ducklings, playfulness, opacity, sound on/off with volume, nap delay
 model on every browser start”, “pause on this site” with an editable list of paused
 sites (a domain covers its subdomains), and a name for your duck (she says it when the
 petting bar is full) — everything applies instantly, without reloading. The model grid
-has a search box, a soundboard previews every sound, and 16 buttons trigger tricks
-directly (including feeding, fish hunt, shore leave and visitors).
+has a search box, a soundboard previews every sound, and 17 buttons trigger tricks
+directly (including feeding, fish hunt, shore leave, visitors and the disco ball).
 
 She honors your system's “reduce motion” setting: with it enabled, pirouettes, shaking,
 bathing, dancing and the disco ball are skipped automatically — the trick buttons in
