@@ -6,7 +6,7 @@
   var DEFAULTS = {
     enabled: true, model: 'mallard', size: 1.0, speed: 1.0, distance: 1.0, ducklings: 0,
     playfulness: 1.0, sound: false, volume: 0.35, effects: true,
-    reflection: true, opacity: 1.0, reduceMotion: false,
+    reflection: true, opacity: 1.0,
     peck: true, feed: true, sleepAfter: 15, duckName: '',
     hat: '', glasses: '', randomOnStart: false, disabledHosts: []
   };
@@ -544,7 +544,7 @@
       save({ model: id });
       showModel(DuckModels.get(id));
       renderWardrobe();
-      buildModels();
+      buildModels(document.getElementById('modelSearch').value);   // keep the search filter
     };
 
     var tr = document.getElementById('tricks');

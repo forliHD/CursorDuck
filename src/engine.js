@@ -456,7 +456,7 @@
   // High-motion idle actions skipped when the OS asks for reduced
   // motion. Only filters what she starts on her own — manually triggered
   // tricks (popup buttons) always play.
-  var CALM_SKIP = { shake: 1, spin: 1, dance: 1 };
+  var CALM_SKIP = { shake: 1, spin: 1, dance: 1, bathe: 1 };
 
   function weightedAction(calm) {
     var total = 0, i;
@@ -525,6 +525,13 @@
     this.stTime = 0;
     this.stDur = dur || 1;
     this.actionTick = 0;
+  };
+
+  // The water shake-off that ends dabbling, diving, peekaboo & Co. Under
+  // reduced motion she simply settles instead of rattling at 5 Hz — the
+  // idle picker alone skipped 'shake', but these chained ones slipped through.
+  Duck.prototype.shakeOff = function (dur) {
+    this.setState(this.e.cfg.reduceMotion ? 'idle' : 'shake', dur);
   };
 
   // Gold-hoard models take the scenic route into bed (dive first)
@@ -823,7 +830,7 @@
     // Dances in rounds with short breathers; the first beat even wakes
     // her, and when the music stops so does she.
     if (!this.baby) {
-      if (e.mediaOn) {
+      if (e.musicOn) {
         if (e.mediaPing) {
           e.mediaPing = false;
           if (st === 'sleep' || st === 'goldnap' || st === 'tuckin') {
@@ -1111,7 +1118,7 @@
           e.fx.splash(this.x + r * this.dirF * 0.7, this.y, 0.7);
           e.sound.splash(0.5);
         }
-        if (this.stTime > this.stDur) { this.dabbleUp = false; this.setState('shake', 1.0); }
+        if (this.stTime > this.stDur) { this.dabbleUp = false; this.shakeOff(1.0); }
         break;
 
       case 'dive':
@@ -1136,7 +1143,7 @@
           e.sound.splash(1.1);
           for (var b = 0; b < 5; b++) e.fx.droplet(this.x + rand(-r, r), this.y - r, rand(-160, 160), -rand(120, 260), rand(1.3, 2.4));
         }
-        if (this.stTime > this.stDur) { this.dove = false; this.surfaced = false; this.setState('shake', 1.0); }
+        if (this.stTime > this.stDur) { this.dove = false; this.surfaced = false; this.shakeOff(1.0); }
         break;
 
       case 'spin':
@@ -1181,7 +1188,7 @@
         if (this.stTime > this.stDur) {
           e.stats.dizzy = (e.stats.dizzy || 0) + 1;
           e.saveStats();
-          this.setState('shake', 0.9);
+          this.shakeOff(0.9);
         }
         break;
       }
@@ -1254,7 +1261,7 @@
           this.pkbDove = false; this.pkbUp = false;
           e.stats.peekaboos = (e.stats.peekaboos || 0) + 1;
           e.saveStats();
-          this.setState('shake', 0.8);
+          this.shakeOff(0.8);
         }
         break;
       }
@@ -1452,7 +1459,7 @@
         }
         if (bkT > this.stDur) {
           this.burstOh = this.burstPop = this.burstBack = false;
-          this.setState('shake', 1.0);
+          this.shakeOff(1.0);
         }
         break;
       }
@@ -1556,7 +1563,7 @@
             if (Math.random() < 0.5) this.say('!', '#ff9d2e');
           }
         }
-        if (this.stTime > 8) this.setState('shake', 1.0);   // irgendwann aufgeben
+        if (this.stTime > 8) this.shakeOff(1.0);   // irgendwann aufgeben
         break;
       }
 
@@ -1652,7 +1659,7 @@
           }
         }
         if (dist > stopDist * 1.6) { this.setState('swim', 1); break; }
-        if (e.pointerIdle > cfg.sleepAfter * (e.isNight() ? 0.5 : 1) && !e.mediaOn && e.typeT <= 0) {
+        if (e.pointerIdle > cfg.sleepAfter * (e.isNight() ? 0.5 : 1) && !e.musicOn && e.typeT <= 0) {
           if (e.babies.length) {
             // Erst die Küken ins Nest bringen, dann selbst schlafen
             this.tuckKiss = this.tuckHeart = false;
@@ -1790,8 +1797,11 @@
     this.pointerIdle = 0;
     this.typeT = 0;           // Mitlesen: Blickziel, solange getippt wird
     this.typeX = 0; this.typeY = 0;
+    this._typeEl = null;      // the text field last measured for the look target
     this._selCd = 0;          // Knabber-Cooldown für Textselektionen
+    this._selTimer = 0;       // debounced selectionchange
     this._lastTap = 0; this._lastTapX = 0; this._lastTapY = 0;   // Doppel-Tap
+    this._touchAt = 0;        // last touchstart: the browser's mouse replay after it is ignored
     this.alertT = 0;          // kurz erhöhtes Tempo nach Cursor-Sprung
     this.alertPing = false;   // Ein-Frame-Signal für die "!"-Reaktion
     this.fx = new DuckFX();
@@ -1809,6 +1819,7 @@
     this.nest = null;         // Küken-Nest, taucht auf wenn Mama schläft
     this.hoard = null;        // gold pile for the tycoon's bedtime dive
     this.mediaOn = false;     // page plays video/audio with sound → she grooves
+    this.musicOn = false;     // mediaOn minus reduced motion (manual disco still counts)
     this.mediaPing = false;   // one-frame rising-edge signal for the duck
     this.mediaReal = false;   // what the host page last reported
     this.mediaHoldT = 0;      // trigger('disco') pretends music for a while
@@ -1832,26 +1843,33 @@
     this.mediaOn = want;
   };
 
-  // Mitlesen: Bei Tastaturaktivität schaut sie zum Textfeld statt zum
-  // Cursor (und nickt nicht ein — Tippen ist Aktivität). Das Rechteck wird
-  // nur beim ersten Anschlag einer Tipp-Phase vermessen (kein Layout
-  // pro Tastendruck); Passwortfelder sind ausgenommen (Fokus-Modus).
+  // Reading along: while keys are typed she looks at the text field instead
+  // of the cursor (and doesn't doze off — typing is activity). The field is
+  // measured once per typing phase or when the field changes, not per
+  // keystroke; password fields are excluded (focus mode). Keys without a
+  // text field (Esc, arrows, shortcuts) don't count as typing — she used to
+  // stare at a stale target or the top-left corner for 2 s.
   Engine.prototype.pokeTyping = function () {
-    if (this.typeT <= 0) {
-      try {
-        var ae = document.activeElement;
-        if (ae) {
-          var tag = (ae.tagName || '').toUpperCase();
-          var editable = tag === 'INPUT' || tag === 'TEXTAREA' || ae.isContentEditable === true;
-          if (editable && String(ae.type || '').toLowerCase() !== 'password') {
-            var r = ae.getBoundingClientRect ? ae.getBoundingClientRect() : null;
-            if (r && r.width > 0) {
-              this.typeX = r.left + r.width / 2;
-              this.typeY = r.top + r.height / 2;
-            }
-          }
-        }
-      } catch (e) { /* Blick bleibt beim Cursor */ }
+    var ae = null, editable = false;
+    try {
+      ae = document.activeElement;
+      if (ae) {
+        var tag = (ae.tagName || '').toUpperCase();
+        editable = (tag === 'INPUT' || tag === 'TEXTAREA' || ae.isContentEditable === true) &&
+          String(ae.type || '').toLowerCase() !== 'password';
+      }
+    } catch (e) { ae = null; }
+    if (!editable) { this._typeEl = null; return; }
+    if (this.typeT <= 0 || ae !== this._typeEl) {
+      this._typeEl = ae;
+      var r = null;
+      try { r = ae.getBoundingClientRect ? ae.getBoundingClientRect() : null; } catch (e2) { r = null; }
+      if (r && r.width > 0) {
+        this.typeX = r.left + r.width / 2;
+        this.typeY = r.top + r.height / 2;
+      } else {
+        this.typeX = this.px; this.typeY = this.py;   // invisible field: keep looking at the cursor
+      }
     }
     this.typeT = 2.2;
   };
@@ -2408,6 +2426,9 @@
     b.resize = function () { self.resize(); };
     b.down = function (ev) {
       self.sound.unlock();
+      // browsers replay a tap as mousedown/click/dblclick right after
+      // touchend — the touch path below has already handled it
+      if (ev.isTrusted && self._touchAt && Date.now() - self._touchAt < 700) return;
       var d = self.duck;
       if (!d) return;
       var dist = Math.hypot(ev.clientX - d.x, ev.clientY - d.y);
@@ -2420,6 +2441,7 @@
       }
     };
     b.dbl = function (ev) {
+      if (ev.isTrusted && self._touchAt && Date.now() - self._touchAt < 700) return;
       var d = self.duck;
       if (!d) return;
       var dist = ev.clientX !== undefined ? Math.hypot(ev.clientX - d.x, ev.clientY - d.y) : 0;
@@ -2441,7 +2463,12 @@
       self.sound.unlock();
       self.pokeTyping();
     };
-    b.sel = function () { self.pokeSelection(); };
+    // debounced: selectionchange fires for every mouse move of a drag
+    // selection — one geometry read once the selection has settled is enough
+    b.sel = function () {
+      if (self._selTimer) clearTimeout(self._selTimer);
+      self._selTimer = setTimeout(function () { self._selTimer = 0; self.pokeSelection(); }, 250);
+    };
     // Touch: Position folgen, Tap = Quaken, Doppel-Tap = Flattern/Füttern —
     // läuft bewusst über die Maus-Pfade, damit Taps exakt wie Klicks wirken.
     b.touch = function (ev) {
@@ -2449,8 +2476,12 @@
       var t = ev.changedTouches && ev.changedTouches[0];
       if (!t || t.clientX === undefined) return;
       self.setPointer(t.clientX, t.clientY);
+      // The finger lands out of nowhere: no pointer speed from that jump, or
+      // the tap reads as petting/startling instead of a click on the duck
+      self.ppx = self.px; self.ppy = self.py; self.pointerSpeed = 0;
+      self._touchAt = Date.now();
       if (ev.touches && ev.touches.length > 1) return;   // Pinch & Co.: nur Position
-      var now = Date.now();
+      var now = self._touchAt;
       var dbl = now - self._lastTap < 350 &&
         Math.hypot(t.clientX - self._lastTapX, t.clientY - self._lastTapY) < 40;
       self._lastTap = now; self._lastTapX = t.clientX; self._lastTapY = t.clientY;
@@ -2538,6 +2569,7 @@
     root.removeEventListener('touchmove', b.touchMove, true);
     root.removeEventListener('keydown', b.key, true);
     document.removeEventListener('selectionchange', b.sel);
+    if (this._selTimer) { clearTimeout(this._selTimer); this._selTimer = 0; }
     root.removeEventListener('resize', b.resize);
     root.removeEventListener('scroll', b.pageScroll);
     root.removeEventListener('message', b.msg);
@@ -2653,6 +2685,9 @@
       this.mediaHoldT -= dt;
       if (this.mediaHoldT <= 0) this.setMedia(this.mediaReal);
     }
+    // Reduced motion: no dancing to page media — only the popup's 🪩 button
+    // (mediaHoldT) may still throw a party on request
+    this.musicOn = this.mediaOn && (!this.cfg.reduceMotion || this.mediaHoldT > 0);
     if (this.mediaOn && !this.disco && this.cfg.effects && !this.cfg.reduceMotion) {
       this.discoCd -= dt;
       if (this.discoCd <= 0) this.spawnDisco();
@@ -2946,7 +2981,7 @@
       this.babyActT = 0;
       if (Math.random() < dt * 1.2) e.fx.note(this.x + rand(-6, 6), this.y - br * 1.6, pick(DISCO_COLS));
       if (Math.random() < dt * 0.12) e.sound.quack(this.model.quackPitch);
-    } else if (e.mediaOn && !this.nesting && !this.eating) {
+    } else if (e.musicOn && !this.nesting && !this.eating) {
       t.squash = 1 + Math.sin(e.time * 7.5 + this.phase) * 0.06;
       t.headRot = Math.sin(e.time * 3.75 + this.phase) * 0.14;
       t.wingFlap = Math.max(0, Math.sin(e.time * 3.75 + this.phase)) * 0.25;

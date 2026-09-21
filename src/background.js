@@ -25,7 +25,6 @@ const DEFAULTS = {
   effects: true,
   reflection: true,
   opacity: 1.0,
-  reduceMotion: false,
   peck: true,
   feed: true,
   sleepAfter: 15,

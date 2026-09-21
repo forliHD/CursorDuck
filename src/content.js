@@ -87,23 +87,23 @@
 
   // Fokus-Modus: Bei Fullscreen-Video oder Fokus in einem Passwortfeld
   // tritt die Ente ab — danach meldet sie sich mit "!" zurück.
-  function updateFocusHold() {
-    var hold = false;
+  function focusHoldNow() {
     try {
       var fe = document.fullscreenElement || document.webkitFullscreenElement;
       if (fe) {
         var tag = (fe.tagName || '').toUpperCase();
         // IFRAME: embedded players (YouTube & Co.) go fullscreen as the
         // frame element — cross-origin, so assume video and stand down.
-        hold = tag === 'VIDEO' || tag === 'IFRAME' ||
-          !!(fe.querySelector && fe.querySelector('video'));
+        if (tag === 'VIDEO' || tag === 'IFRAME' ||
+            !!(fe.querySelector && fe.querySelector('video'))) return true;
       }
-      if (!hold) {
-        var ae = document.activeElement;
-        hold = !!(ae && (ae.tagName || '').toUpperCase() === 'INPUT' &&
-          String(ae.type || '').toLowerCase() === 'password');
-      }
-    } catch (e) { hold = false; }
+      var ae = document.activeElement;
+      return !!(ae && (ae.tagName || '').toUpperCase() === 'INPUT' &&
+        String(ae.type || '').toLowerCase() === 'password');
+    } catch (e) { return false; }
+  }
+  function updateFocusHold() {
+    var hold = focusHoldNow();
     if (hold === focusHold) return;
     focusHold = hold;
     sync();
@@ -111,10 +111,18 @@
       try { engine.duck.say('!', '#4a90d9'); } catch (e) { /* Deko */ }
     }
   }
-  document.addEventListener('fullscreenchange', updateFocusHold);
-  document.addEventListener('webkitfullscreenchange', updateFocusHold);
-  document.addEventListener('focusin', updateFocusHold);
-  document.addEventListener('focusout', updateFocusHold);
+  // Deferred by a tick: when focus jumps from one password field to the
+  // next, focusout (activeElement = body) precedes focusin — evaluated
+  // immediately, the duck briefly popped back up in between.
+  var focusTimer = 0;
+  function scheduleFocusCheck() {
+    if (focusTimer) return;
+    focusTimer = setTimeout(function () { focusTimer = 0; updateFocusHold(); }, 0);
+  }
+  document.addEventListener('fullscreenchange', scheduleFocusCheck);
+  document.addEventListener('webkitfullscreenchange', scheduleFocusCheck);
+  document.addEventListener('focusin', scheduleFocusCheck);
+  document.addEventListener('focusout', scheduleFocusCheck);
 
   // Reduced motion: the OS setting is the source of truth (no popup
   // toggle) — read at boot, then follow live changes below.
@@ -136,6 +144,9 @@
           var yKey = yest.getFullYear() + '-' + (yest.getMonth() + 1) + '-' + yest.getDate();
           stats.streakDays = stats.streakLast === yKey ? (stats.streakDays || 0) + 1 : 1;
           stats.streakLast = dayKey;
+          // persist right away — otherwise a day without petting or pecking
+          // never reached storage and the streak silently broke the next day
+          chrome.storage.local.set({ stats: stats });
         }
       } catch (e) { /* Serie ist Deko */ }
       var opts = {};
@@ -158,6 +169,7 @@
       engine.mount(document.documentElement);
       window.__cursorDuck = engine;   // Debug-Handle
       blocked = !siteAllowed(cfg);
+      focusHold = focusHoldNow();     // login page with an autofocused password field
       sync();
     });
   }
@@ -188,7 +200,7 @@
     var rmQuery = window.matchMedia ? window.matchMedia('(prefers-reduced-motion: reduce)') : null;
     if (rmQuery) {
       var rmUpdate = function () {
-        if (engine) engine.apply({ reduceMotion: !!rmQuery.matches });
+        if (engine) { engine.apply({ reduceMotion: !!rmQuery.matches }); sync(); }   // apply() alone would revive a paused site
       };
       if (rmQuery.addEventListener) rmQuery.addEventListener('change', rmUpdate);
       else if (rmQuery.addListener) rmQuery.addListener(rmUpdate);
@@ -214,6 +226,7 @@
         continue;
       }
       if (k === 'stats') { engine.stats = changes[k].newValue || engine.stats; continue; }
+      if (k === 'reduceMotion') continue;   // comes from the OS, never from storage
       patch[k] = changes[k].newValue;
     }
     if (Object.keys(patch).length) engine.apply(patch);
