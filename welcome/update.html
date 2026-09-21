@@ -35,6 +35,13 @@
   li { margin:8px 0; }
   b { color:var(--accent); }
   .tip { color:var(--muted); font-size:14px; margin-top:26px; text-align:center; }
+  h2 { font-size:18px; margin:0 0 10px; }
+  textarea {
+    width:100%; border:1px solid var(--line); border-radius:10px; padding:10px 12px;
+    font:inherit; background:transparent; color:var(--ink); resize:vertical;
+  }
+  textarea:focus { outline:none; border-color:var(--accent); }
+  .try { margin:12px 0 0; color:var(--muted); }
 </style>
 </head>
 <body>
@@ -44,13 +51,19 @@
 
   <div class="card">
     <ul>
-      <li><b data-i18n="uF1b">Musik &amp; Video:</b> <span data-i18n="uF1t">Läuft auf der Seite ein Video oder ein Song mit Ton, tanzt sie mit — in Runden, mit Verschnaufpausen; die Küken wippen im Takt. Ab und zu senkt sich eine kleine Discokugel herab, und die ganze Familie dreht durch: Hüpfer, Flügelschlag, bunte Noten, Konfetti. Pause im Player, und sie hört auf.</span></li>
-      <li><b data-i18n="uF2b">Garderobe:</b> <span data-i18n="uF2t">14 Hüte und 5 Brillen für jedes Modell — Zylinder, Krone, Ninja-Maske, Monokel … Jedes Stück schaltet ein Erfolg frei; die Kacheln im Popup zeigen deine Ente gleich damit.</span></li>
-      <li><b data-i18n="uF3b">59 Erfolge in vier Stufen:</b> <span data-i18n="uF3t">24 neue Abzeichen, von Bronze über Silber und Gold bis Diamant — samt drei fürs Goldbad der Milliardärs-Ente. Der Zähler oben zeigt deinen Stand.</span></li>
-      <li><b data-i18n="uF4b">Abstand zum Cursor:</b> <span data-i18n="uF4t">Neuer Regler: Sie hält auf Wunsch mehr Abstand, damit sie nie auf dem Text sitzt, den du gerade liest — pickt kurz, zieht sich dann wieder zurück.</span></li>
-      <li><b data-i18n="uF5b">Seiten pausieren, richtig:</b> <span data-i18n="uF5t">Pausierte Seiten blieben nach einem Tab-Wechsel nicht pausiert — gefixt. Dazu eine Liste aller pausierten Seiten im Popup; ein Eintrag wie example.com gilt für www. und alle Subdomains.</span></li>
-      <li><b data-i18n="uF6b">Aufgeräumtes Popup:</b> <span data-i18n="uF6t">Jede Sektion lässt sich mit einem Klick auf die Überschrift einklappen, der Zustand bleibt gespeichert. Und Alt+Shift+N kennt jetzt auch die Milliardärs-Ente.</span></li>
+      <li><b data-i18n="uF1b">Mitlesen &amp; Fokus-Modus:</b> <span data-i18n="uF1t">Tippst du in ein Textfeld, schaut sie zum Feld statt zum Cursor und nickt dabei nicht ein. Bei Passwortfeldern und Vollbild-Videos tritt sie ab — danach meldet sie sich mit „!“ zurück.</span></li>
+      <li><b data-i18n="uF2b">Selektions-Snack:</b> <span data-i18n="uF2t">Markierst du Text in ihrer Nähe, knabbert sie am Rand der Markierung — „nom“. (Sie sieht nur, wo der Text liegt, nie was drinsteht.)</span></li>
+      <li><b data-i18n="uF3b">Einschlafen nach Wunsch:</b> <span data-i18n="uF3t">Neuer Regler von 5 bis 60 Sekunden, bis sie den Kopf ins Gefieder steckt.</span></li>
+      <li><b data-i18n="uF4b">Ruhiger Modus:</b> <span data-i18n="uF4t">Ist im System „Bewegung reduzieren“ aktiv, lässt sie Pirouetten, Schütteln, Baden, Tanzen und Discokugel weg — nur die Kunststück-Knöpfe im Popup dürfen noch alles.</span></li>
+      <li><b data-i18n="uF5b">Name, Stammgast &amp; neue Enten:</b> <span data-i18n="uF5t">Gib ihr im Popup einen Namen — bei voller Streichel-Leiste sagt sie ihn. Wer 30 Tage in Folge vorbeischaut, holt sich das Diamant-Abzeichen „Stammgast“. Und im Januar und Februar warten Neujahrs- und Valentins-Ente.</span></li>
+      <li><b data-i18n="uF6b">Popup &amp; Touch:</b> <span data-i18n="uF6t">Soundboard zum Anhören aller Klänge und ein Suchfeld fürs Modell-Raster. Auf Touchscreens folgt sie dem Finger: Tipp auf die Ente = Quaken, Doppeltipp = Flattern oder Füttern.</span></li>
     </ul>
+  </div>
+
+  <div class="card">
+    <h2 data-i18n="uTryTitle">Probier's gleich aus</h2>
+    <textarea rows="2" data-i18n-ph="uTryType" placeholder="Tipp hier etwas — sie liest mit …"></textarea>
+    <p class="try" data-i18n="uTrySelect">Markier diesen Satz mit der Maus, wenn sie in der Nähe schwimmt — sie knabbert am Rand.</p>
   </div>
 
   <p class="tip" data-i18n="uTip">Alles Weitere wie gehabt: Popup über das Enten-Symbol, Alt+Shift+D schaltet sie an und aus.</p>

@@ -19,6 +19,10 @@
       var s = MSG(el.getAttribute('data-i18n'));
       if (s) el.textContent = s;
     });
+    document.querySelectorAll('[data-i18n-ph]').forEach(function (el) {
+      var s = MSG(el.getAttribute('data-i18n-ph'));
+      if (s) el.placeholder = s;
+    });
   })();
 
   function start(settings) {
@@ -28,14 +32,10 @@
     engine.mount(document.body);
     engine.start();
     window.__duck = engine;
-    // Show off right away: the tycoon duck introduces herself, dances to
-    // "music" for a bit, then gets sleepy and dives into her gold hoard
-    // (moving the mouse wakes her)
-    setTimeout(function () { engine.setModel('tycoon'); }, 1800);
-    setTimeout(function () { engine.trigger('quack'); }, 2600);
-    setTimeout(function () { engine.setMedia(true); }, 4200);
-    setTimeout(function () { engine.setMedia(false); }, 13000);
-    setTimeout(function () { engine.trigger('sleep', 99); }, 15000);
+    // A quick hello — the "try it" card on the page shows the new
+    // reading-along and selection tricks with the real duck
+    setTimeout(function () { engine.trigger('quack'); }, 2200);
+    setTimeout(function () { engine.trigger('flap'); }, 5200);
   }
 
   if (isExt) {
