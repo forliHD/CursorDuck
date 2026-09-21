@@ -36,6 +36,7 @@
     peck: true,
     feed: true,         // Brotkrumen per Doppelklick
     sleepAfter: 15,     // Sekunden Cursor-Stillstand bis zum Nickerchen
+    duckName: '',       // Taufname, wird bei voller Streichel-Leiste gesagt
     hat: '',            // wardrobe: '' = the model's own, 'none' = bare, else a hat kind
     glasses: ''         // same for glasses
   };
@@ -706,6 +707,7 @@
         }
         if (this.pet >= 1) {
           this.pet = 0.25;
+          if (cfg.duckName) this.say(String(cfg.duckName).slice(0, 24), '#e04b7a');
           e.stats.pets++;
           e.saveStats();
           for (var i = 0; i < 5; i++) e.fx.heart(this.x + rand(-r, r), this.y - r * 1.4, rand(6, 9) * cfg.size);

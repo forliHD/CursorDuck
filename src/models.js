@@ -391,6 +391,24 @@
       hat: 'bunny',
       dots: ['#ff9ec4', '#8ce0c9', '#a8c8ff', '#ffd23d'],
       sparkle: 0.3, quackPitch: 1.25
+    }),
+    duck({
+      id: 'valentine', name: 'Valentins-Ente', emoji: '💘', tier: 'epic',
+      season: { months: [2] },
+      body: '#f7a8c4', bodyDark: '#d97ba0', belly: '#ffe3ee',
+      head: '#f7a8c4', headDark: '#d97ba0', cheek: '#e04b7a',
+      beak: '#e04b4b', beakDark: '#b83232',
+      wing: '#f291b8', wingBar: '#ffffff', tail: '#e07ba4', foot: '#e04b7a',
+      glow: '#ff8fb5', sparkle: 0.5, quackPitch: 1.2
+    }),
+    duck({
+      id: 'newyear', name: 'Neujahrs-Ente', emoji: '🎆', tier: 'epic',
+      season: { months: [1] },
+      body: '#2c3e6e', bodyDark: '#1c2a4e', belly: '#d8e2f7',
+      head: '#2c3e6e', headDark: '#1c2a4e',
+      beak: '#ffd23d', beakDark: '#e0ae14',
+      wing: '#3d5386', wingBar: '#ffd23d', tail: '#3d5386', foot: '#ffd23d',
+      hat: 'party', confetti: 1, glow: '#ffd23d', sparkle: 0.6, quackPitch: 1.1
     })
   ];
 

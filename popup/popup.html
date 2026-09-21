@@ -12,6 +12,7 @@
       <div>
         <h1>Cursor&nbsp;Duck</h1>
         <p id="modelName">Stockente</p>
+        <input type="text" id="duckName" maxlength="24" autocomplete="off" spellcheck="false" placeholder="Ente benennen …">
       </div>
       <label class="switch" title="Ente an/aus" data-i18n-title="enabledTitle">
         <input type="checkbox" id="enabled" checked>
@@ -27,6 +28,7 @@
         <button id="randomBtn" class="ghost" data-i18n="btnRandom">🎲 Zufall</button>
       </div>
       <div class="sec-body">
+        <div class="model-search"><input type="search" id="modelSearch" autocomplete="off" placeholder="Modelle suchen …"></div>
         <div id="models" class="models"></div>
       </div>
     </section>
@@ -76,6 +78,8 @@
         <span><span data-i18n="lblSleep">Einschlafen nach</span> <b id="sleepAfterV">15 s</b></span>
         <input type="range" id="sleepAfter" min="5" max="60" step="1">
       </label>
+      <div class="sound-head"><span data-i18n="lblSoundboard">Anhören</span></div>
+      <div class="soundboard" id="soundboard"></div>
       </div>
     </section>
 

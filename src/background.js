@@ -29,6 +29,7 @@ const DEFAULTS = {
   peck: true,
   feed: true,
   sleepAfter: 15,
+  duckName: '',
   randomOnStart: false,   // bei jedem Browserstart ein neues Zufallsmodell
   hat: '',                // Garderobe: '' = wie das Modell, 'none' = ohne, sonst Hut-Art
   glasses: '',

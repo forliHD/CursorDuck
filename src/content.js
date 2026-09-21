@@ -126,6 +126,18 @@
 
   function boot() {
     readAll(function (cfg, stats) {
+      // Tages-Serie: einmal pro Kalendertag zählen (lokale Zeit, keine
+      // Netzwerk-Uhr). Idempotent pro Tag — mehrere Tabs zählen nicht doppelt.
+      try {
+        var today = new Date();
+        var dayKey = today.getFullYear() + '-' + (today.getMonth() + 1) + '-' + today.getDate();
+        if (stats && stats.streakLast !== dayKey) {
+          var yest = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 1);
+          var yKey = yest.getFullYear() + '-' + (yest.getMonth() + 1) + '-' + yest.getDate();
+          stats.streakDays = stats.streakLast === yKey ? (stats.streakDays || 0) + 1 : 1;
+          stats.streakLast = dayKey;
+        }
+      } catch (e) { /* Serie ist Deko */ }
       var opts = {};
       for (var k in DEFAULTS) opts[k] = cfg[k];
       opts.reduceMotion = osReduceMotion();

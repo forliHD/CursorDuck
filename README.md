@@ -56,9 +56,10 @@ astro duck (helmet), zombie duck, angel duck (halo), devil duck, cowboy duck,
 tycoon duck (top hat, monocle — and a gold hoard to nap in), rainbow duck,
 galaxy duck (starry body), golden duck.
 
-**Seasonal:** pumpkin duck (October), Christmas duck (December) and Easter duck
-(from three weeks before until one week after Easter Sunday, computed with Gauss's
-Easter algorithm) appear in the popup automatically during their time window.
+**Seasonal:** pumpkin duck (October), Christmas duck (December), New Year duck
+(January), Valentine duck (February) and Easter duck (from three weeks before
+until one week after Easter Sunday, computed with Gauss's Easter algorithm)
+appear in the popup automatically during their time window.
 
 **With opinions:** the visionary duck (black turtleneck, round glasses) doesn't just
 quack — every now and then she says things like “One more thing …”,
@@ -66,7 +67,7 @@ quack — every now and then she says things like “One more thing …”,
 
 Rare models are marked in the popup (blue = rare, purple = epic, gold = legendary).
 The 🎲 button picks at random — legendaries are rare. The popup also holds
-**59 achievements in bronze, silver, gold and diamond tiers** — from petting fan through
+**60 achievements in bronze, silver, gold and diamond tiers** — from petting fan through
 “Identity crisis” and “Croesus” to “Duck whisperer”; clicking an achievement reveals how
 to earn it, and the header counts what you've collected.
 

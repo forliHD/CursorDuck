@@ -7,7 +7,7 @@
     enabled: true, model: 'mallard', size: 1.0, speed: 1.0, distance: 1.0, ducklings: 0,
     playfulness: 1.0, sound: false, volume: 0.35, effects: true,
     reflection: true, opacity: 1.0, reduceMotion: false,
-    peck: true, feed: true, sleepAfter: 15,
+    peck: true, feed: true, sleepAfter: 15, duckName: '',
     hat: '', glasses: '', randomOnStart: false, disabledHosts: []
   };
 
@@ -112,6 +112,14 @@
 
   function modelName(m) {
     return MSG('model_' + m.id.replace(/-/g, '_')) || m.name;
+  }
+
+  function headerTitle(m) {
+    return (cfg.duckName ? '\u201C' + cfg.duckName + '\u201D · ' : '') + m.emoji + '\u2002' + modelName(m);
+  }
+
+  function showModel(m) {
+    document.getElementById('modelName').textContent = headerTitle(m);
   }
 
   function applyI18n() {
@@ -264,7 +272,8 @@
     ['quotes', 200, '💫', 'achQuote3', 'Reality Distortion Field', '200 Sprüche. Du glaubst inzwischen alles, was sie sagt.', 'gold'],
     ['waddles', 5, '🚶', 'achWaddle', 'Landratte', 'Sieh ihr 5-mal beim Landgang zu — oder stups ihn im Popup an.', 'bronze'],
     ['waddles', 25, '🥾', 'achWaddle2', 'Wanderverein', '25 Landgänge. Die Watschelrunde ist jetzt ein eingetragener Verein.', 'silver'],
-    ['waddles', 100, '🏃', 'achWaddle3', 'Watschel-Marathon', '100 Landgänge. 42,195 Kilometer — in Entenschritten.', 'gold']
+    ['waddles', 100, '🏃', 'achWaddle3', 'Watschel-Marathon', '100 Landgänge. 42,195 Kilometer — in Entenschritten.', 'gold'],
+    ['streakDays', 30, '🔥', 'achStreak', 'Stammgast', '30 Tage in Folge besucht. Sie hat dir längst einen Stammplatz freigehalten.', 'diamond']
   ];
 
   // achievement display name by key (localized, German fallback from the list)
@@ -416,13 +425,52 @@
   }
   requestAnimationFrame(drawHero);
 
+  // ── Soundboard: Samples direkt anhören (Popup-Lautstärke gilt) ──
+  function buildSoundboard() {
+    var wrap = document.getElementById('soundboard');
+    if (!wrap) return;
+    var base = null;
+    try {
+      base = (chrome.runtime && chrome.runtime.getURL) ? chrome.runtime.getURL('audio/') : null;
+    } catch (e) { base = null; }
+    if (!base) {
+      wrap.style.display = 'none';
+      var head = wrap.previousElementSibling;
+      if (head) head.style.display = 'none';
+      return;
+    }
+    var sounds = [
+      ['quack.wav', '📣'], ['quack-alt1.wav', '🦆'], ['quack-alt2.wav', '🦆'],
+      ['splash.wav', '💧'], ['peck.wav', '🐦'], ['pop.wav', '🍾'],
+      ['coins-small.wav', '🪙'], ['coins-big.wav', '💰']
+    ];
+    sounds.forEach(function (s) {
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.textContent = s[1];
+      b.title = s[0];
+      b.onclick = function () {
+        try {
+          var a = new Audio(base + s[0]);
+          a.volume = Math.max(0, Math.min(1, cfg.volume));
+          var p = a.play();
+          if (p && p.catch) p.catch(function () {});
+        } catch (e) { /* stiller Button */ }
+      };
+      wrap.appendChild(b);
+    });
+  }
+
   // ── Modell-Raster ───────────────────────────────────────────
-  function buildModels() {
+  function buildModels(filter) {
     var wrap = document.getElementById('models');
     wrap.textContent = '';
+    var q = String(filter || '').toLowerCase();
     DuckModels.list.forEach(function (m) {
       // Saison-Enten nur in ihrem Monat zeigen (außer sie ist gerade gewählt)
       if (!DuckModels.isAvailable(m) && m.id !== cfg.model) return;
+      // Suche filtert nach lokalisiertem Namen — das gewählte Modell bleibt sichtbar
+      if (q && modelName(m).toLowerCase().indexOf(q) === -1 && m.id !== cfg.model) return;
       var d = document.createElement('div');
       d.className = 'm tier-' + m.tier + (m.id === cfg.model ? ' on' : '');
       d.title = modelName(m) + (m.tier !== 'common' ? ' · ' + m.tier : '');
@@ -440,7 +488,7 @@
         save({ model: m.id });
         wrap.querySelectorAll('.m').forEach(function (el) { el.classList.remove('on'); });
         d.classList.add('on');
-        document.getElementById('modelName').textContent = m.emoji + '\u2002' + modelName(m);
+        showModel(m);
         renderWardrobe();
       };
       wrap.appendChild(d);
@@ -452,6 +500,22 @@
     var en = document.getElementById('enabled');
     en.checked = cfg.enabled;
     en.onchange = function () { save({ enabled: en.checked }); };
+
+    var dn = document.getElementById('duckName');
+    dn.placeholder = MSG('duckNamePh') || 'Ente benennen …';
+    dn.value = cfg.duckName || '';
+    dn.onchange = function () {
+      var v = dn.value.trim().slice(0, 24);
+      dn.value = v;
+      save({ duckName: v });
+      showModel(DuckModels.get(cfg.model));
+    };
+
+    var ms = document.getElementById('modelSearch');
+    ms.placeholder = MSG('modelSearchPh') || 'Modelle suchen …';
+    ms.oninput = function () { buildModels(ms.value); };
+
+    buildSoundboard();
 
     SLIDERS.forEach(function (pair) {
       var id = pair[0], fmt = pair[1];
@@ -478,7 +542,7 @@
     document.getElementById('randomBtn').onclick = function () {
       var id = DuckModels.randomId();
       save({ model: id });
-      document.getElementById('modelName').textContent = DuckModels.get(id).emoji + '\u2002' + modelName(DuckModels.get(id));
+      showModel(DuckModels.get(id));
       renderWardrobe();
       buildModels();
     };
@@ -519,7 +583,7 @@
   // ── Start ───────────────────────────────────────────────────
   chrome.storage.sync.get(DEFAULTS, function (loaded) {
     cfg = loaded;
-    document.getElementById('modelName').textContent = DuckModels.get(cfg.model).emoji + '\u2002' + modelName(DuckModels.get(cfg.model));
+    showModel(DuckModels.get(cfg.model));
     buildModels();
     bind();
     renderWardrobe();
