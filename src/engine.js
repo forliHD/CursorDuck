@@ -32,6 +32,7 @@
     effects: true,
     reflection: true,
     opacity: 1.0,
+    reduceMotion: false, // OS prefers-reduced-motion: calm auto-tricks, no auto disco
     peck: true,
     feed: true,         // Brotkrumen per Doppelklick
     sleepAfter: 15,     // Sekunden Cursor-Stillstand bis zum Nickerchen
@@ -451,11 +452,20 @@
     { id: 'waddle', w: 0.8, dur: [6.15, 6.15] }   // Landgang: feste Choreo-Länge
   ];
 
-  function weightedAction() {
+  // High-motion idle actions skipped when the OS asks for reduced
+  // motion. Only filters what she starts on her own — manually triggered
+  // tricks (popup buttons) always play.
+  var CALM_SKIP = { shake: 1, spin: 1, dance: 1 };
+
+  function weightedAction(calm) {
     var total = 0, i;
-    for (i = 0; i < IDLE_ACTIONS.length; i++) total += IDLE_ACTIONS[i].w;
+    for (i = 0; i < IDLE_ACTIONS.length; i++) {
+      if (calm && CALM_SKIP[IDLE_ACTIONS[i].id]) continue;
+      total += IDLE_ACTIONS[i].w;
+    }
     var r = Math.random() * total;
     for (i = 0; i < IDLE_ACTIONS.length; i++) {
+      if (calm && CALM_SKIP[IDLE_ACTIONS[i].id]) continue;
       r -= IDLE_ACTIONS[i].w;
       if (r <= 0) return IDLE_ACTIONS[i];
     }
@@ -581,8 +591,9 @@
       // Sprint, wenn die Ente weit abgehängt wurde
       if (dist > 420) want = Math.min(maxSpeed * 1.9, want * 1.5);
       var ux = dx / dist, uy = dy / dist;
-      // Enten schlängeln beim Paddeln leicht seitlich
-      var wob = Math.sin(this.e.time * 5.5 + this.phase) * 0.10 * Math.min(1, dist / 220);
+      // Enten schlängeln beim Paddeln leicht seitlich (sanfter bei Reduced Motion)
+      var wobAmp = cfg.reduceMotion ? 0.04 : 0.10;
+      var wob = Math.sin(this.e.time * 5.5 + this.phase) * wobAmp * Math.min(1, dist / 220);
       var wx = ux * Math.cos(wob) - uy * Math.sin(wob);
       var wy = ux * Math.sin(wob) + uy * Math.cos(wob);
       this.vx = approach(this.vx, wx * want, 5.5 * alert, dt);
@@ -1655,7 +1666,7 @@
           break;
         }
         if (this.nextIdle <= 0) {
-          var act = weightedAction();
+          var act = weightedAction(cfg.reduceMotion);
           this.nextIdle = rand(2.2, 6.5) / cfg.playfulness;
           this.setState(act.id, rand(act.dur[0], act.dur[1]));
         }
@@ -2545,7 +2556,7 @@
       this.mediaHoldT -= dt;
       if (this.mediaHoldT <= 0) this.setMedia(this.mediaReal);
     }
-    if (this.mediaOn && !this.disco && this.cfg.effects) {
+    if (this.mediaOn && !this.disco && this.cfg.effects && !this.cfg.reduceMotion) {
       this.discoCd -= dt;
       if (this.discoCd <= 0) this.spawnDisco();
     }

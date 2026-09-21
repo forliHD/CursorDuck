@@ -50,11 +50,12 @@
   var engine = null;
   var host = location.hostname;
   var blocked = false;   // Seite über das Popup pausiert?
+  var focusHold = false; // Fokus-Modus: Fullscreen-Video oder Passwortfeld?
 
   // Einzige Stelle, die über Laufen/Nicht-Laufen entscheidet.
   function sync() {
     if (!engine) return;
-    if (engine.cfg.enabled && !blocked) engine.start();
+    if (engine.cfg.enabled && !blocked && !focusHold) engine.start();
     else engine.stop();
   }
 
@@ -84,10 +85,50 @@
     return !hostBlocked(cfg.disabledHosts);
   }
 
+  // Fokus-Modus: Bei Fullscreen-Video oder Fokus in einem Passwortfeld
+  // tritt die Ente ab — danach meldet sie sich mit "!" zurück.
+  function updateFocusHold() {
+    var hold = false;
+    try {
+      var fe = document.fullscreenElement || document.webkitFullscreenElement;
+      if (fe) {
+        var tag = (fe.tagName || '').toUpperCase();
+        // IFRAME: embedded players (YouTube & Co.) go fullscreen as the
+        // frame element — cross-origin, so assume video and stand down.
+        hold = tag === 'VIDEO' || tag === 'IFRAME' ||
+          !!(fe.querySelector && fe.querySelector('video'));
+      }
+      if (!hold) {
+        var ae = document.activeElement;
+        hold = !!(ae && (ae.tagName || '').toUpperCase() === 'INPUT' &&
+          String(ae.type || '').toLowerCase() === 'password');
+      }
+    } catch (e) { hold = false; }
+    if (hold === focusHold) return;
+    focusHold = hold;
+    sync();
+    if (!hold && engine && engine.duck && engine.cfg.enabled && !blocked) {
+      try { engine.duck.say('!', '#4a90d9'); } catch (e) { /* Deko */ }
+    }
+  }
+  document.addEventListener('fullscreenchange', updateFocusHold);
+  document.addEventListener('webkitfullscreenchange', updateFocusHold);
+  document.addEventListener('focusin', updateFocusHold);
+  document.addEventListener('focusout', updateFocusHold);
+
+  // Reduced motion: the OS setting is the source of truth (no popup
+  // toggle) — read at boot, then follow live changes below.
+  function osReduceMotion() {
+    try {
+      return !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+    } catch (e) { return false; }
+  }
+
   function boot() {
     readAll(function (cfg, stats) {
       var opts = {};
       for (var k in DEFAULTS) opts[k] = cfg[k];
+      opts.reduceMotion = osReduceMotion();
       engine = new window.CursorDuckEngine(opts);
       // sound samples live in the extension package (web_accessible_resources)
       try {
@@ -128,6 +169,19 @@
     }
     engine.setMedia(any);
   }, 1000);
+
+  // Follow OS reduced-motion changes live (Settings → Accessibility
+  // while the tab is open). Guarded: engine may not be booted yet.
+  try {
+    var rmQuery = window.matchMedia ? window.matchMedia('(prefers-reduced-motion: reduce)') : null;
+    if (rmQuery) {
+      var rmUpdate = function () {
+        if (engine) engine.apply({ reduceMotion: !!rmQuery.matches });
+      };
+      if (rmQuery.addEventListener) rmQuery.addEventListener('change', rmUpdate);
+      else if (rmQuery.addListener) rmQuery.addListener(rmUpdate);
+    }
+  } catch (e) { /* old browser: stays on the boot value */ }
 
   function throttle(fn, ms) {
     var t = 0, pending = null;

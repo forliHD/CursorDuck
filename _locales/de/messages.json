@@ -14,6 +14,7 @@
   "lblPlayfulness": { "message": "Verspieltheit" },
   "lblOpacity": { "message": "Sichtbarkeit" },
   "lblVolume": { "message": "Lautstärke" },
+  "lblSleep": { "message": "Einschlafen nach" },
   "chkPeck": { "message": "Pickt den Cursor an" },
   "chkFeed": { "message": "Brotkrumen per Doppelklick 🍞" },
   "chkEffects": { "message": "Wasser-Effekte & Splashes" },

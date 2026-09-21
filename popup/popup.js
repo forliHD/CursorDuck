@@ -6,7 +6,8 @@
   var DEFAULTS = {
     enabled: true, model: 'mallard', size: 1.0, speed: 1.0, distance: 1.0, ducklings: 0,
     playfulness: 1.0, sound: false, volume: 0.35, effects: true,
-    reflection: true, opacity: 1.0, peck: true, feed: true, sleepAfter: 15,
+    reflection: true, opacity: 1.0, reduceMotion: false,
+    peck: true, feed: true, sleepAfter: 15,
     hat: '', glasses: '', randomOnStart: false, disabledHosts: []
   };
 
@@ -189,7 +190,8 @@
     ['ducklings', function (v) { return String(v | 0); }],
     ['playfulness', function (v) { return v.toFixed(1) + '×'; }],
     ['opacity', function (v) { return Math.round(v * 100) + ' %'; }],
-    ['volume', function (v) { return Math.round(v * 100) + ' %'; }]
+    ['volume', function (v) { return Math.round(v * 100) + ' %'; }],
+    ['sleepAfter', function (v) { return Math.round(v) + ' s'; }]
   ];
   var CHECKS = ['peck', 'feed', 'effects', 'reflection', 'sound', 'randomOnStart'];
   var TRICKS = [
@@ -461,7 +463,9 @@
         var v = parseFloat(el.value);
         out.textContent = fmt(v);
         paintRange(el);
-        save(id === 'ducklings' ? { ducklings: v | 0 } : (function () { var o = {}; o[id] = v; return o; })());
+        var patch = {};
+        patch[id] = id === 'sleepAfter' ? Math.round(v) : (id === 'ducklings' ? v | 0 : v);
+        save(patch);
       };
     });
 
