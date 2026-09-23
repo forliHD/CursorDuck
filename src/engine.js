@@ -1584,16 +1584,12 @@
         break;
 
       case 'feed': {
-        // Brotkrumen aufsammeln, eine nach der anderen
+        // Brotkrumen aufsammeln, eine nach der anderen — nur die im Fenster;
+        // der Rest liegt auf der Seite und wartet
         var crumbs = e.crumbs;
-        if (!crumbs.length) { this.setState('idle', 1); break; }
-        var best = null, bd = 1e18;
-        for (var ci = 0; ci < crumbs.length; ci++) {
-          var cdx = crumbs[ci].x - this.x, cdy = crumbs[ci].y - this.y;
-          var cd = cdx * cdx + cdy * cdy;
-          if (cd < bd) { bd = cd; best = crumbs[ci]; }
-        }
-        bd = Math.sqrt(bd);
+        var best = e.nearestCrumb(this.x, this.y);
+        if (!best) { this.setState('idle', 1); break; }
+        var bd = Math.hypot(best.x - this.x, best.y - this.y);
         this.swim(dt, best.x, best.y, r * 0.85, 1.15);
         if (bd < r * 1.5) {
           var nib = Math.sin(e.time * 13);
@@ -1620,9 +1616,11 @@
                 this.setState('burst', 3.2);
                 break;
               }
-              if (!crumbs.length) {
-                e.fx.heart(this.x, this.y - r * 1.8, 6 * cfg.size);
-                e.sound.quack(this.model.quackPitch * 1.1, true);
+              if (!e.crumbsInView()) {
+                if (!crumbs.length) {   // all gone, not just out of view
+                  e.fx.heart(this.x, this.y - r * 1.8, 6 * cfg.size);
+                  e.sound.quack(this.model.quackPitch * 1.1, true);
+                }
                 this.setState('idle', 1);
               }
             }
@@ -1648,7 +1646,7 @@
         // Brotkrumen schlagen alles. (Bewusst ohne cfg.feed-Check: das Setting
         // gated nur das Werfen per Doppelklick — liegen Krumen da, etwa vom
         // Popup-Knopf, werden sie immer gefressen, sonst verwaisen sie.)
-        if (e.crumbs.length) { this.setState('feed', 99); break; }
+        if (e.crumbsInView()) { this.setState('feed', 99); break; }
         // Fisch entdeckt?
         if (e.fish && e.fish.alpha > 0.5 && !e.fish.caught) {
           var fdx0 = e.fish.x - this.x, fdy0 = e.fish.y - this.y;
@@ -1686,7 +1684,7 @@
 
       case 'swim':
       default:
-        if (e.crumbs.length && !this.baby) { this.setState('feed', 99); break; }
+        if (e.crumbsInView() && !this.baby) { this.setState('feed', 99); break; }
         this.swim(dt, px, py, stopDist, 1);
         var spd0 = Math.sqrt(this.vx * this.vx + this.vy * this.vy);
         t.lean = clamp(-spd0 * 0.00022 - (dist > 420 ? 0.06 : 0), -0.14, 0);
@@ -2274,6 +2272,36 @@
     this.sound.splash(0.35);
   };
 
+  // Crumbs stay where they were thrown on the page: scrolling moves them with
+  // the content, and anything more than two screens away is forgotten.
+  Engine.prototype.shiftCrumbs = function (dx, dy) {
+    var far = 2 * Math.max(this.w, this.h);
+    for (var i = this.crumbs.length - 1; i >= 0; i--) {
+      var c = this.crumbs[i];
+      c.x += dx; c.y += dy;
+      if (c.x < -far || c.x > this.w + far || c.y < -far || c.y > this.h + far) this.crumbs.splice(i, 1);
+    }
+  };
+  // The ducks live on the glass, so only crumbs inside the viewport can be
+  // eaten; the rest waits on the page until it is scrolled back into view.
+  Engine.prototype.crumbVisible = function (c) {
+    return c.x >= 0 && c.x <= this.w && c.y >= 0 && c.y <= this.h;
+  };
+  Engine.prototype.nearestCrumb = function (x, y) {
+    var best = null, bd = 1e18;
+    for (var i = 0; i < this.crumbs.length; i++) {
+      var c = this.crumbs[i];
+      if (!this.crumbVisible(c)) continue;
+      var dx = c.x - x, dy = c.y - y, d = dx * dx + dy * dy;
+      if (d < bd) { bd = d; best = c; }
+    }
+    return best;
+  };
+  Engine.prototype.crumbsInView = function () {
+    for (var i = 0; i < this.crumbs.length; i++) if (this.crumbVisible(this.crumbs[i])) return true;
+    return false;
+  };
+
   // Fisch & Krumen liegen "im Wasser" — also unter den Enten zeichnen
   Engine.prototype.drawExtras = function (ctx) {
     var t = this.time, i;
@@ -2496,9 +2524,12 @@
     // Enten mitzieht (Seite runter → Wasser zieht nach oben und umgekehrt).
     b.pageScroll = function () {
       var y = root.scrollY || root.pageYOffset || 0;
-      if (self._scrollY == null) { self._scrollY = y; return; }
-      var d = y - self._scrollY;
-      self._scrollY = y;
+      var x = root.scrollX || root.pageXOffset || 0;
+      if (self._scrollY == null) { self._scrollY = y; self._scrollX = x; return; }
+      var d = y - self._scrollY, dx = x - (self._scrollX || 0);
+      self._scrollY = y; self._scrollX = x;
+      // crumbs lie on the page, not on the glass: they scroll with the content
+      if (d || dx) self.shiftCrumbs(-dx, -d);
       if (!self.running || Math.abs(d) < 3) return;
       var kick = clamp(-d * 0.9, -240, 240);
       var dk = self.duck;
@@ -2671,7 +2702,7 @@
     } else {
       var vst = this.duck.state;
       var vCalm = vst === 'idle' || vst === 'swim' || vst === 'bob' || vst === 'look';
-      if (vCalm && !this.fish && !this.crumbs.length && this.cfg.playfulness > 0.25) {
+      if (vCalm && !this.fish && !this.crumbsInView() && this.cfg.playfulness > 0.25) {
         this.visitorCd -= dt * this.cfg.playfulness;
         if (this.visitorCd <= 0) {
           this.visitorCd = rand(150, 360);
@@ -2798,15 +2829,7 @@
     var nestOpen = this.nest && !this.nest.sink ? this.nest : null;
     for (var i = 0; i < this.babies.length; i++) {
       var b = this.babies[i];
-      var crumb = null;
-      if (this.crumbs.length && !nestOpen) {
-        var bd = 1e18;
-        for (var ci = 0; ci < this.crumbs.length; ci++) {
-          var cdx = this.crumbs[ci].x - b.x, cdy = this.crumbs[ci].y - b.y;
-          var cd = cdx * cdx + cdy * cdy;
-          if (cd < bd) { bd = cd; crumb = this.crumbs[ci]; }
-        }
-      }
+      var crumb = (this.crumbs.length && !nestOpen) ? this.nearestCrumb(b.x, b.y) : null;
       if (nestOpen) {
         // Jedes Küken hat seinen festen Kuschel-Platz im Nest
         b.eating = false;
