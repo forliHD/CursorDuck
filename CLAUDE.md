@@ -70,7 +70,13 @@ hreflang. The build also completes the JSON-LD (version, description) and writes
 pages need a canonical link or a noindex tag. `site/404.html` is served for
 unknown paths (with a real 404 status). Use absolute paths (`/site.css`,
 `/api/…`) in pages and scripts, since the same files run under `/de/` and on
-the 404 page.
+the 404 page. The address follows the language on screen (`/` or `/de/`, via
+`history.replaceState`), and `/en` redirects to `/` (`site/_redirects`).
+
+Cloudflare lets browsers cache JS and CSS for four hours, so the build appends
+a content hash to every script and stylesheet a page loads (`/site.js?v=…`);
+reference new scripts the same way (root-absolute `src`/`href`) and they are
+fingerprinted automatically.
 
 The duck log (`site/releases.json`) fills itself: `tools/build.py` archives the
 current version's entry from the update page strings (`uF<n>b`/`uF<n>t` and the

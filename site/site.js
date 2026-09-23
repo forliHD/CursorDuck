@@ -131,7 +131,8 @@
   }
 
   // The start page exists as / (English) and /de/ (German, for search engines);
-  // after a switch the address follows, so a reload or a shared link keeps it.
+  // the address follows the language on screen (on load and after a switch),
+  // so a reload or a shared link keeps it.
   // Privacy, imprint and 404 are one bilingual page and keep their address.
   function syncUrl() {
     var path = location.pathname;
@@ -604,6 +605,7 @@
     drawLogo();
     bootDuck();
     applyLang(lang);
+    syncUrl();   // the address names the language on screen, / or /de/
     renderStats();
     loadReleases();
     var lb = $('#langBtn');

@@ -16,12 +16,16 @@ This script
   5. pre-renders the German start page as _site/de/index.html (search engines
      index / and /de/ as the two language versions, linked by hreflang), fills
      the structured data with version and description, and writes sitemap.xml
-     from the canonical URLs of all indexable pages.
+     from the canonical URLs of all indexable pages,
+  6. fingerprints every script and stylesheet a page loads (/site.js?v=<hash>):
+     Cloudflare lets browsers keep JS and CSS for four hours, so without a new
+     address per version returning visitors would run old code on new pages.
 
 Cloudflare Pages runs it as the build command with `_site` as the output
 directory; locally it feeds the "site" preview server.
 """
 import datetime
+import hashlib
 import html
 import json
 import os
@@ -143,6 +147,32 @@ def sitemap(lastmod, problems):
             + '\n'.join(urls) + '\n</urlset>\n')
 
 
+ASSET_REF = re.compile(r'((?:src|href)=")(/[A-Za-z0-9_./-]+\.(?:js|css))(")')
+
+
+def fingerprint_assets():
+    """Point every page at /file.js?v=<content hash> so each deploy's pages
+    fetch the scripts and styles that belong to them."""
+    hashes = {}
+
+    def versioned(m):
+        path = m.group(2)
+        if path not in hashes:
+            with open(os.path.join(OUT, path.lstrip('/')), 'rb') as f:
+                hashes[path] = hashlib.sha256(f.read()).hexdigest()[:10]
+        return m.group(1) + path + '?v=' + hashes[path] + m.group(3)
+
+    for dirpath, _, files in os.walk(OUT):
+        for fn in files:
+            if fn.endswith('.html'):
+                path = os.path.join(dirpath, fn)
+                with open(path, encoding='utf-8') as f:
+                    page = f.read()
+                with open(path, 'w', encoding='utf-8') as f:
+                    f.write(ASSET_REF.sub(versioned, page))
+    return len(hashes)
+
+
 def write(rel, text):
     path = os.path.join(OUT, rel)
     os.makedirs(os.path.dirname(path), exist_ok=True)
@@ -258,11 +288,13 @@ def main():
         for p in problems:
             print('ERROR: ' + p)
         sys.exit(1)
+    fingerprinted = fingerprint_assets()
 
     size = sum(os.path.getsize(os.path.join(dp, f)) for dp, _, fs in os.walk(OUT) for f in fs)
     print('cursorduck.com %s: %d models (%d seasonal), %d achievements, %d trick buttons, '
-          '%d hats, %d glasses -> _site/ (%d KB)'
-          % (manifest['version'], len(models), seasonal, achievements, tricks, hats, glasses, size // 1024))
+          '%d hats, %d glasses, %d fingerprinted assets -> _site/ (%d KB)'
+          % (manifest['version'], len(models), seasonal, achievements, tricks, hats, glasses,
+             fingerprinted, size // 1024))
 
 
 if __name__ == '__main__':
