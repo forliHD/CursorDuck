@@ -168,7 +168,7 @@ export async function translateIdea(env, idea) {
     let body = '';
     if (idea.body) {
       const bodyOut = await ask(env, plain, idea.body, 500);
-      body = cleanText(typeof bodyOut.response === 'string' ? bodyOut.response : '', 800);
+      body = cleanText(typeof bodyOut.response === 'string' ? bodyOut.response.replace(/^["\u201C\u201E']+|["\u201D\u201C']+$/g, '') : '', 800);
     }
     return { tr_title: title, tr_body: body };
   } catch (err) {
