@@ -114,36 +114,38 @@ export function publicIdea(row) {
 }
 
 // Ideas are shown in the visitor's language: the other language is filled in
-// by Workers AI (binding AI) once per idea. An instruction-tuned model beats the
-// plain translation models on tone ("she", "du"); no binding or a failed call
-// simply leaves the original, which the site shows as is.
+// by Workers AI (binding AI) once per idea. Title and body go into one call so
+// the model has context for the short headline; an instruction-tuned model
+// beats the plain translation models on tone ("she", "du"). No binding or a
+// failed call simply leaves the original, which the site shows as is.
 const LANG_NAME = { en: 'English', de: 'German' };
 const MODEL = '@cf/meta/llama-3.3-70b-instruct-fp8-fast';
 
-export async function translateText(env, text, from, to) {
-  if (!env.AI || !text) return null;
-  const system = 'You translate short feature ideas for Cursor Duck, a browser extension in which a little ' +
-    'duck follows the mouse pointer. Translate the user\'s text from ' + LANG_NAME[from] + ' to ' + LANG_NAME[to] +
-    '. Keep the meaning, the casual tone and the length. Address the reader informally (German: du). ' +
-    'The duck is female (German: sie, die Ente). Reply with the translation only: no quotes, notes or explanations.';
-  const out = await env.AI.run(MODEL, {
-    messages: [{ role: 'system', content: system }, { role: 'user', content: text }],
-    max_tokens: 400,
-    temperature: 0.2
-  });
-  let translated = out && typeof out.response === 'string' ? out.response.trim() : '';
-  translated = translated.replace(/^["\u201C\u201E']+|["\u201D\u201C']+$/g, '').trim();
-  return translated || null;
-}
-
 export async function translateIdea(env, idea) {
+  if (!env.AI || !idea.title) return null;
   const from = idea.lang === 'de' ? 'de' : 'en';
   const to = from === 'de' ? 'en' : 'de';
+  const system = 'You translate feature ideas for Cursor Duck, a browser extension in which a little duck ' +
+    'follows the mouse pointer. Translate the JSON the user sends from ' + LANG_NAME[from] + ' to ' + LANG_NAME[to] +
+    '. Keep the meaning, the casual tone and the length. Address the reader informally (German: du). ' +
+    'The duck is female (German: sie, die Ente). The title is a short headline: translate it as one and never ' +
+    'expand it. Reply with JSON only, in the shape {"title": "...", "body": "..."}; keep the body empty if it is empty.';
   try {
-    const title = await translateText(env, idea.title, from, to);
+    const out = await env.AI.run(MODEL, {
+      messages: [
+        { role: 'system', content: system },
+        { role: 'user', content: JSON.stringify({ title: idea.title, body: idea.body || '' }) }
+      ],
+      max_tokens: 600,
+      temperature: 0.1
+    });
+    const text = out && typeof out.response === 'string' ? out.response : '';
+    const match = text.match(/\{[\s\S]*\}/);
+    if (!match) return null;
+    const parsed = JSON.parse(match[0]);
+    const title = cleanText(parsed.title, 120);
     if (!title) return null;
-    const body = idea.body ? await translateText(env, idea.body, from, to) : '';
-    return { tr_title: cleanText(title, 120), tr_body: cleanText(body || '', 800) };
+    return { tr_title: title, tr_body: cleanText(parsed.body, 800) };
   } catch {
     return null;
   }
