@@ -18,7 +18,7 @@ export async function onRequestGet({ env }) {
   if (env.AI) {
     let done = 0;
     for (const row of results) {
-      if (row.tr_title || done >= 5) continue;
+      if (row.tr_title || done >= 3) continue;
       const tr = await translateIdea(env, row);
       if (!tr) continue;
       await storeTranslation(env, row.id, tr);

@@ -114,16 +114,25 @@ export function publicIdea(row) {
 }
 
 // Ideas are shown in the visitor's language: the other language is filled in
-// by Workers AI (binding AI) once per idea. No binding or a failed call simply
-// leaves the original, which the site shows as is.
-const LANG_NAME = { en: 'english', de: 'german' };
+// by Workers AI (binding AI) once per idea. An instruction-tuned model beats the
+// plain translation models on tone ("she", "du"); no binding or a failed call
+// simply leaves the original, which the site shows as is.
+const LANG_NAME = { en: 'English', de: 'German' };
+const MODEL = '@cf/meta/llama-3.3-70b-instruct-fp8-fast';
 
 export async function translateText(env, text, from, to) {
   if (!env.AI || !text) return null;
-  const out = await env.AI.run('@cf/meta/m2m100-1.2b', {
-    text, source_lang: LANG_NAME[from], target_lang: LANG_NAME[to]
+  const system = 'You translate short feature ideas for Cursor Duck, a browser extension in which a little ' +
+    'duck follows the mouse pointer. Translate the user\'s text from ' + LANG_NAME[from] + ' to ' + LANG_NAME[to] +
+    '. Keep the meaning, the casual tone and the length. Address the reader informally (German: du). ' +
+    'The duck is female (German: sie, die Ente). Reply with the translation only: no quotes, notes or explanations.';
+  const out = await env.AI.run(MODEL, {
+    messages: [{ role: 'system', content: system }, { role: 'user', content: text }],
+    max_tokens: 400,
+    temperature: 0.2
   });
-  const translated = out && typeof out.translated_text === 'string' ? out.translated_text.trim() : '';
+  let translated = out && typeof out.response === 'string' ? out.response.trim() : '';
+  translated = translated.replace(/^["\u201C\u201E']+|["\u201D\u201C']+$/g, '').trim();
   return translated || null;
 }
 
