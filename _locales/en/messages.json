@@ -276,6 +276,7 @@
   "uTitle": { "message": "Cursor Duck — Update 🎉" },
   "uH1": { "message": "Your duck has learned new tricks 🎉" },
   "uLead": { "message": "Here's what's in this update — try everything right on this page." },
+  "uLogTitle": { "message": "Reading along, selection snack & calm mode" },
   "uF1b": { "message": "Reading along & focus mode:" },
   "uF1t": { "message": "When you type into a text field she looks at the field instead of the cursor and won't doze off. On password fields and fullscreen videos she steps aside — and reports back with a “!” afterwards." },
   "uF2b": { "message": "Selection snack:" },

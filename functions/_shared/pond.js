@@ -108,6 +108,39 @@ export function hasLink(text) {
 export function publicIdea(row) {
   return {
     id: row.id, title: row.title, body: row.body, lang: row.lang,
-    status: row.status, votes: row.votes, version: row.version || null, created: row.created
+    status: row.status, votes: row.votes, version: row.version || null, created: row.created,
+    tr_title: row.tr_title || null, tr_body: row.tr_body || null
   };
+}
+
+// Ideas are shown in the visitor's language: the other language is filled in
+// by Workers AI (binding AI) once per idea. No binding or a failed call simply
+// leaves the original, which the site shows as is.
+const LANG_NAME = { en: 'english', de: 'german' };
+
+export async function translateText(env, text, from, to) {
+  if (!env.AI || !text) return null;
+  const out = await env.AI.run('@cf/meta/m2m100-1.2b', {
+    text, source_lang: LANG_NAME[from], target_lang: LANG_NAME[to]
+  });
+  const translated = out && typeof out.translated_text === 'string' ? out.translated_text.trim() : '';
+  return translated || null;
+}
+
+export async function translateIdea(env, idea) {
+  const from = idea.lang === 'de' ? 'de' : 'en';
+  const to = from === 'de' ? 'en' : 'de';
+  try {
+    const title = await translateText(env, idea.title, from, to);
+    if (!title) return null;
+    const body = idea.body ? await translateText(env, idea.body, from, to) : '';
+    return { tr_title: cleanText(title, 120), tr_body: cleanText(body || '', 800) };
+  } catch {
+    return null;
+  }
+}
+
+export async function storeTranslation(env, id, tr) {
+  await env.DB.prepare('UPDATE ideas SET tr_title = ?2, tr_body = ?3 WHERE id = ?1')
+    .bind(id, tr.tr_title, tr.tr_body).run();
 }

@@ -10,8 +10,9 @@ This script
   3. writes _site/data.js with the version, the model/achievement/trick counts,
      the model names in both languages (from _locales/) and the German site
      strings (site/de.json),
-  4. checks that every data-i18n key used in the HTML has a German string, that
-     releases.json is well-formed and that its newest entry matches manifest.json.
+  4. checks that every data-i18n key used in the HTML has a German string and
+     that releases.json is well-formed; when the newest release is missing from
+     it, the entry is generated from the update page strings (tools/release_log.py).
 
 Cloudflare Pages runs it as the build command with `_site` as the output
 directory; locally it feeds the "site" preview server.
@@ -125,15 +126,22 @@ def main():
         problems.append('German JS strings missing for: ' + ', '.join(js_missing))
 
     releases = json.loads(read('site', 'releases.json'))
+    if not releases or releases[0]['version'] != manifest['version']:
+        # tools/build.py archives the entry with the release commit; until then
+        # the update page's strings stand in, so a deploy never waits for the log
+        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+        import release_log
+        releases.insert(0, release_log.generate(manifest['version']))
+        with open(os.path.join(OUT, 'releases.json'), 'w', encoding='utf-8') as f:
+            json.dump(releases, f, ensure_ascii=False, indent=2)
+        print('note: duck log entry for %s generated from the update page strings '
+              '(python3 tools/release_log.py archives it)' % manifest['version'])
     for r in releases:
         for k in ('version', 'date', 'title', 'items'):
             if k not in r:
                 problems.append('release %s lacks "%s"' % (r.get('version', '?'), k))
         if len(r.get('items', {}).get('en', [])) != len(r.get('items', {}).get('de', [])):
             problems.append('release %s: en/de item count differs' % r.get('version', '?'))
-    if releases and releases[0]['version'] != manifest['version']:
-        problems.append('releases.json starts with %s but manifest.json says %s '
-                        '(add the new release to the duck log)' % (releases[0]['version'], manifest['version']))
 
     if problems:
         for p in problems:

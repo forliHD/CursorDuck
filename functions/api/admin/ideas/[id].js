@@ -1,6 +1,9 @@
 // POST   /api/admin/ideas/:id — set status/version, optionally fix title/body
+//                                or refresh the translation ({ translate: true })
 // DELETE /api/admin/ideas/:id — remove an idea and its votes
-import { json, fail, isAdmin, readJson, cleanText, STATUSES } from '../../../_shared/pond.js';
+import {
+  json, fail, isAdmin, readJson, cleanText, STATUSES, translateIdea, storeTranslation
+} from '../../../_shared/pond.js';
 
 export async function onRequestPost({ request, env, params }) {
   if (!isAdmin(request, env)) return fail('auth', 401);
@@ -17,7 +20,13 @@ export async function onRequestPost({ request, env, params }) {
     'UPDATE ideas SET status = ?2, version = ?3, title = COALESCE(?4, title), body = COALESCE(?5, body) WHERE id = ?1'
   ).bind(id, body.status, version, title, text).run();
   if (!result.meta.changes) return fail('missing', 404);
-  return json({ ok: true });
+  let translated = false;
+  if (body.translate === true || title !== null || text !== null) {
+    const row = await env.DB.prepare('SELECT id, title, body, lang FROM ideas WHERE id = ?1').bind(id).first();
+    const tr = row ? await translateIdea(env, row) : null;
+    if (tr) { await storeTranslation(env, id, tr); translated = true; }
+  }
+  return json({ ok: true, translated });
 }
 
 export async function onRequestDelete({ request, env, params }) {

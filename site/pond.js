@@ -54,7 +54,10 @@
     adminEditTitle: 'Title',
     adminEditBody: 'Details',
     adminSure: 'Really delete?',
-    pondIdeasGroup: 'Ideas'
+    pondIdeasGroup: 'Ideas',
+    pondTranslated: 'automatically translated',
+    pondOriginal: 'Original:',
+    adminTranslate: 'Translate'
   };
 
   function lang() { return doc.documentElement.lang === 'de' ? 'de' : 'en'; }
@@ -229,6 +232,7 @@
       });
     }
     if (idea.status !== 'declined') add(T('adminDecline'), function () { adminSet(idea, 'declined'); });
+    add(T('adminTranslate'), function () { adminSet(idea, idea.status, { translate: true, version: idea.version || '' }); });
     add(T('adminEdit'), function () {
       var t = window.prompt(T('adminEditTitle'), idea.title);
       if (t === null) return;
@@ -260,8 +264,15 @@
       return new Intl.DateTimeFormat(lang() === 'de' ? 'de-DE' : 'en-GB', { day: 'numeric', month: 'short', year: 'numeric' }).format(new Date(ms));
     } catch (e) { return ''; }
   }
+  // the idea in the visitor's language: the stored translation when the
+  // submitter wrote in the other one, the original otherwise
+  function display(idea) {
+    if (idea.lang !== lang() && idea.tr_title) return { title: idea.tr_title, body: idea.tr_body || '', translated: true };
+    return { title: idea.title, body: idea.body || '', translated: false };
+  }
   function pad(idea) {
     var art = el('article', 'pad ' + idea.status);
+    var shown = display(idea);
     var btn = el('button', 'crumb' + (voted[idea.id] ? ' did' : ''));
     btn.type = 'button';
     btn.appendChild(doc.createTextNode('🍞 '));
@@ -273,15 +284,19 @@
     btn.onclick = function () { vote(idea, btn); };
     art.appendChild(btn);
     var body = el('div', 'pad-body');
-    body.appendChild(el('h3', '', idea.title));
-    if (idea.body) body.appendChild(el('p', '', idea.body));
+    body.appendChild(el('h3', '', shown.title));
+    if (shown.body) body.appendChild(el('p', '', shown.body));
     var meta = el('p', 'pad-meta');
     if (idea.status === 'planned') meta.appendChild(el('span', 'badge planned', T('pondPlanned')));
     if (idea.status === 'built') meta.appendChild(el('span', 'badge built', T('pondBuilt').replace('{v}', idea.version || '')));
     if (idea.status === 'pending') meta.appendChild(el('span', 'badge pending', T('adminPending')));
     meta.appendChild(doc.createTextNode((meta.childNodes.length ? ' · ' : '') + fmtDate(idea.created) +
+      (shown.translated ? ' · ' + T('pondTranslated') : '') +
       (adminToken ? ' · ' + idea.lang.toUpperCase() : '')));
     body.appendChild(meta);
+    if (adminToken && shown.translated) {
+      body.appendChild(el('p', 'pad-orig', T('pondOriginal') + ' ' + idea.title + (idea.body ? ' — ' + idea.body : '')));
+    }
     if (adminToken) body.appendChild(adminActions(idea));
     art.appendChild(body);
     return art;

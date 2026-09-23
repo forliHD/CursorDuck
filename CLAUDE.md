@@ -63,15 +63,20 @@ version, counts and model names); Cloudflare Pages runs the same command with
 `_site` as output directory. The site runs the real engine, so it never needs
 screenshots or videos of the duck.
 
-Release checklist addition: add the new version to `site/releases.json` (both
-languages) in the release commit; the build fails while the newest entry does
-not match `manifest.json`. `site/og.png` is the social card and the site's only
-raster image; regenerate it with `demo/og.html` when the duck's look changes.
+The duck log (`site/releases.json`) fills itself: `tools/build.py` archives the
+current version's entry from the update page strings (`uF<n>b`/`uF<n>t` and the
+short `uLogTitle` in both locale files), so keeping the update page current is
+the whole release step; the site build generates the same entry on the fly if
+it is still missing. `site/og.png` is the social card and the site's only raster
+image; regenerate it with `demo/og.html` when the duck's look changes.
 
 The wishing pond (idea board) is the site's only backend: Cloudflare Pages
 Functions in `functions/` (modern ES modules, Workers runtime; the ES5 rule above
 is for the extension) with a D1 database (`migrations/`), Turnstile against bots
-and a moderation queue (admin mode on the start page: footer link “Admin” or `?admin`). Production bindings `DB`,
+and a moderation queue (admin mode on the start page: footer link “Admin” or `?admin`).
+Ideas are shown in the visitor's language: Workers AI (binding `AI`, model
+m2m100) translates each idea once, at submission, after admin edits and lazily
+for rows that still lack a translation. Production bindings `DB`,
 `TURNSTILE_SECRET`, `VOTER_SECRET`, `ADMIN_TOKEN` and the build variable
 `TURNSTILE_SITE_KEY` are configured in the Cloudflare dashboard, never in the
 repo. Locally, `wrangler.local.toml` feeds the D1 CLI (migrations, seed) and

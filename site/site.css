@@ -420,6 +420,7 @@ a { color: var(--accent-deep); }
 .pad h3 { margin: 0; font: 600 20px var(--font-display); }
 .pad p { margin: 4px 0 0; color: var(--muted); white-space: pre-line; }
 .pad-meta { font-size: 13px; }
+.pad .pad-orig { font-size: 13px; font-style: italic; }
 .badge.planned { background: var(--accent); }
 .badge.built { background: #2e9e5b; }
 .admin-bar {

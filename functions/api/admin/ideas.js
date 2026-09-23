@@ -7,7 +7,7 @@ export async function onRequestGet({ request, env }) {
   const status = new URL(request.url).searchParams.get('status') || 'pending';
   if (!STATUSES.includes(status)) return fail('invalid');
   const { results } = await env.DB.prepare(
-    'SELECT id, title, body, lang, status, votes, version, created FROM ideas WHERE status = ?1 ORDER BY created DESC LIMIT 500'
+    'SELECT id, title, body, lang, status, votes, version, created, tr_title, tr_body FROM ideas WHERE status = ?1 ORDER BY created DESC LIMIT 500'
   ).bind(status).all();
   const counts = await env.DB.prepare('SELECT status, COUNT(*) AS n FROM ideas GROUP BY status').all();
   const byStatus = {};

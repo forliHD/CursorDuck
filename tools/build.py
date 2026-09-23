@@ -80,6 +80,11 @@ def main():
         chrome = json.load(fh)
     version = chrome["version"]
     os.makedirs(DIST, exist_ok=True)
+    # the website's duck log gets this version's entry from the update page strings
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    import release_log
+    if release_log.archive(version):
+        print("duck log: added", version, "to site/releases.json (commit it with the release)")
     build("chrome", chrome, version)
     build("firefox", firefox_manifest(chrome), version)
 

@@ -186,6 +186,9 @@
     "adminEditTitle": "Titel",
     "adminEditBody": "Details",
     "adminSure": "Wirklich löschen?",
-    "pondIdeasGroup": "Ideen"
+    "pondIdeasGroup": "Ideen",
+    "pondTranslated": "automatisch übersetzt",
+    "pondOriginal": "Original:",
+    "adminTranslate": "Übersetzen"
   }
 }
