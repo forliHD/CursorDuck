@@ -121,32 +121,58 @@ export function publicIdea(row) {
 const LANG_NAME = { en: 'English', de: 'German' };
 const MODEL = '@cf/meta/llama-3.3-70b-instruct-fp8-fast';
 
+function parseTranslation(out) {
+  let raw = out && out.response !== undefined ? out.response : out;
+  if (raw && typeof raw === 'object') return raw;
+  if (typeof raw !== 'string') return null;
+  const attempts = [raw.trim(), raw.replace(/```[a-z]*/gi, '').trim()];
+  const braces = raw.match(/\{[\s\S]*?\}/);
+  if (braces) attempts.push(braces[0]);
+  for (const candidate of attempts) {
+    try { return JSON.parse(candidate); } catch { /* next */ }
+  }
+  return null;
+}
+
+async function ask(env, system, user, maxTokens) {
+  return env.AI.run(MODEL, {
+    messages: [{ role: 'system', content: system }, { role: 'user', content: user }],
+    max_tokens: maxTokens,
+    temperature: 0.1
+  });
+}
+
 export async function translateIdea(env, idea) {
   if (!env.AI || !idea.title) return null;
   const from = idea.lang === 'de' ? 'de' : 'en';
   const to = from === 'de' ? 'en' : 'de';
-  const system = 'You translate feature ideas for Cursor Duck, a browser extension in which a little duck ' +
-    'follows the mouse pointer. Translate the JSON the user sends from ' + LANG_NAME[from] + ' to ' + LANG_NAME[to] +
-    '. Keep the meaning, the casual tone and the length. Address the reader informally (German: du). ' +
-    'The duck is female (German: sie, die Ente). The title is a short headline: translate it as one and never ' +
-    'expand it. Reply with JSON only, in the shape {"title": "...", "body": "..."}; keep the body empty if it is empty.';
+  const tone = 'Keep the meaning, the casual tone and the length. Address the reader informally (German: du). ' +
+    'The duck is female (German: sie, die Ente).';
+  const intro = 'You translate feature ideas for Cursor Duck, a browser extension in which a little duck ' +
+    'follows the mouse pointer. Translate from ' + LANG_NAME[from] + ' to ' + LANG_NAME[to] + '. ' + tone;
   try {
-    const out = await env.AI.run(MODEL, {
-      messages: [
-        { role: 'system', content: system },
-        { role: 'user', content: JSON.stringify({ title: idea.title, body: idea.body || '' }) }
-      ],
-      max_tokens: 600,
-      temperature: 0.1
-    });
-    const text = out && typeof out.response === 'string' ? out.response : '';
-    const match = text.match(/\{[\s\S]*\}/);
-    if (!match) return null;
-    const parsed = JSON.parse(match[0]);
-    const title = cleanText(parsed.title, 120);
+    // one call for both fields: the body gives the short headline its context
+    const out = await ask(env, intro + ' The title is a short headline: translate it as one and never expand it. ' +
+      'Reply with JSON only, in the shape {"title": "...", "body": "..."}; keep the body empty if it is empty.',
+      JSON.stringify({ title: idea.title, body: idea.body || '' }), 600);
+    const parsed = parseTranslation(out);
+    if (parsed && typeof parsed.title === 'string') {
+      const title = cleanText(parsed.title, 120);
+      if (title) return { tr_title: title, tr_body: cleanText(typeof parsed.body === 'string' ? parsed.body : '', 800) };
+    }
+    // the model did not play along with JSON: plain text, one field per call
+    const plain = intro + ' Reply with the translation only: no quotes, notes or explanations.';
+    const titleOut = await ask(env, plain + ' The text is a short headline; keep it one.', idea.title, 120);
+    const title = cleanText(typeof titleOut.response === 'string' ? titleOut.response.replace(/^["\u201C\u201E']+|["\u201D\u201C']+$/g, '') : '', 120);
     if (!title) return null;
-    return { tr_title: title, tr_body: cleanText(parsed.body, 800) };
-  } catch {
+    let body = '';
+    if (idea.body) {
+      const bodyOut = await ask(env, plain, idea.body, 500);
+      body = cleanText(typeof bodyOut.response === 'string' ? bodyOut.response : '', 800);
+    }
+    return { tr_title: title, tr_body: body };
+  } catch (err) {
+    console.error('translateIdea failed', err && err.message ? err.message : err);
     return null;
   }
 }
