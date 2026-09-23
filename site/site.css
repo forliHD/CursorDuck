@@ -337,6 +337,9 @@ a { color: var(--accent-deep); }
 .prose .meta { color: var(--muted); }
 .prose .note { background: var(--accent-soft); border-radius: 12px; padding: 12px 16px; }
 .prose hr { border: 0; border-top: 1px solid var(--line); margin: 48px 0; }
+.notfound { text-align: center; padding-top: 12vh; }
+.notfound .code { margin: 0 0 6px; font: 600 clamp(64px, 12vw, 110px)/1 var(--font-display); color: var(--accent); }
+.notfound .btn { margin-top: 10px; }
 
 /* ── Responsive & motion ────────────────────────────────────────── */
 /* ── Menu (hamburger below 900px), active section, back to top ──── */

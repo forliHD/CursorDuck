@@ -80,6 +80,9 @@
   $$('[data-i18n]').forEach(function (e) { EN[e.getAttribute('data-i18n')] = e.textContent; });
   $$('[data-i18n-ph]').forEach(function (e) { EN['ph:' + e.getAttribute('data-i18n-ph')] = e.getAttribute('placeholder') || ''; });
   $$('[data-i18n-content]').forEach(function (e) { EN['content:' + e.getAttribute('data-i18n-content')] = e.getAttribute('content') || ''; });
+  // /de/ is pre-rendered in German, so the start page's English comes from the build
+  var EN_BUILT = (DATA.en && DATA.en.dom) || {};
+  Object.keys(EN_BUILT).forEach(function (k) { EN[k] = EN_BUILT[k]; });
 
   function T(key) {
     if (lang === 'de' && DE.js && DE.js[key]) return DE.js[key];
@@ -92,6 +95,7 @@
   function detectLang() {
     var q = /[?&]lang=(de|en)(?:&|$)/.exec(location.search);
     if (q) return q[1];
+    if (/^\/de(\/|$)/.test(location.pathname)) return 'de';   // /de/ is the German start page
     var saved = store('cd-lang');
     if (saved === 'de' || saved === 'en') return saved;
     var nl = (navigator.languages && navigator.languages[0]) || navigator.language || '';
@@ -124,6 +128,18 @@
     renderTheme();
     renderMenuLabels();
     try { doc.dispatchEvent(new CustomEvent('cd:lang', { detail: lang })); } catch (e) { /* old browser */ }
+  }
+
+  // The start page exists as / (English) and /de/ (German, for search engines);
+  // after a switch the address follows, so a reload or a shared link keeps it.
+  // Privacy, imprint and 404 are one bilingual page and keep their address.
+  function syncUrl() {
+    var path = location.pathname;
+    if (path !== '/' && !/^\/de\/?$/.test(path)) return;
+    var target = lang === 'de' ? '/de/' : '/';
+    var search = location.search.replace(/([?&])lang=(?:de|en)(&|$)/, '$1').replace(/[?&]$/, '');
+    if (path === target && search === location.search) return;
+    try { history.replaceState(null, '', target + search + location.hash); } catch (e) { /* stays put */ }
   }
 
   // ── Day / night ───────────────────────────────────────────────
@@ -199,7 +215,7 @@
       model: 'mallard', size: 1.1, ducklings: 2, sound: soundOn, volume: 0.3,
       sleepAfter: 20, reduceMotion: reduceMotion()
     });
-    engine.sound.base = 'audio/';
+    engine.sound.base = '/audio/';
     try { engine.sound.preload(); } catch (e) { /* synth fallback */ }
     engine.mount(doc.body);
     engine.start();
@@ -353,7 +369,7 @@
   var releases = null;
   function loadReleases() {
     if (!window.fetch || !$('#timeline')) return;
-    fetch('releases.json')
+    fetch('/releases.json')
       .then(function (r) { return r.json(); })
       .then(function (j) { releases = j; renderTimeline(); })
       .catch(function () { /* the GitHub link in the markup stays */ });
@@ -589,7 +605,7 @@
     renderStats();
     loadReleases();
     var lb = $('#langBtn');
-    if (lb) lb.onclick = function () { var next = lang === 'de' ? 'en' : 'de'; store('cd-lang', next); applyLang(next); };
+    if (lb) lb.onclick = function () { var next = lang === 'de' ? 'en' : 'de'; store('cd-lang', next); applyLang(next); syncUrl(); };
     var tb = $('#themeBtn');
     if (tb) tb.onclick = toggleTheme;
     var bb = $('#beatBtn');

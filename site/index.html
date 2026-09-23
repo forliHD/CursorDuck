@@ -3,44 +3,74 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title data-i18n="pageTitle">Cursor Duck – a duck for your cursor</title>
-<meta name="description" data-i18n-content="metaDesc" content="A free browser extension for Chrome, Firefox and Edge: a little duck swims after your mouse pointer, lets you pet and feed her, naps while you read and dances when music plays. No tracking, no data.">
+<title data-i18n="pageTitle">Cursor Duck – a little duck that follows your mouse</title>
+<meta name="description" data-i18n-content="metaDesc" content="Free browser extension for Chrome, Firefox and Edge: a little duck follows your mouse pointer, naps while you read and dances to music. No tracking.">
 <link rel="canonical" href="https://cursorduck.com/">
 <link rel="alternate" hreflang="en" href="https://cursorduck.com/">
-<link rel="alternate" hreflang="de" href="https://cursorduck.com/?lang=de">
+<link rel="alternate" hreflang="de" href="https://cursorduck.com/de/">
 <link rel="alternate" hreflang="x-default" href="https://cursorduck.com/">
 <link rel="alternate" type="application/atom+xml" title="Cursor Duck releases" href="https://github.com/forliHD/CursorDuck/releases.atom">
 <meta name="theme-color" content="#f3f8fd" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#0e1823" media="(prefers-color-scheme: dark)">
-<link rel="icon" href="favicon.svg" type="image/svg+xml">
-<link rel="icon" href="icons/icon32.png" sizes="32x32" type="image/png">
-<link rel="apple-touch-icon" href="icons/icon128.png">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="/icons/icon48.png" sizes="48x48" type="image/png">
+<link rel="icon" href="/icons/icon32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="/icons/icon128.png">
+<link rel="preload" href="/fonts/fredoka-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="/fonts/nunito-latin.woff2" as="font" type="font/woff2" crossorigin>
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Cursor Duck">
-<meta property="og:title" content="Cursor Duck – a duck for your cursor">
-<meta property="og:description" data-i18n-content="metaDesc" content="A free browser extension for Chrome, Firefox and Edge: a little duck swims after your mouse pointer, lets you pet and feed her, naps while you read and dances when music plays. No tracking, no data.">
+<meta property="og:locale" content="en_US">
+<meta property="og:locale:alternate" content="de_DE">
+<meta property="og:title" data-i18n-content="pageTitle" content="Cursor Duck – a little duck that follows your mouse">
+<meta property="og:description" data-i18n-content="metaDesc" content="Free browser extension for Chrome, Firefox and Edge: a little duck follows your mouse pointer, naps while you read and dances to music. No tracking.">
 <meta property="og:url" content="https://cursorduck.com/">
 <meta property="og:image" content="https://cursorduck.com/og.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
+<meta property="og:image:alt" data-i18n-content="ogImageAlt" content="Cursor Duck: a mallard and two ducklings swimming on a pond">
 <meta name="twitter:card" content="summary_large_image">
-<link rel="stylesheet" href="site.css">
-<script src="theme.js"></script>
+<link rel="stylesheet" href="/site.css">
+<script src="/theme.js"></script>
+<!-- tools/site_build.py adds softwareVersion and the page's description -->
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",
-  "@type": "SoftwareApplication",
-  "name": "Cursor Duck",
-  "url": "https://cursorduck.com/",
-  "applicationCategory": "BrowserApplication",
-  "operatingSystem": "Chrome, Firefox, Edge",
-  "offers": { "@type": "Offer", "price": "0", "priceCurrency": "EUR" },
-  "author": { "@type": "Person", "name": "Lucas Reiser" },
-  "publisher": { "@type": "Organization", "name": "IT-Reiser" },
-  "downloadUrl": [
-    "https://chromewebstore.google.com/detail/hohfcnokdpmjggmicebcjalgjcfpfblg",
-    "https://addons.mozilla.org/firefox/addon/cursor-duck/",
-    "https://microsoftedge.microsoft.com/addons/detail/cursor-duck/bflhnhaiomokfncloblfonafkeomfabj"
+  "@graph": [
+    {
+      "@type": "WebSite",
+      "@id": "https://cursorduck.com/#website",
+      "name": "Cursor Duck",
+      "alternateName": "CursorDuck",
+      "url": "https://cursorduck.com/",
+      "inLanguage": ["en", "de"],
+      "publisher": { "@id": "https://cursorduck.com/#publisher" }
+    },
+    {
+      "@type": "Organization",
+      "@id": "https://cursorduck.com/#publisher",
+      "name": "IT-Reiser"
+    },
+    {
+      "@type": "SoftwareApplication",
+      "@id": "https://cursorduck.com/#app",
+      "name": "Cursor Duck",
+      "url": "https://cursorduck.com/",
+      "image": "https://cursorduck.com/og.png",
+      "applicationCategory": "BrowserApplication",
+      "operatingSystem": "Chrome, Firefox, Edge",
+      "inLanguage": ["en", "de"],
+      "isAccessibleForFree": true,
+      "offers": { "@type": "Offer", "price": "0", "priceCurrency": "EUR" },
+      "author": { "@type": "Person", "name": "Lucas Reiser" },
+      "publisher": { "@id": "https://cursorduck.com/#publisher" },
+      "downloadUrl": [
+        "https://chromewebstore.google.com/detail/hohfcnokdpmjggmicebcjalgjcfpfblg",
+        "https://addons.mozilla.org/firefox/addon/cursor-duck/",
+        "https://microsoftedge.microsoft.com/addons/detail/cursor-duck/bflhnhaiomokfncloblfonafkeomfabj"
+      ],
+      "sameAs": ["https://github.com/forliHD/CursorDuck"]
+    }
   ]
 }
 </script>
@@ -343,7 +373,7 @@
     <a href="https://microsoftedge.microsoft.com/addons/detail/cursor-duck/bflhnhaiomokfncloblfonafkeomfabj" rel="noopener">Edge Add-ons</a>
     <a href="/privacy" data-i18n="footPrivacy">Privacy</a>
     <a href="/imprint" data-i18n="footImprint">Legal notice</a>
-    <a href="?admin" id="adminLink" data-i18n="footAdmin">Admin</a>
+    <a href="?admin" id="adminLink" rel="nofollow" data-i18n="footAdmin">Admin</a>
     <p class="foot-note" data-i18n="footMade">Made in Germany with a lot of quacking. Sounds are CC0 recordings, everything else is drawn live.</p>
   </div>
 </footer>
@@ -351,12 +381,12 @@
 <button class="totop" id="toTop" type="button">↑</button>
 <audio id="beat" aria-hidden="true"></audio>
 
-<script src="src/models.js"></script>
-<script src="src/render.js"></script>
-<script src="src/effects.js"></script>
-<script src="src/engine.js"></script>
-<script src="data.js"></script>
-<script src="site.js"></script>
-<script src="pond.js"></script>
+<script src="/src/models.js"></script>
+<script src="/src/render.js"></script>
+<script src="/src/effects.js"></script>
+<script src="/src/engine.js"></script>
+<script src="/data.js"></script>
+<script src="/site.js"></script>
+<script src="/pond.js"></script>
 </body>
 </html>

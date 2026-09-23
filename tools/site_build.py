@@ -8,16 +8,21 @@ This script
   1. copies site/ to _site/,
   2. adds src/{models,render,effects,engine}.js, audio/ and icons/,
   3. writes _site/data.js with the version, the model/achievement/trick counts,
-     the model names in both languages (from _locales/) and the German site
-     strings (site/de.json),
+     the model names in both languages (from _locales/) and the site strings
+     (English from the markup, German from site/de.json),
   4. checks that every data-i18n key used in the HTML has a German string and
      that releases.json is well-formed; when the newest release is missing from
-     it, the entry is generated from the update page strings (tools/release_log.py).
+     it, the entry is generated from the update page strings (tools/release_log.py),
+  5. pre-renders the German start page as _site/de/index.html (search engines
+     index / and /de/ as the two language versions, linked by hreflang), fills
+     the structured data with version and description, and writes sitemap.xml
+     from the canonical URLs of all indexable pages.
 
 Cloudflare Pages runs it as the build command with `_site` as the output
 directory; locally it feeds the "site" preview server.
 """
 import datetime
+import html
 import json
 import os
 import re
@@ -28,6 +33,9 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SITE = os.path.join(ROOT, 'site')
 OUT = os.path.join(ROOT, '_site')
 ENGINE = ['models.js', 'render.js', 'effects.js', 'engine.js']
+BASE = 'https://cursorduck.com'
+# the start page's language versions, as index.html declares them with hreflang
+START_PAGES = (('en', '/'), ('de', '/de/'), ('x-default', '/'))
 
 
 def read(*parts):
@@ -49,6 +57,97 @@ def names_from(locale):
         if key.startswith('model_'):
             out[key[6:].replace('_', '-')] = val['message']
     return out
+
+
+TAG = re.compile(r'<([a-zA-Z][a-zA-Z0-9]*)(\s[^>]*)?>')
+LD = re.compile(r'<script type="application/ld\+json">(.*?)</script>', re.S)
+
+
+def translate_page(page, dom):
+    """Do at build time what site.js does in the browser: swap the text of every
+    data-i18n element and the data-i18n-ph / data-i18n-content attributes.
+    Returns the translated page and the English strings it replaced, keyed the
+    way site.js keys them."""
+    out, en, pos = [], {}, 0
+    for m in TAG.finditer(page):
+        if m.start() < pos:
+            continue
+        attrs = m.group(2) or ''
+        for kind, target in (('ph', 'placeholder'), ('content', 'content')):
+            key = re.search(r'\sdata-i18n-%s="([^"]+)"' % kind, attrs)
+            if key:
+                val = re.search(r'\s%s="([^"]*)"' % target, attrs)
+                en[kind + ':' + key.group(1)] = html.unescape(val.group(1))
+                new = dom.get(key.group(1), en[kind + ':' + key.group(1)])
+                attrs = attrs[:val.start(1)] + html.escape(new) + attrs[val.end(1):]
+        out.append(page[pos:m.start()] + '<' + m.group(1) + attrs + '>')
+        pos = m.end()
+        key = re.search(r'\sdata-i18n="([^"]+)"', attrs)
+        if key:
+            close = page.index('</', pos)
+            if '<' in page[pos:close] or not page.startswith('</' + m.group(1) + '>', close):
+                raise SystemExit('ERROR: data-i18n="%s" must hold plain text only' % key.group(1))
+            en[key.group(1)] = html.unescape(page[pos:close])
+            out.append(html.escape(dom.get(key.group(1), en[key.group(1)]), quote=False))
+            pos = close
+    out.append(page[pos:])
+    return ''.join(out), en
+
+
+def german_start_page(page, de):
+    """The pre-rendered German start page: translated text plus its own address."""
+    for old, new in (('<html lang="en">', '<html lang="de">'),
+                     ('<link rel="canonical" href="%s/">' % BASE, '<link rel="canonical" href="%s/de/">' % BASE),
+                     ('<meta property="og:url" content="%s/">' % BASE, '<meta property="og:url" content="%s/de/">' % BASE),
+                     ('<meta property="og:locale" content="en_US">', '<meta property="og:locale" content="de_DE">'),
+                     ('<meta property="og:locale:alternate" content="de_DE">',
+                      '<meta property="og:locale:alternate" content="en_US">'),
+                     ('data-lang-toggle>DE</button>', 'data-lang-toggle>EN</button>'),
+                     ('>🎶 Play a beat</button>', '>🎶 %s</button>' % de['js']['beatPlay'])):
+        if page.count(old) != 1:
+            raise SystemExit('ERROR: index.html should contain %r exactly once' % old)
+        page = page.replace(old, new)
+    return page
+
+
+def with_structured_data(page, version, description):
+    """Complete the JSON-LD block with what changes per release and language."""
+    m = LD.search(page)
+    ld = json.loads(m.group(1))
+    app = next(item for item in ld['@graph'] if item['@type'] == 'SoftwareApplication')
+    app['softwareVersion'] = version
+    app['description'] = description
+    return page[:m.start(1)] + '\n' + json.dumps(ld, ensure_ascii=False, indent=2) + '\n' + page[m.end(1):]
+
+
+def sitemap(lastmod, problems):
+    """Both start pages (with their hreflang set) plus every other page that
+    may be indexed, by its canonical URL. noindex pages stay out."""
+    alternates = ''.join('\n    <xhtml:link rel="alternate" hreflang="%s" href="%s"/>' % (hl, BASE + path)
+                         for hl, path in START_PAGES)
+    urls = ['  <url>\n    <loc>%s</loc>\n    <lastmod>%s</lastmod>%s\n  </url>' % (BASE + path, lastmod, alternates)
+            for path in ('/', '/de/')]
+    for fn in sorted(os.listdir(SITE)):
+        if not fn.endswith('.html') or fn in ('index.html', '404.html'):
+            continue
+        page = read('site', fn)
+        if re.search(r'<meta name="robots" content="[^"]*noindex', page):
+            continue
+        canonical = re.search(r'<link rel="canonical" href="([^"]+)">', page)
+        if not canonical:
+            problems.append('%s has neither a canonical link nor noindex' % fn)
+            continue
+        urls.append('  <url>\n    <loc>%s</loc>\n  </url>' % canonical.group(1))
+    return ('<?xml version="1.0" encoding="UTF-8"?>\n'
+            '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">\n'
+            + '\n'.join(urls) + '\n</urlset>\n')
+
+
+def write(rel, text):
+    path = os.path.join(OUT, rel)
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, 'w', encoding='utf-8') as f:
+        f.write(text)
 
 
 def main():
@@ -89,6 +188,8 @@ def main():
     if not turnstile_key:
         print('note: TURNSTILE_SITE_KEY not set, the wishing pond stays hidden on this deployment')
     de = json.loads(read('site', 'de.json'))
+    index = read('site', 'index.html')
+    index_de, en_dom = translate_page(index, de['dom'])
     data = {
         'meta': {
             'version': manifest['version'],
@@ -99,6 +200,7 @@ def main():
             'turnstileSiteKey': turnstile_key
         },
         'names': names,
+        'en': {'dom': en_dom},
         'de': de
     }
     with open(os.path.join(OUT, 'data.js'), 'w', encoding='utf-8') as f:
@@ -142,6 +244,15 @@ def main():
                 problems.append('release %s lacks "%s"' % (r.get('version', '?'), k))
         if len(r.get('items', {}).get('en', [])) != len(r.get('items', {}).get('de', [])):
             problems.append('release %s: en/de item count differs' % r.get('version', '?'))
+
+    declared = set(re.findall(r'<link rel="alternate" hreflang="([^"]+)" href="([^"]+)">', index))
+    if declared != set((hl, BASE + path) for hl, path in START_PAGES):
+        problems.append('the hreflang links in index.html differ from START_PAGES')
+    write('index.html', with_structured_data(index, manifest['version'], en_dom['content:metaDesc']))
+    write(os.path.join('de', 'index.html'),
+          with_structured_data(german_start_page(index_de, de), manifest['version'], de['dom']['metaDesc']))
+    # the start pages change with every release: version, duck log, counts
+    write('sitemap.xml', sitemap(releases[0]['date'], problems))
 
     if problems:
         for p in problems:

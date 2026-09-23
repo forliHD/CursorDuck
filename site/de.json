@@ -1,9 +1,11 @@
 {
   "dom": {
-    "pageTitle": "Cursor Duck – eine Ente für deinen Cursor",
+    "pageTitle": "Cursor Duck – eine kleine Ente, die deinem Mauszeiger folgt",
     "pageTitlePrivacy": "Datenschutz – Cursor Duck",
     "pageTitleImprint": "Impressum – Cursor Duck",
-    "metaDesc": "Kostenlose Browser-Erweiterung für Chrome, Firefox und Edge: Eine kleine Ente schwimmt deinem Mauszeiger hinterher, lässt sich streicheln und füttern, macht ein Nickerchen, während du liest, und tanzt, wenn Musik läuft. Kein Tracking, keine Daten.",
+    "pageTitle404": "Seite nicht gefunden – Cursor Duck",
+    "metaDesc": "Kostenlose Browser-Erweiterung für Chrome, Firefox und Edge: Eine kleine Ente folgt deinem Mauszeiger, schläft beim Lesen und tanzt zu Musik. Kein Tracking.",
+    "ogImageAlt": "Cursor Duck: eine Stockente und zwei Küken schwimmen auf einem Teich",
     "skip": "Zum Inhalt springen",
     "navFeatures": "Funktionen",
     "navDucks": "Enten",
@@ -112,7 +114,10 @@
     "adminTokenLabel": "Admin-Token",
     "adminLoginBtn": "Anmelden",
     "adminHint": "Der Token aus den Cloudflare-Einstellungen. Er bleibt nur in diesem Tab.",
-    "footAdmin": "Admin"
+    "footAdmin": "Admin",
+    "nfTitle": "Diese Seite ist weggeschwommen.",
+    "nfText": "Vielleicht ist der Link veraltet, oder die Ente hat ihn für Brot gehalten. Der Teich ist gleich hier:",
+    "nfHome": "Zurück zum Teich"
   },
   "js": {
     "addTo": "Zu {browser} hinzufügen",

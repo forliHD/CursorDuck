@@ -63,6 +63,15 @@ version, counts and model names); Cloudflare Pages runs the same command with
 `_site` as output directory. The site runs the real engine, so it never needs
 screenshots or videos of the duck.
 
+For search engines the start page exists twice: `/` (English, x-default) and
+`/de/`, which the build pre-renders from `index.html` + `de.json`, linked by
+hreflang. The build also completes the JSON-LD (version, description) and writes
+`sitemap.xml` from the canonical links of all pages without `noindex`, so new
+pages need a canonical link or a noindex tag. `site/404.html` is served for
+unknown paths (with a real 404 status). Use absolute paths (`/site.css`,
+`/api/…`) in pages and scripts, since the same files run under `/de/` and on
+the 404 page.
+
 The duck log (`site/releases.json`) fills itself: `tools/build.py` archives the
 current version's entry from the update page strings (`uF<n>b`/`uF<n>t` and the
 short `uLogTitle` in both locale files), so keeping the update page current is
@@ -74,8 +83,8 @@ The wishing pond (idea board) is the site's only backend: Cloudflare Pages
 Functions in `functions/` (modern ES modules, Workers runtime; the ES5 rule above
 is for the extension) with a D1 database (`migrations/`), Turnstile against bots
 and a moderation queue (admin mode on the start page: footer link “Admin” or `?admin`).
-Ideas are shown in the visitor's language: Workers AI (binding `AI`, model
-m2m100) translates each idea once, at submission, after admin edits and lazily
+Ideas are shown in the visitor's language: Workers AI (binding `AI`, Llama 3.3
+70B) translates each idea once, at submission, after admin edits and lazily
 for rows that still lack a translation. Production bindings `DB`,
 `TURNSTILE_SECRET`, `VOTER_SECRET`, `ADMIN_TOKEN` and the build variable
 `TURNSTILE_SITE_KEY` are configured in the Cloudflare dashboard, never in the

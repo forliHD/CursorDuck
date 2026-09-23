@@ -148,7 +148,7 @@
     var v = store('cd-voter');
     if (v) return Promise.resolve(v);
     return turnstileToken()
-      .then(function (t) { return api('POST', 'api/voter', { turnstile: t }); })
+      .then(function (t) { return api('POST', '/api/voter', { turnstile: t }); })
       .then(function (j) { store('cd-voter', j.voter); return j.voter; });
   }
   // runs an action with a voter pass; a stale pass is replaced once
@@ -168,7 +168,7 @@
   }
   function loadPending() {
     if (!adminToken) { pending = []; counts = {}; return Promise.resolve(false); }
-    return adminApi('GET', 'api/admin/ideas?status=pending')
+    return adminApi('GET', '/api/admin/ideas?status=pending')
       .then(function (j) { pending = j.ideas || []; counts = j.counts || {}; return true; })
       .catch(function (e) {
         if (e.code === 'auth') { adminToken = ''; session('cd-admin', null); pending = []; counts = {}; }
@@ -202,13 +202,13 @@
   function adminSet(idea, status, extra) {
     var body = { status: status };
     if (extra) for (var k in extra) body[k] = extra[k];
-    return adminApi('POST', 'api/admin/ideas/' + idea.id, body)
+    return adminApi('POST', '/api/admin/ideas/' + idea.id, body)
       .then(refreshAll)
       .then(function () { msg('adminDone', true); })
       .catch(function (e) { msg(e.code === 'auth' ? 'adminWrong' : 'err_generic'); });
   }
   function adminRemove(idea) {
-    adminApi('DELETE', 'api/admin/ideas/' + idea.id)
+    adminApi('DELETE', '/api/admin/ideas/' + idea.id)
       .then(refreshAll)
       .then(function () { msg('adminDone', true); })
       .catch(function (e) { msg(e.code === 'auth' ? 'adminWrong' : 'err_generic'); });
@@ -327,7 +327,7 @@
     if (voted[idea.id]) { msg('err_dup'); return; }
     btn.disabled = true;
     var rect = btn.getBoundingClientRect();
-    withVoter(function (v) { return api('POST', 'api/ideas/' + idea.id + '/vote', { voter: v }); })
+    withVoter(function (v) { return api('POST', '/api/ideas/' + idea.id + '/vote', { voter: v }); })
       .then(function (j) {
         idea.votes = j.votes;
         voted[idea.id] = 1;
@@ -365,7 +365,7 @@
     if (title.length < 4) { msg('err_title'); titleEl.focus(); return; }
     var submit = $('#pondSubmit');
     submit.disabled = true;
-    withVoter(function (v) { return api('POST', 'api/ideas', { voter: v, title: title, body: text, lang: lang() }); })
+    withVoter(function (v) { return api('POST', '/api/ideas', { voter: v, title: title, body: text, lang: lang() }); })
       .then(function () { form.reset(); updateCount(); closeForm(); msg('pondThanks', true); return adminToken ? refreshAll() : null; })
       .catch(function (e) { msg(STR_EN['err_' + e.code] ? 'err_' + e.code : 'err_generic'); })
       .then(function () { submit.disabled = false; });
@@ -398,7 +398,7 @@
   if (/[?&]admin(?:=|&|$)/.test(location.search)) openAdminBox();
 
   function loadPublic() {
-    return api('GET', 'api/ideas').then(function (j) { ideas = j.ideas || []; });
+    return api('GET', '/api/ideas').then(function (j) { ideas = j.ideas || []; });
   }
   function refreshAll() {
     return Promise.all([loadPublic(), loadPending().catch(function () { /* logged out */ })])
