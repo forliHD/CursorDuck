@@ -1,0 +1,361 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title data-i18n="pageTitle">Cursor Duck – a duck for your cursor</title>
+<meta name="description" data-i18n-content="metaDesc" content="A free browser extension for Chrome, Firefox and Edge: a little duck swims after your mouse pointer, lets you pet and feed her, naps while you read and dances when music plays. No tracking, no data.">
+<link rel="canonical" href="https://cursorduck.com/">
+<link rel="alternate" hreflang="en" href="https://cursorduck.com/">
+<link rel="alternate" hreflang="de" href="https://cursorduck.com/?lang=de">
+<link rel="alternate" hreflang="x-default" href="https://cursorduck.com/">
+<link rel="alternate" type="application/atom+xml" title="Cursor Duck releases" href="https://github.com/forliHD/CursorDuck/releases.atom">
+<meta name="theme-color" content="#f3f8fd" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0e1823" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="icon" href="icons/icon32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="icons/icon128.png">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Cursor Duck">
+<meta property="og:title" content="Cursor Duck – a duck for your cursor">
+<meta property="og:description" data-i18n-content="metaDesc" content="A free browser extension for Chrome, Firefox and Edge: a little duck swims after your mouse pointer, lets you pet and feed her, naps while you read and dances when music plays. No tracking, no data.">
+<meta property="og:url" content="https://cursorduck.com/">
+<meta property="og:image" content="https://cursorduck.com/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="stylesheet" href="site.css">
+<script src="theme.js"></script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "Cursor Duck",
+  "url": "https://cursorduck.com/",
+  "applicationCategory": "BrowserApplication",
+  "operatingSystem": "Chrome, Firefox, Edge",
+  "offers": { "@type": "Offer", "price": "0", "priceCurrency": "EUR" },
+  "author": { "@type": "Person", "name": "Lucas Reiser" },
+  "downloadUrl": [
+    "https://chromewebstore.google.com/detail/hohfcnokdpmjggmicebcjalgjcfpfblg",
+    "https://addons.mozilla.org/firefox/addon/cursor-duck/",
+    "https://microsoftedge.microsoft.com/addons/detail/cursor-duck/bflhnhaiomokfncloblfonafkeomfabj"
+  ]
+}
+</script>
+</head>
+<body>
+<a class="skip" href="#main" data-i18n="skip">Skip to content</a>
+
+<header class="nav">
+  <div class="wrap nav-inner">
+    <a class="brand" href="#top" aria-label="Cursor Duck">
+      <canvas id="logo" width="36" height="30" aria-hidden="true"></canvas>
+      <span>Cursor Duck</span>
+    </a>
+    <nav class="nav-links" id="siteNav" aria-label="Sections">
+      <a href="#features" data-i18n="navFeatures">Features</a>
+      <a href="#ducks" data-i18n="navDucks">Ducks</a>
+      <a href="#changelog" data-i18n="navChangelog">Changelog</a>
+      <a href="#pond" data-i18n="navPond">Ideas</a>
+      <a href="#faq" data-i18n="navFaq">Questions</a>
+      <a href="#privacy" data-i18n="navPrivacy">Privacy</a>
+      <a href="https://github.com/forliHD/CursorDuck" rel="noopener">GitHub</a>
+      <a class="nav-install" href="https://chromewebstore.google.com/detail/hohfcnokdpmjggmicebcjalgjcfpfblg" rel="noopener" data-install data-i18n="navInstall">Install</a>
+    </nav>
+    <span class="spacer"></span>
+    <button class="icon-btn" id="themeBtn" type="button">🌙</button>
+    <button class="icon-btn" id="langBtn" type="button" data-lang-toggle>DE</button>
+    <a class="btn btn-primary btn-mini" id="navInstall" href="https://chromewebstore.google.com/detail/hohfcnokdpmjggmicebcjalgjcfpfblg" rel="noopener" data-install data-i18n="navInstall">Install</a>
+    <button class="icon-btn menu-btn" id="menuBtn" type="button" aria-expanded="false" aria-controls="siteNav">☰</button>
+  </div>
+</header>
+
+<main id="main">
+  <section class="hero" id="top">
+    <div class="stars" aria-hidden="true"></div>
+    <div class="moon" aria-hidden="true"></div>
+    <div class="wrap hero-inner">
+      <p class="eyebrow" data-i18n="heroEyebrow">Free extension for Chrome, Firefox and Edge</p>
+      <h1 class="display" data-i18n="heroTitle">A duck for your cursor.</h1>
+      <p class="lead" data-i18n="heroLead">A little duck swims after your mouse pointer on every website. Pet her, feed her, watch her nap while you read and dance when music plays. Drawn live on a canvas without a single image. No tracking, ever.</p>
+      <div class="cta" id="cta">
+        <a class="btn btn-primary" href="https://chromewebstore.google.com/detail/hohfcnokdpmjggmicebcjalgjcfpfblg" rel="noopener">Chrome Web Store</a>
+        <a class="btn btn-ghost" href="https://addons.mozilla.org/firefox/addon/cursor-duck/" rel="noopener">Firefox Add-ons</a>
+        <a class="btn btn-ghost" href="https://microsoftedge.microsoft.com/addons/detail/cursor-duck/bflhnhaiomokfncloblfonafkeomfabj" rel="noopener">Edge Add-ons</a>
+      </div>
+      <p class="hint" id="browserNote"></p>
+      <p class="hint" data-i18n="heroHint">Psst, she's already here. Move your mouse.</p>
+      <div class="tricks" id="tricks"></div>
+    </div>
+    <div class="pond" aria-hidden="true">
+      <div class="wave w3"><svg viewBox="0 0 2880 170" preserveAspectRatio="none"><path fill="currentColor" d="M0 70 C90 30 270 110 360 70 C450 30 630 110 720 70 C810 30 990 110 1080 70 C1170 30 1350 110 1440 70 C1530 30 1710 110 1800 70 C1890 30 2070 110 2160 70 C2250 30 2430 110 2520 70 C2610 30 2790 110 2880 70 L2880 170 L0 170 Z"/></svg></div>
+      <div class="wave w2"><svg viewBox="0 0 2880 120" preserveAspectRatio="none"><path fill="currentColor" d="M0 60 C90 20 270 100 360 60 C450 20 630 100 720 60 C810 20 990 100 1080 60 C1170 20 1350 100 1440 60 C1530 20 1710 100 1800 60 C1890 20 2070 100 2160 60 C2250 20 2430 100 2520 60 C2610 20 2790 100 2880 60 L2880 120 L0 120 Z"/></svg></div>
+      <div class="wave w1"><svg viewBox="0 0 2880 80" preserveAspectRatio="none"><path fill="currentColor" d="M0 40 C90 10 270 70 360 40 C450 10 630 70 720 40 C810 10 990 70 1080 40 C1170 10 1350 70 1440 40 C1530 10 1710 70 1800 40 C1890 10 2070 70 2160 40 C2250 10 2430 70 2520 40 C2610 10 2790 70 2880 40 L2880 80 L0 80 Z"/></svg></div>
+      <div class="lily l1"><svg viewBox="0 0 46 46"><path d="M23 4 A19 19 0 1 1 22.9 4 L23 23 Z" fill="#5fae62" opacity=".9"/><circle cx="23" cy="23" r="19" fill="none" stroke="#3f8a45" stroke-width="1.5" opacity=".5"/></svg></div>
+      <div class="lily l2"><svg viewBox="0 0 46 46"><path d="M23 4 A19 19 0 1 1 22.9 4 L23 23 Z" fill="#6cb86f" opacity=".9"/></svg></div>
+      <div class="lily l3"><svg viewBox="0 0 46 46"><path d="M23 4 A19 19 0 1 1 22.9 4 L23 23 Z" fill="#5fae62" opacity=".9"/><circle cx="23" cy="14" r="4" fill="#f7a8c4"/></svg></div>
+    </div>
+  </section>
+
+  <div class="under">
+    <section class="section" id="features">
+      <div class="wrap">
+        <div class="section-head">
+          <p class="kicker" data-i18n="featKicker">What she can do</p>
+          <h2 class="title" data-i18n="featTitle">Small duck, big repertoire.</h2>
+          <p class="sub" data-i18n="featSub">Everything below happens on this page too, with the real engine. The dashed cards are for trying out.</p>
+        </div>
+        <div class="features">
+          <article class="feat">
+            <div class="ico" aria-hidden="true">🏊</div>
+            <h3 data-i18n="f1h">Following</h3>
+            <p data-i18n="f1p">The farther away your cursor, the faster she paddles, wake and bow wave included. She turns into her swimming direction and sprints when she falls behind.</p>
+          </article>
+          <article class="feat">
+            <div class="ico" aria-hidden="true">🫶</div>
+            <h3 data-i18n="f2h">Petting</h3>
+            <p data-i18n="f2p">Let her catch up, then wiggle the cursor over her: squinty happy eyes, blushing cheeks, hearts. A full petting bar earns a happy quack.</p>
+          </article>
+          <article class="feat try">
+            <span class="tag" data-i18n="tryTag">Try it</span>
+            <div class="ico" aria-hidden="true">🍞</div>
+            <h3 data-i18n="f3h">Feeding</h3>
+            <p data-i18n="f3p">Double-click anywhere on this page to toss bread crumbs into the water. She swims over and picks them up one by one, and the ducklings join in. Just don't overfeed her.</p>
+          </article>
+          <article class="feat try">
+            <span class="tag" data-i18n="tryTag">Try it</span>
+            <div class="ico" aria-hidden="true">📝</div>
+            <h3 data-i18n="f4h">Reading along</h3>
+            <p data-i18n="f4p">Type into a text field and she watches the field instead of the cursor, and won't doze off. She only knows that you type, never what.</p>
+            <textarea rows="3" data-i18n-ph="f4ph" placeholder="Type anything here. She'll look over, promise."></textarea>
+          </article>
+          <article class="feat try">
+            <span class="tag" data-i18n="tryTag">Try it</span>
+            <div class="ico" aria-hidden="true">🍪</div>
+            <h3 data-i18n="f5h">Selection snack</h3>
+            <p data-i18n="f5p">Select text near her and she nibbles at the edge of the selection. She sees where the text is, never what it says.</p>
+            <p class="selectme" data-i18n="f5sel">Go on, select this sentence with your mouse while she's close by. Nom.</p>
+          </article>
+          <article class="feat try">
+            <span class="tag" data-i18n="tryTag">Try it</span>
+            <div class="ico" aria-hidden="true">🎵</div>
+            <h3 data-i18n="f6h">Music &amp; video</h3>
+            <p data-i18n="f6p">When a video or a song with sound plays on the page, she dances along and the ducklings bob to the beat. Every now and then a disco ball drops in and the whole family goes wild.</p>
+            <div class="row">
+              <button class="btn btn-ghost btn-mini" id="beatBtn" type="button">🎶 Play a beat</button>
+              <span class="hint" data-i18n="f6note">Two bars of chiptune, generated right here.</span>
+            </div>
+          </article>
+          <article class="feat">
+            <div class="ico" aria-hidden="true">😴</div>
+            <h3 data-i18n="f7h">Napping</h3>
+            <p data-i18n="f7p">After a while of quiet she tucks her head into her feathers. Zzz. When you're back she wakes up with a “!”. At night she gets sleepy sooner and dreams in little stars.</p>
+          </article>
+          <article class="feat">
+            <div class="ico" aria-hidden="true">🐟</div>
+            <h3 data-i18n="f8h">Fish hunt</h3>
+            <p data-i18n="f8p">Every now and then a fish shadow passes below the surface. She spots it, chases it, snaps, and doesn't always get it. The popup counts her catches.</p>
+          </article>
+          <article class="feat">
+            <div class="ico" aria-hidden="true">💕</div>
+            <h3 data-i18n="f9h">Visitors &amp; shore leave</h3>
+            <p data-i18n="f9p">Every few minutes a wild duck swims by for a quack duet and a synchronized little dance. Now and then she climbs out of the water and waddles a proud circle across the page.</p>
+          </article>
+          <article class="feat">
+            <div class="ico" aria-hidden="true">🐥</div>
+            <h3 data-i18n="f10h">Ducklings</h3>
+            <p data-i18n="f10p">Up to six ducklings paddle in a row behind her, with their own little animations. When mama gets sleepy she tucks them into a nest first.</p>
+          </article>
+          <article class="feat">
+            <div class="ico" aria-hidden="true">🎩</div>
+            <h3 data-i18n="f11h">Wardrobe</h3>
+            <p data-i18n="f11p">14 hats and 5 pairs of glasses for any model, each unlocked by an achievement: top hat, crown, halo, ninja mask, sunglasses, monocle and more.</p>
+          </article>
+          <article class="feat">
+            <div class="ico" aria-hidden="true">🏆</div>
+            <h3 data-i18n="f12h">Achievements</h3>
+            <p data-i18n="f12p">60 badges in bronze, silver, gold and diamond, from petting fan through “Identity crisis” to the 30-day “Regular”. Every badge tells you how to earn it.</p>
+          </article>
+          <article class="feat">
+            <div class="ico" aria-hidden="true">🙈</div>
+            <h3 data-i18n="f13h">Focus mode &amp; calm mode</h3>
+            <p data-i18n="f13p">On password fields and fullscreen videos she steps aside. With “reduce motion” enabled in your system she skips pirouettes, dancing and the disco ball.</p>
+          </article>
+          <article class="feat">
+            <div class="ico" aria-hidden="true">📱</div>
+            <h3 data-i18n="f14h">Touch</h3>
+            <p data-i18n="f14p">On touchscreens she follows your finger. Tap her to quack, double-tap to flap, double-tap the water to feed.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="section tight">
+      <div class="wrap">
+        <div class="stats">
+          <div class="stat"><b id="statModels">38</b><span data-i18n="statsModels">duck models</span></div>
+          <div class="stat"><b id="statAch">60</b><span data-i18n="statsAch">achievements</span></div>
+          <div class="stat"><b id="statTricks">17</b><span data-i18n="statsTricks">trick buttons</span></div>
+          <div class="stat"><b>0</b><span data-i18n="statsTrackers">trackers</span></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="ducks">
+      <div class="wrap">
+        <div class="section-head">
+          <p class="kicker" data-i18n="flockKicker">The flock</p>
+          <h2 class="title" data-i18n="flockTitle">38 ducks, drawn live.</h2>
+          <p class="sub" data-i18n="flockSub">Real ducks, fantasy ducks and five seasonal guests. Click one and she changes right here on the page.</p>
+        </div>
+        <div class="gallery" id="gallery"></div>
+        <div class="legend">
+          <span><i class="dot rare"></i><span data-i18n="legendRare">rare</span></span>
+          <span><i class="dot epic"></i><span data-i18n="legendEpic">epic</span></span>
+          <span><i class="dot legendary"></i><span data-i18n="legendLegendary">legendary</span></span>
+          <span data-i18n="legendSeason">Faded ducks are seasonal and outside their season right now.</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="changelog">
+      <div class="wrap">
+        <div class="section-head">
+          <p class="kicker" data-i18n="logKicker">Changelog</p>
+          <h2 class="title" data-i18n="logTitle">The duck log.</h2>
+          <p class="sub" data-i18n="logSub">Every release since she moved in. Packages and full notes live on GitHub.</p>
+        </div>
+        <div class="timeline" id="timeline">
+          <p class="hint"><a href="https://github.com/forliHD/CursorDuck/releases" rel="noopener" data-i18n="logFallback">All releases on GitHub</a></p>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="pond">
+      <div class="wrap">
+        <div class="section-head">
+          <p class="kicker" data-i18n="pondKicker">Wishing pond</p>
+          <h2 class="title" data-i18n="pondTitle">Throw an idea into the pond.</h2>
+          <p class="sub" data-i18n="pondSub">What should she learn next? Toss breadcrumbs at the ideas you like. New ideas surface once a human has looked at them.</p>
+        </div>
+        <div class="admin-bar" id="adminBar" hidden></div>
+        <form class="pond-form admin-box" id="adminBox" hidden>
+          <label for="adminTokenInput" data-i18n="adminTokenLabel">Admin token</label>
+          <input id="adminTokenInput" type="password" autocomplete="off">
+          <div class="row">
+            <button type="submit" class="btn btn-primary btn-mini" data-i18n="adminLoginBtn">Log in</button>
+            <button type="button" class="btn btn-ghost btn-mini" id="adminCancel" data-i18n="pondCancel">Cancel</button>
+          </div>
+          <p class="hint" data-i18n="adminHint">The token from the Cloudflare settings. It stays in this tab only.</p>
+        </form>
+        <div class="pond-bar">
+          <div class="seg" role="group" aria-label="Sort">
+            <button type="button" class="on" data-sort="top" data-i18n="pondTop">Most crumbs</button>
+            <button type="button" data-sort="new" data-i18n="pondNew">Newest</button>
+          </div>
+          <button type="button" class="btn btn-primary btn-mini" id="pondAdd" data-i18n="pondAdd">Add an idea</button>
+        </div>
+        <form id="pondForm" class="pond-form" hidden>
+          <label for="pondTitle" data-i18n="pondTitleLabel">Your idea</label>
+          <input id="pondTitle" type="text" maxlength="80" required autocomplete="off" data-i18n-ph="pondTitlePh" placeholder="One sentence that says it all">
+          <label for="pondBody"><span data-i18n="pondBodyLabel">Details (optional)</span> <span class="count" id="pondCount">0/500</span></label>
+          <textarea id="pondBody" rows="3" maxlength="500" data-i18n-ph="pondBodyPh" placeholder="What exactly should happen, and why would it be lovely?"></textarea>
+          <div class="row">
+            <button type="submit" class="btn btn-primary btn-mini" id="pondSubmit" data-i18n="pondSubmit">Throw it in</button>
+            <button type="button" class="btn btn-ghost btn-mini" id="pondCancel" data-i18n="pondCancel">Cancel</button>
+          </div>
+          <p class="hint" data-i18n="pondFormNote">No account, no e-mail. A quick bot check by Cloudflare Turnstile, then a human takes a look before it shows up. Please no links.</p>
+        </form>
+        <div id="tsBox" hidden></div>
+        <p class="pond-msg" id="pondMsg" role="status"></p>
+        <p class="hint" id="pondLoading" data-i18n="pondLoading">Fishing for ideas…</p>
+        <div class="pads" id="pads"></div>
+        <p class="hint" id="pondEmpty" hidden data-i18n="pondEmpty">The pond is quiet. Throw the first idea in.</p>
+      </div>
+    </section>
+
+    <section class="section" id="privacy">
+      <div class="wrap">
+        <div class="section-head">
+          <p class="kicker" data-i18n="privKicker">Privacy</p>
+          <h2 class="title" data-i18n="privTitle">Zero trackers. Zero cookies. Zero data.</h2>
+          <p class="sub" data-i18n="privSub">The extension never talks to the internet. It doesn't know what you type or select, only where things are. This website plays by the same rules.</p>
+        </div>
+        <div class="zeros">
+          <div class="zero"><b>0</b><span data-i18n="z1">network requests by the extension</span></div>
+          <div class="zero"><b>0</b><span data-i18n="z2">cookies and analytics on this site</span></div>
+          <div class="zero"><b>0</b><span data-i18n="z3">third-party requests, fonts and sounds included</span></div>
+        </div>
+        <p class="sub" data-i18n="privText">The only things this site remembers are your language, your day-or-night choice and the ideas you tossed crumbs at, stored in your own browser. The wishing pond is the one exception to the no-third-party rule: the first time you vote or submit, Cloudflare’s Turnstile bot check loads.</p>
+        <div class="links">
+          <a href="/privacy" data-i18n="privLinkPage">Privacy policy of this website</a>
+          <a href="https://github.com/forliHD/CursorDuck/blob/main/PRIVACY.md" rel="noopener" data-i18n="privLinkFull">Privacy policy of the extension</a>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="faq">
+      <div class="wrap">
+        <div class="section-head">
+          <p class="kicker" data-i18n="faqKicker">Questions</p>
+          <h2 class="title" data-i18n="faqTitle">Frequently quacked questions.</h2>
+        </div>
+        <div class="faq">
+          <details>
+            <summary data-i18n="q1">Does she slow down my browser?</summary>
+            <p data-i18n="a1">No. She draws on her own canvas layer, detached from the page layout, pauses in background tabs and adapts her resolution on very busy pages.</p>
+          </details>
+          <details>
+            <summary data-i18n="q2">She's in the way on one site.</summary>
+            <p data-i18n="a2">Open the popup and choose “Pause on this site”. Alt+Shift+D toggles her everywhere, and the distance slider keeps her off the text you're reading.</p>
+          </details>
+          <details>
+            <summary data-i18n="q3">Why is she asleep?</summary>
+            <p data-i18n="a3">After a while without cursor movement she naps, anywhere from 5 to 60 seconds, adjustable in the popup. Move the mouse, scroll hard or play some music and she's back.</p>
+          </details>
+          <details>
+            <summary data-i18n="q4">Does she see what I type?</summary>
+            <p data-i18n="a4">Never. A key press is just an activity signal, a selection is just a rectangle on screen, and password fields hide her entirely.</p>
+          </details>
+          <details>
+            <summary data-i18n="q5">What about Safari?</summary>
+            <p data-i18n="a5">Not yet. She lives in Chrome, Firefox and Edge, and in Chromium browsers like Brave, Opera or Vivaldi via the Chrome Web Store.</p>
+          </details>
+          <details>
+            <summary data-i18n="q6">Can I suggest a feature?</summary>
+            <p data-i18n="a6">Please do. Toss it into the wishing pond right here on this site, or open an issue on GitHub.</p>
+          </details>
+        </div>
+      </div>
+    </section>
+  </div>
+</main>
+
+<footer class="footer">
+  <div class="wrap foot-inner">
+    <span>© 2026 Lucas Reiser · <span id="footVersion">Cursor Duck</span></span>
+    <a href="https://github.com/forliHD/CursorDuck" rel="noopener">GitHub</a>
+    <a href="https://github.com/forliHD/CursorDuck/releases.atom" rel="noopener" data-i18n="footFeed">Release feed</a>
+    <a href="https://chromewebstore.google.com/detail/hohfcnokdpmjggmicebcjalgjcfpfblg" rel="noopener">Chrome Web Store</a>
+    <a href="https://addons.mozilla.org/firefox/addon/cursor-duck/" rel="noopener">Firefox Add-ons</a>
+    <a href="https://microsoftedge.microsoft.com/addons/detail/cursor-duck/bflhnhaiomokfncloblfonafkeomfabj" rel="noopener">Edge Add-ons</a>
+    <a href="/privacy" data-i18n="footPrivacy">Privacy</a>
+    <a href="/imprint" data-i18n="footImprint">Legal notice</a>
+    <a href="?admin" id="adminLink" data-i18n="footAdmin">Admin</a>
+    <p class="foot-note" data-i18n="footMade">Made in Germany with a lot of quacking. Sounds are CC0 recordings, everything else is drawn live.</p>
+  </div>
+</footer>
+
+<button class="totop" id="toTop" type="button">↑</button>
+<audio id="beat" aria-hidden="true"></audio>
+
+<script src="src/models.js"></script>
+<script src="src/render.js"></script>
+<script src="src/effects.js"></script>
+<script src="src/engine.js"></script>
+<script src="data.js"></script>
+<script src="site.js"></script>
+<script src="pond.js"></script>
+</body>
+</html>

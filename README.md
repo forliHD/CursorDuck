@@ -7,6 +7,8 @@ shadows — and in between does what ducks do: dabble, dive, preen, bathe, quack
 Everything is drawn procedurally onto a canvas — **not a single image asset**. That's why
 every duck stays crisp at any size, and a new model is just a few lines of color values.
 
+Website: [cursorduck.com](https://cursorduck.com) (the duck swims there too, no install needed).
+
 ## Install
 
 - **Chrome:** [Chrome Web Store](https://chromewebstore.google.com/detail/hohfcnokdpmjggmicebcjalgjcfpfblg)

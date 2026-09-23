@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Cursor Duck — social card (og.png)</title>
+<style>
+  body { margin: 0; padding: 28px; font: 15px/1.6 ui-rounded, system-ui, sans-serif; background: #eef4fb; color: #1d2b3a; }
+  h1 { font-size: 22px; margin: 0 0 6px; }
+  p { color: #5d7590; max-width: 720px; }
+  canvas { display: block; width: 600px; height: 315px; border: 1px solid #d9e3f0; border-radius: 10px; background: #fff; margin: 14px 0; }
+  a.btn { display: inline-block; padding: 8px 14px; border-radius: 8px; background: #2f7fd6; color: #fff; text-decoration: none; font-weight: 700; }
+</style>
+</head>
+<body>
+<h1>Social card for cursorduck.com</h1>
+<p>Renders the 1200×630 Open Graph image with the real renderer. Serve the repo root
+(e.g. the <code>demo</code> preview server) so the fonts under <code>site/fonts/</code> load,
+then save the file as <code>site/og.png</code>.</p>
+<canvas id="card" width="1200" height="630"></canvas>
+<a class="btn" id="dl" href="#" download="og.png">Download og.png</a>
+
+<script src="../src/models.js"></script>
+<script src="../src/render.js"></script>
+<script>
+(function () {
+  var fonts = [
+    ['Fredoka', '../site/fonts/fredoka-latin.woff2', '300 700'],
+    ['Nunito', '../site/fonts/nunito-latin.woff2', '200 1000']
+  ];
+  var loads = fonts.map(function (f) {
+    var ff = new FontFace(f[0], 'url(' + f[1] + ')', { weight: f[2] });
+    return ff.load().then(function (loaded) { document.fonts.add(loaded); });
+  });
+  Promise.all(loads).catch(function () { /* system fallback fonts */ }).then(draw);
+
+  function draw() {
+    var c = document.getElementById('card'), x = c.getContext('2d');
+    var g = x.createLinearGradient(0, 0, 0, 630);
+    g.addColorStop(0, '#eef6fd'); g.addColorStop(0.6, '#d8eafb'); g.addColorStop(1, '#a7d3f3');
+    x.fillStyle = g; x.fillRect(0, 0, 1200, 630);
+    function wave(y, amp, color, ph) {
+      x.fillStyle = color; x.beginPath(); x.moveTo(0, y);
+      for (var i = 0; i <= 1200; i += 10) x.lineTo(i, y + Math.sin(i / 95 + ph) * amp);
+      x.lineTo(1200, 630); x.lineTo(0, 630); x.closePath(); x.fill();
+    }
+    wave(455, 11, '#cfe6fa', 0); wave(500, 13, '#a7d3f3', 1.4); wave(560, 9, '#7cbbea', 2.8);
+    x.textBaseline = 'top';
+    x.fillStyle = '#16283a'; x.font = '600 100px Fredoka, ui-rounded, sans-serif'; x.fillText('Cursor Duck', 84, 118);
+    x.fillStyle = '#4a6382'; x.font = '700 42px Nunito, ui-rounded, sans-serif'; x.fillText('A duck for your cursor.', 90, 240);
+    x.fillStyle = '#1f6fbf'; x.font = '800 24px Nunito, ui-rounded, sans-serif'; x.fillText('FREE FOR CHROME  ·  FIREFOX  ·  EDGE', 92, 312);
+    x.fillStyle = '#5d7590'; x.font = '700 24px Nunito, ui-rounded, sans-serif'; x.fillText('cursorduck.com', 92, 356);
+    var m = DuckModels.get('mallard'), b = DuckRender.babyOf(m);
+    var pose = { t: 0, dir: -1, bob: 0, paddle: 0, wingFlap: 0, beakOpen: 0, eyeOpen: 1, reflection: true };
+    function at(model, px, py, r, t) {
+      var p = {}; for (var k in pose) p[k] = pose[k];
+      p.x = px; p.y = py; p.r = r; p.t = t;
+      DuckRender.draw(x, model, p);
+    }
+    at(b, 690, 500, 40, 0.5);
+    at(b, 590, 530, 36, 1.2);
+    at(m, 900, 440, 118, 0);
+    document.getElementById('dl').href = c.toDataURL('image/png');
+  }
+})();
+</script>
+</body>
+</html>

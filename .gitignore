@@ -6,3 +6,11 @@ dist/
 
 # Lokale Claude-Code-Arbeitsdateien und Worktrees
 .claude/
+
+# Website build output (tools/site_build.py)
+_site/
+
+# Cloudflare wrangler (local pond emulation)
+.wrangler/
+.dev.vars
+node_modules/

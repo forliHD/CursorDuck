@@ -1,0 +1,21 @@
+# Local development only. `wrangler pages dev` refuses custom config paths, so
+# this file feeds the D1 CLI (migrations, seed):
+#   npx wrangler d1 migrations apply cursorduck-pond --local -c wrangler.local.toml
+#   npx wrangler d1 execute cursorduck-pond --local -c wrangler.local.toml --file tools/pond-seed.sql
+# The local dev server binds the same database by id and passes the test
+# secrets as flags (see .claude/launch.json or CLAUDE.md):
+#   npx wrangler pages dev _site --d1 DB=local-only --binding TURNSTILE_SECRET=... \
+#     --binding VOTER_SECRET=... --binding ADMIN_TOKEN=...
+# Production bindings live in the Cloudflare dashboard (Pages → Settings →
+# Bindings), so nothing in this file can break a deploy. Deliberately NOT named
+# wrangler.toml: Pages would treat that as the source of truth for bindings.
+name = "cursorduck"
+compatibility_date = "2026-09-01"
+pages_build_output_dir = "_site"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "cursorduck-pond"
+database_id = "local-only"
+migrations_dir = "migrations"
+

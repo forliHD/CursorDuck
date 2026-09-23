@@ -1,0 +1,182 @@
+[
+  {
+    "version": "1.7.0",
+    "date": "2026-09-21",
+    "github": true,
+    "title": { "en": "Reading along, selection snack & calm mode", "de": "Mitlesen, Selektions-Snack & ruhiger Modus" },
+    "items": {
+      "en": [
+        "📝 Reading along & focus mode: type into a text field and she watches the field instead of the cursor, and won't doze off. On password fields and fullscreen videos she steps aside, then reports back with a “!”.",
+        "🍪 Selection snack: select text near her and she nibbles at the edge of the selection. She only sees where the text is, never what it says.",
+        "😴 Nap timer: a new slider from 5 to 60 seconds until she tucks her head in.",
+        "🌙 Calm mode: with “reduce motion” enabled in your system she skips pirouettes, shaking, bathing, dancing and the disco ball.",
+        "💘 A name, a regular & seasonal ducks: name her in the popup and she says it when the petting bar is full. 30 days in a row earn the diamond badge “Regular”, 60 achievements in total. New Year duck in January, Valentine duck in February.",
+        "🔊 Popup & touch: a soundboard for every sound, a search box for the model grid, and on touchscreens she follows your finger."
+      ],
+      "de": [
+        "📝 Mitlesen & Fokus-Modus: Tippst du in ein Textfeld, schaut sie zum Feld statt zum Cursor und nickt dabei nicht ein. Bei Passwortfeldern und Vollbild-Videos tritt sie ab und meldet sich danach mit „!“ zurück.",
+        "🍪 Selektions-Snack: Markierst du Text in ihrer Nähe, knabbert sie am Rand der Markierung. Sie sieht nur, wo der Text liegt, nie was drinsteht.",
+        "😴 Einschlafen nach Wunsch: neuer Regler von 5 bis 60 Sekunden.",
+        "🌙 Ruhiger Modus: Ist im System „Bewegung reduzieren“ aktiv, lässt sie Pirouetten, Schütteln, Baden, Tanzen und Discokugel automatisch weg.",
+        "💘 Name, Stammgast & Saison-Enten: Gib ihr im Popup einen Namen, bei voller Streichel-Leiste sagt sie ihn. 30 Tage in Folge bringen das Diamant-Abzeichen „Stammgast“, 60 Erfolge insgesamt. Neujahrs-Ente im Januar, Valentins-Ente im Februar.",
+        "🔊 Popup & Touch: Soundboard für alle Klänge, Suchfeld fürs Modell-Raster, und auf Touchscreens folgt sie dem Finger."
+      ]
+    }
+  },
+  {
+    "version": "1.6.0",
+    "date": "2026-09-18",
+    "github": true,
+    "title": { "en": "Music dance & wardrobe", "de": "Musik-Tanz & Garderobe" },
+    "items": {
+      "en": [
+        "🎵 Music & video: when a video or song with sound plays on the page, embedded players included, she dances along in rounds, the ducklings bob to the beat and a sleeping duck wakes up for the first beat. Every now and then a little disco ball sinks in and the whole family goes wild.",
+        "🎩 Wardrobe: 14 hats and 5 pairs of glasses for any model, each unlocked by an achievement.",
+        "🏆 59 achievements in four tiers, from bronze through silver and gold to diamond.",
+        "📏 Distance to cursor: a new slider so she never sits on the text you're reading.",
+        "🐛 Paused sites stay paused after a tab switch, with an editable list of paused sites in the popup.",
+        "🧹 Every popup section collapses with a click on its heading.",
+        "🚀 Smoother on busy pages: she no longer triggers page layouts and her drawing area is decoupled from the page."
+      ],
+      "de": [
+        "🎵 Musik & Video: Läuft auf der Seite ein Video oder ein Song mit Ton, auch in eingebetteten Playern, tanzt sie in Runden mit, die Küken wippen im Takt und der erste Beat weckt eine schlafende Ente. Ab und zu senkt sich eine kleine Discokugel herab, und die ganze Familie dreht durch.",
+        "🎩 Garderobe: 14 Hüte und 5 Brillen für jedes Modell, jedes Stück schaltet ein Erfolg frei.",
+        "🏆 59 Erfolge in vier Stufen, von Bronze über Silber und Gold bis Diamant.",
+        "📏 Abstand zum Cursor: neuer Regler, damit sie nie auf dem Text sitzt, den du gerade liest.",
+        "🐛 Pausierte Seiten bleiben nach einem Tab-Wechsel pausiert, dazu eine bearbeitbare Liste im Popup.",
+        "🧹 Jede Popup-Sektion lässt sich mit einem Klick auf die Überschrift einklappen.",
+        "🚀 Flüssiger auf schweren Seiten: Sie löst keine Seitenlayouts mehr aus, ihr Zeichenbereich ist von der Seite entkoppelt."
+      ]
+    }
+  },
+  {
+    "version": "1.5.0",
+    "date": "2026-08-28",
+    "github": true,
+    "title": { "en": "Tycoon Duck & real sounds", "de": "Milliardärs-Ente & echte Geräusche" },
+    "items": {
+      "en": [
+        "💰 Tycoon Duck: top hat, monocle and a red tailcoat. When she gets sleepy a gold hoard rises from the water, she takes a run-up, dives in headfirst and sleeps buried in her riches.",
+        "🔊 Real sounds: quacking, splashing, pecking, popping and coin jingles are now CC0 recordings instead of synthesizer tones. Every model keeps its own pitch, ducklings peep high.",
+        "🎚️ Volume slider in the popup, before it was just on or off.",
+        "✨ Polished popup: filled sliders, section icons, emojis on the trick buttons."
+      ],
+      "de": [
+        "💰 Milliardärs-Ente: Zylinder, Monokel und roter Frack. Wird sie müde, steigt ein Goldhaufen aus dem Wasser, sie nimmt Anlauf, springt kopfüber hinein und schläft im Gold.",
+        "🔊 Echte Geräusche: Quaken, Platschen, Picken, Plopp und Münzklimpern sind jetzt CC0-Aufnahmen statt Synthesizer-Töne. Jedes Modell behält seine Tonlage, Küken piepsen hoch.",
+        "🎚️ Lautstärkeregler im Popup, vorher gab es nur an oder aus.",
+        "✨ Popup aufpoliert: gefüllte Schieberegler, Icons an den Abschnitten, Emojis auf den Kunststück-Knöpfen."
+      ]
+    }
+  },
+  {
+    "version": "1.4.0",
+    "date": "2026-08-27",
+    "github": true,
+    "title": { "en": "Visionary & Easter Duck, bedtime ritual", "de": "Visionärs- & Oster-Ente, Gute-Nacht-Ritual" },
+    "items": {
+      "en": [
+        "💡 Visionary Duck: black turtleneck, round glasses and twelve lines she drops while quacking, from “One more thing …” to “Quack different.”",
+        "🐰 Easter Duck: bunny ears and easter-egg speckles, available from three weeks before until one week after Easter Sunday. The extension computes the date itself.",
+        "🎲 Random model on every browser start as a new popup option.",
+        "🪺 Bedtime ritual: when mama gets sleepy she tucks the ducklings into a nest first, gives them a good-night nudge and dreams little hearts.",
+        "🔊 New synthesized quack with rasp and a happy “quack-quack”.",
+        "🏅 35 achievements, and every badge explains on click how to earn it.",
+        "👀 The duck family gently keeps its distance so no duckling disappears behind mama."
+      ],
+      "de": [
+        "💡 Visionärs-Ente: schwarzer Rollkragen, runde Brille und zwölf Sprüche beim Quaken, von „One more thing …“ bis „Quack different.“",
+        "🐰 Oster-Ente: Hasenohren und Ostereier-Tupfen, verfügbar von drei Wochen vor bis eine Woche nach Ostersonntag. Das Datum rechnet die Erweiterung selbst aus.",
+        "🎲 Zufallsmodell bei jedem Browserstart als neue Option im Popup.",
+        "🪺 Gute-Nacht-Ritual: Wird die Mama müde, bringt sie die Küken erst ins Nest, stupst ihnen ein Küsschen zu und träumt Herzchen.",
+        "🔊 Neuer synthetischer Quack mit Knarren und fröhlichem „quack-quack“.",
+        "🏅 35 Erfolge, und jedes Abzeichen verrät per Klick, wie man es holt.",
+        "👀 Die Entenfamilie hält sanft Abstand, kein Küken verschwindet mehr hinter der Mama."
+      ]
+    }
+  },
+  {
+    "version": "1.3.0",
+    "date": "2026-08-24",
+    "github": true,
+    "title": { "en": "Shore leave, overfeeding pop & dance duet", "de": "Landgang, Überfütterungs-Plopp & Tanz-Duett" },
+    "items": {
+      "en": [
+        "🚶 Shore leave: every now and then she climbs out of the water, waddles a proud circle on procedurally drawn legs and jumps back in right where she left.",
+        "🎈 Don't overfeed her: too many crumbs in a row make her plump, then she hiccups, then POP. She resurfaces looking sheepish.",
+        "💃 Dance duet: after the quack duet, visitor and duck dance in sync with a shared pirouette.",
+        "🏅 22 achievements, new: “Landlubber” and “Bursting with joy”."
+      ],
+      "de": [
+        "🚶 Landgang: Ab und zu klettert sie aus dem Wasser, watschelt auf prozedural gezeichneten Beinchen stolz im Kreis und springt genau dort wieder hinein.",
+        "🎈 Nicht überfüttern: Zu viele Krumen am Stück machen sie pummelig, dann hickst sie, dann PLOPP. Sie taucht verlegen wieder auf.",
+        "💃 Tanz-Duett: Nach dem Quak-Duett tanzen Besuch und Ente synchron mit gemeinsamer Pirouette.",
+        "🏅 22 Erfolge, neu: „Landratte“ und „Platzt vor Glück“."
+      ]
+    }
+  },
+  {
+    "version": "1.2.0",
+    "date": "2026-08-19",
+    "github": true,
+    "title": { "en": "Visitors, achievements & more", "de": "Besuch, Erfolge & mehr" },
+    "items": {
+      "en": [
+        "💕 Visitors: every few minutes a wild duck swims by for a quack duet with music notes and hearts.",
+        "🐣 Ducklings join the feeding with their own nibble animation.",
+        "🌊 Scroll current: scrolling sweeps the duck family along, vigorous scrolling wakes a sleeping duck.",
+        "🎃🎄 Seasonal ducks: pumpkin duck in October, Christmas duck in December.",
+        "🏆 20 achievements in the popup.",
+        "🌙 Night mode: between 10 pm and 6 am she gets sleepy sooner and dreams in little stars.",
+        "🐛 Fish hunt works at every duck size, and the popup no longer opens too wide."
+      ],
+      "de": [
+        "💕 Besuch: Alle paar Minuten schwimmt eine wilde Ente vorbei, für ein Quak-Duett mit Notenwölkchen und Herzchen.",
+        "🐣 Küken fressen mit eigener Knabber-Animation mit.",
+        "🌊 Scroll-Strömung: Scrollen zieht die Entenfamilie mit, heftiges Scrollen weckt Schlafende.",
+        "🎃🎄 Saison-Enten: Kürbis-Ente im Oktober, Weihnachts-Ente im Dezember.",
+        "🏆 20 Erfolge im Popup.",
+        "🌙 Nachtmodus: Zwischen 22 und 6 Uhr wird sie schneller müde und träumt in Sternchen.",
+        "🐛 Die Fisch-Jagd klappt bei jeder Entengröße, und das Popup öffnet nicht mehr überbreit."
+      ]
+    }
+  },
+  {
+    "version": "1.1.2",
+    "date": "2026-08-19",
+    "github": false,
+    "title": { "en": "English & Firefox", "de": "Englisch & Firefox" },
+    "items": {
+      "en": [
+        "🌍 Second language: the interface follows your browser language, English or German.",
+        "🦊 Firefox support, built from the same code base.",
+        "🐛 Fish hunt fixed for small ducks."
+      ],
+      "de": [
+        "🌍 Zweite Sprache: Die Oberfläche folgt der Browsersprache, Englisch oder Deutsch.",
+        "🦊 Firefox-Unterstützung, aus derselben Codebasis gebaut.",
+        "🐛 Fisch-Jagd für kleine Enten repariert."
+      ]
+    }
+  },
+  {
+    "version": "1.0.1",
+    "date": "2026-08-10",
+    "github": false,
+    "title": { "en": "The duck moves in", "de": "Die Ente zieht ein" },
+    "items": {
+      "en": [
+        "🦆 First release on the Chrome Web Store: a duck that follows the cursor with real physics, wake and bow wave.",
+        "🫶 Petting, pecking, feeding by double-click, fish hunt, dizziness, dancing and peekaboo.",
+        "🐥 Up to six ducklings in a row, and 31 duck models to choose from.",
+        "🔒 No data collection, no network access."
+      ],
+      "de": [
+        "🦆 Erste Version im Chrome Web Store: eine Ente, die dem Cursor mit echter Physik, Kielwasser und Bugwelle folgt.",
+        "🫶 Streicheln, Picken, Füttern per Doppelklick, Fisch-Jagd, Schwindel, Tänzchen und Kuckuck.",
+        "🐥 Bis zu sechs Küken in einer Reihe, und 31 Entenmodelle zur Auswahl.",
+        "🔒 Keine Datensammlung, keine Netzwerkzugriffe."
+      ]
+    }
+  }
+]

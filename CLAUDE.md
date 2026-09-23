@@ -52,3 +52,30 @@ version-specific numbers, so they survive future releases unchanged.
 
 Proprietary, source-available. Do not add instructions that invite copying,
 modifying or redistributing the code.
+
+## Website (cursorduck.com)
+
+`site/` holds the product website: plain HTML/CSS/JS, no framework. English
+lives in the markup, German in `site/de.json` (every `data-i18n` key needs a
+German string, the build checks it). `python3 tools/site_build.py` assembles
+`_site/` (site + engine files + audio + icons + a generated `data.js` with
+version, counts and model names); Cloudflare Pages runs the same command with
+`_site` as output directory. The site runs the real engine, so it never needs
+screenshots or videos of the duck.
+
+Release checklist addition: add the new version to `site/releases.json` (both
+languages) in the release commit; the build fails while the newest entry does
+not match `manifest.json`. `site/og.png` is the social card and the site's only
+raster image; regenerate it with `demo/og.html` when the duck's look changes.
+
+The wishing pond (idea board) is the site's only backend: Cloudflare Pages
+Functions in `functions/` (modern ES modules, Workers runtime; the ES5 rule above
+is for the extension) with a D1 database (`migrations/`), Turnstile against bots
+and a moderation queue (admin mode on the start page: footer link “Admin” or `?admin`). Production bindings `DB`,
+`TURNSTILE_SECRET`, `VOTER_SECRET`, `ADMIN_TOKEN` and the build variable
+`TURNSTILE_SITE_KEY` are configured in the Cloudflare dashboard, never in the
+repo. Locally, `wrangler.local.toml` feeds the D1 CLI (migrations, seed) and
+`npx wrangler pages dev _site --d1 DB=local-only --binding TURNSTILE_SECRET=<test secret>
+--binding VOTER_SECRET=x --binding ADMIN_TOKEN=x` emulates the API with Turnstile's
+test keys. Without a site key the pond section stays hidden, so the rest of the
+site always deploys.
