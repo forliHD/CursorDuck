@@ -278,7 +278,8 @@
     btn.appendChild(doc.createTextNode('🍞 '));
     btn.appendChild(el('b', '', String(idea.votes)));
     var label = T(voted[idea.id] ? 'pondVoted' : 'pondVote');
-    btn.setAttribute('aria-label', label);
+    // the name starts with the visible count and says which idea the crumb is for
+    btn.setAttribute('aria-label', idea.votes + ' · ' + label + ': ' + shown.title);
     btn.title = label;
     if (idea.status === 'built' || idea.status === 'pending') btn.disabled = true;
     btn.onclick = function () { vote(idea, btn); };

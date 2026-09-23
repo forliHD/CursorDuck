@@ -395,6 +395,8 @@
         var a = el('a', '', T('onGithub'));
         a.href = 'https://github.com/forliHD/CursorDuck/releases/tag/v' + r.version;
         a.rel = 'noopener';
+        // every entry has this link: the version keeps the names apart for screen readers
+        a.setAttribute('aria-label', T('onGithub') + ' (v' + r.version + ')');
         meta.appendChild(a);
       }
       art.appendChild(meta);
