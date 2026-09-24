@@ -32,6 +32,7 @@ const DEFAULTS = {
   randomOnStart: false,   // bei jedem Browserstart ein neues Zufallsmodell
   hat: '',                // Garderobe: '' = wie das Modell, 'none' = ohne, sonst Hut-Art
   glasses: '',
+  follow: true,           // aus = Freilauf: sie lebt auf der Seite statt dem Cursor zu folgen
   disabledHosts: []
 };
 
@@ -40,7 +41,7 @@ const MODEL_IDS = [
   'mallard', 'mallard-hen', 'rubber', 'pekin', 'mandarin', 'wood', 'tufted', 'teal',
   'runner', 'chonk', 'duckling', 'swan', 'goose', 'debug', 'neon', 'ghost', 'pirate',
   'royal', 'ninja', 'goth', 'party', 'chef', 'wizard', 'astro', 'zombie', 'angel',
-  'devil', 'cowboy', 'visionary', 'tycoon', 'rainbow', 'galaxy', 'golden'
+  'devil', 'cowboy', 'visionary', 'tycoon', 'techie', 'rainbow', 'galaxy', 'golden'
 ];
 
 // Browserstart: Wer das Zufalls-Abo hat, bekommt eine frische Ente.

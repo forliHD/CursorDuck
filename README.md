@@ -43,13 +43,16 @@ her tricks.
 | **Ducklings** | Up to 6 ducklings swim in a row along mama's trail — with their own little animations (including dozing off) and a fluffy yellow color scheme. The family gently keeps its distance, so no duckling disappears behind mama. |
 | **Duckling nest** | When mama gets sleepy she first puts the ducklings to bed: a nest appears (it grows with the number of ducklings and the duck size), she waits at the rim, gives the little ones a good-night nudge — then falls asleep beside them, occasionally dreaming little hearts. When she wakes up, the nest sinks away with a bubble. |
 | **Gold-hoard nap** | The tycoon duck doesn't simply doze off: a little pile of gold coins rises from the water, she paddles over, takes a gleeful running jump and dives in headfirst — coins fly, gold clinks — then sleeps buried in her riches, dreaming in glitter. On waking she hops out and the hoard sinks away. |
+| **Laptop nap** | The IT duck's bedtime: her laptop rises from the water, she paddles over and types a few more lines with drooping eyes (a build runs through, mostly green), nods off three times and lands face first on the keyboard — key caps fly, a stuck key floods the editor, then the screensaver's bouncing logo takes over while she sleeps on the keys. Wake her and she looks puzzled at what she typed, the lid clacks shut and the laptop sinks away. |
+| **Rubber duck debugging** | Now and then the IT duck fetches a little rubber duck out of the water and explains her bug to it — muttering, “…”, “?”, “!” — until the rubber duck squeaks and the light bulb goes on. Then the helper sinks away again. |
+| **Free roam** | Switch off “Follows the cursor” in the popup and she lives on the page instead: she swims and waddles her own routes, lingers for her tricks, naps when she feels like it (waking on her own, or when your cursor comes close) and stays curious — a cursor resting nearby gets a visit and a peck. |
 | **Clicking** | Click the duck → she quacks back. Double-click the duck → wing flapping. |
 | **Reading along** | Type into a text field and she watches the field instead of the cursor — and won't doze off while you type. |
 | **Focus mode** | On password fields and fullscreen videos she steps aside; afterwards she reports back with a “!”. |
 | **Selection snack** | Select text near her and she nibbles at the edge of the selection — “nom”. She only sees where the text is, never what it says. |
 | **Touch** | On touchscreens she follows your finger: tap her to quack, double-tap to flap or feed. |
 | **Music & video** | When a video or audio track with sound plays on the page (embedded players included), she dances along in rounds, the ducklings bob to the beat, and a sleeping duck wakes up for the first beat. Every now and then a little disco ball sinks in on a string, throws colored spots on the water and the whole family goes wild for a few seconds — hops, wing flaps, colored notes, confetti, ducklings hopping in a wave. Pause the player and she stops. Muted autoplay videos don't count; the 🪩 trick button throws a party on demand. |
-| **Wardrobe** | 14 hats and 5 pairs of glasses can be put on any model — top hat, crown, halo, ninja mask, sunglasses, monocle … Each piece is unlocked by an achievement (the lock tells you which one); the popup previews every piece on your current duck. |
+| **Wardrobe** | 15 hats and 6 pairs of glasses can be put on any model — top hat, crown, halo, ninja mask, headphones, sunglasses, monocle, nerd glasses … Each piece is unlocked by an achievement (the lock tells you which one); the popup previews every piece on your current duck. |
 
 ## The duck models
 
@@ -59,8 +62,9 @@ tufted duck, teal, runner duck, chonk duck, duckling, swan, goose.
 **Fantasy:** debug duck (with glasses), cyber duck (neon visor), ghost duck, pirate duck,
 royal duck, ninja duck, goth duck, party duck (with confetti), chef duck, wizard duck,
 astro duck (helmet), zombie duck, angel duck (halo), devil duck, cowboy duck,
-tycoon duck (top hat, monocle — and a gold hoard to nap in), rainbow duck,
-galaxy duck (starry body), golden duck.
+tycoon duck (top hat, monocle — and a gold hoard to nap in), IT duck (hoodie,
+headphones, nerd glasses — falls asleep at her laptop and debugs with a rubber duck),
+rainbow duck, galaxy duck (starry body), golden duck.
 
 **Seasonal:** pumpkin duck (October), Christmas duck (December), New Year duck
 (January), Valentine duck (February) and Easter duck (from three weeks before
@@ -69,24 +73,27 @@ appear in the popup automatically during their time window.
 
 **With opinions:** the visionary duck (black turtleneck, round glasses) doesn't just
 quack — every now and then she says things like “One more thing …”,
-“You're holding it wrong.” or “Quack different.” (twelve lines in total).
+“You're holding it wrong.” or “Quack different.” (twelve lines in total). The IT duck
+answers with “It works on my machine.”, “sudo quack” or “Have you cleared your
+cache?” (twelve lines as well).
 
 Rare models are marked in the popup (blue = rare, purple = epic, gold = legendary).
 The 🎲 button picks at random — legendaries are rare. The popup also holds
-**60 achievements in bronze, silver, gold and diamond tiers** — from petting fan through
-“Identity crisis” and “Croesus” to “Duck whisperer” and the 30-day “Regular”; clicking an achievement reveals how
+**63 achievements in bronze, silver, gold and diamond tiers** — from petting fan through
+“Identity crisis”, “Croesus” and “Legacy system” to “Duck whisperer” and the 30-day “Regular”; clicking an achievement reveals how
 to earn it, and the header counts what you've collected.
 
 ## Settings (popup)
 
 Size, speed, distance to the cursor (so she never sits on the text you're reading),
 number of ducklings, playfulness, opacity, sound on/off with volume, nap delay
-(5–60 seconds), water effects, reflection, cursor pecking, crumb feeding, “new random
-model on every browser start”, “pause on this site” with an editable list of paused
-sites (a domain covers its subdomains), and a name for your duck (she says it when the
-petting bar is full) — everything applies instantly, without reloading. The model grid
-has a search box, a soundboard previews every sound, and 17 buttons trigger tricks
-directly (including feeding, fish hunt, shore leave, visitors and the disco ball).
+(5–60 seconds), “follows the cursor” (off: free roam), water effects, reflection,
+cursor pecking, crumb feeding, “new random model on every browser start”, “pause on
+this site” with an editable list of paused sites (a domain covers its subdomains), and
+a name for your duck (she says it when the petting bar is full) — everything applies
+instantly, without reloading. The model grid has a search box, a soundboard previews
+every sound, and 18 buttons trigger tricks directly (including feeding, fish hunt,
+shore leave, visitors, the disco ball and rubber duck debugging).
 
 She honors your system's “reduce motion” setting: with it enabled, pirouettes, shaking,
 bathing, dancing and the disco ball are skipped automatically — the trick buttons in

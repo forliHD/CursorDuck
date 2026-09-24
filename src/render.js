@@ -186,6 +186,51 @@
         ctx.globalAlpha /= 0.9;
       }
     }
+    // Shirt print on the chest — counter-flipped, so it never mirrors
+    // when she faces the other way
+    if (m.print && !p.silhouette) {
+      ctx.save();
+      ctx.translate(g.bcx + g.bw * 0.08, g.bcy + g.bh * 0.34);
+      ctx.scale(p.dir < 0 ? -1 : 1, 1);
+      ctx.rotate(-0.08);
+      ctx.fillStyle = m.printColor || 'rgba(38,43,56,0.82)';
+      ctx.font = '900 ' + (g.r * 0.32).toFixed(1) + 'px ui-rounded, system-ui, sans-serif';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(m.print, 0, 0);
+      ctx.restore();
+    }
+    ctx.restore();
+  }
+
+  // Lanyard with a badge: the loop hangs from the neck down the chest,
+  // the head (drawn last) hides its top
+  function drawLanyard(ctx, m, g, p) {
+    var r = g.r;
+    var sway = Math.sin(p.t * 2.1) * r * 0.02 + p.lean * r * 0.1;
+    var nx = g.bcx + g.bw * 0.42, ny = g.bcy - g.bh * 0.62;        // neck base, front
+    var bx = g.bcx + g.bw * 0.66 + sway, by = g.bcy + g.bh * 0.08;  // where the badge hangs
+    ctx.save();
+    ctx.strokeStyle = m.lanyard; ctx.lineWidth = r * 0.045; ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(nx - r * 0.06, ny);
+    ctx.quadraticCurveTo(bx - r * 0.12, (ny + by) * 0.5, bx - r * 0.03, by - r * 0.16);
+    ctx.moveTo(nx + r * 0.1, ny + r * 0.02);
+    ctx.quadraticCurveTo(bx + r * 0.08, (ny + by) * 0.5, bx + r * 0.03, by - r * 0.16);
+    ctx.stroke();
+    // the badge: a little card with a coloured header, a photo and two lines
+    ctx.translate(bx, by);
+    ctx.rotate(0.12 + sway * 0.6);
+    var w = r * 0.26, h = r * 0.32;
+    ctx.fillStyle = '#f7f7f4';
+    ctx.strokeStyle = 'rgba(0,0,0,0.25)'; ctx.lineWidth = r * 0.02;
+    ctx.fillRect(-w / 2, -h / 2, w, h); ctx.strokeRect(-w / 2, -h / 2, w, h);
+    ctx.fillStyle = m.lanyard;
+    ctx.fillRect(-w / 2, -h / 2, w, h * 0.22);
+    ctx.fillStyle = '#c9ced8';
+    ctx.fillRect(-w * 0.36, -h * 0.14, w * 0.34, h * 0.36);
+    ctx.fillStyle = 'rgba(0,0,0,0.35)';
+    ctx.fillRect(w * 0.05, -h * 0.08, w * 0.3, h * 0.06);
+    ctx.fillRect(w * 0.05, h * 0.06, w * 0.3, h * 0.06);
     ctx.restore();
   }
 
@@ -489,6 +534,40 @@
       ctx.strokeStyle = '#e8c33c'; ctx.lineWidth = g.r * 0.04;
       ell(ctx, ex, ey, er * 1.2, er * 1.2); ctx.stroke();
       ctx.fillStyle = 'rgba(220,240,255,0.2)'; ctx.fill();
+    } else if (m.glasses === 'nerd') {
+      // Thick rectangular frame with a screen glare drifting across the
+      // lens and a bit of tape on the bridge
+      var nw = er * 2.4, nh = er * 2.0, nx = ex - nw * 0.5, ny = ey - nh * 0.5, nr = er * 0.35;
+      var lens = function () {
+        ctx.beginPath();
+        ctx.moveTo(nx + nr, ny);
+        ctx.arcTo(nx + nw, ny, nx + nw, ny + nh, nr);
+        ctx.arcTo(nx + nw, ny + nh, nx, ny + nh, nr);
+        ctx.arcTo(nx, ny + nh, nx, ny, nr);
+        ctx.arcTo(nx, ny, nx + nw, ny, nr);
+        ctx.closePath();
+      };
+      lens();
+      ctx.fillStyle = 'rgba(150,205,255,0.2)'; ctx.fill();
+      ctx.save();
+      lens(); ctx.clip();
+      var glare = Math.sin(p.t * 0.9) * er * 0.5;
+      ctx.fillStyle = 'rgba(255,255,255,0.32)';
+      ctx.beginPath();
+      ctx.moveTo(nx + er * 0.2 + glare, ny + nh);
+      ctx.lineTo(nx + er * 0.9 + glare, ny);
+      ctx.lineTo(nx + er * 1.25 + glare, ny);
+      ctx.lineTo(nx + er * 0.55 + glare, ny + nh);
+      ctx.closePath(); ctx.fill();
+      ctx.restore();
+      ctx.strokeStyle = '#1f2229'; ctx.lineWidth = g.r * 0.07; ctx.lineJoin = 'round';
+      lens(); ctx.stroke();
+      // bridge toward the beak, temple toward the back of the head
+      ctx.lineWidth = g.r * 0.055;
+      ctx.beginPath();
+      ctx.moveTo(nx + nw, ey - nh * 0.1); ctx.lineTo(nx + nw + er * 0.45, ey - nh * 0.02);
+      ctx.moveTo(nx, ey - nh * 0.1); ctx.lineTo(nx - er * 0.85, ey - hr * 0.08);
+      ctx.stroke();
     }
     ctx.restore();
   }
@@ -699,6 +778,33 @@
           fillEll(ctx, 0, -hr * 0.92, hr * 0.13, hr * 0.68, 0, '#ffb7cd');
           ctx.restore();
         }
+        break;
+      }
+      case 'headphones': {
+        // Over-ear headphones: a cup on the ear, the band arching over the
+        // crown. Drawn around the head centre (drawHat sits at the crown).
+        ctx.save();
+        ctx.translate(hr * 0.05, -top);
+        var hp = '#23272f';
+        var cx = -hr * 0.42, cy = hr * 0.04;   // the ear, behind the eye
+        ctx.lineCap = 'round';
+        ctx.strokeStyle = hp; ctx.lineWidth = hr * 0.17;
+        ctx.beginPath();
+        ctx.moveTo(cx - hr * 0.08, cy - hr * 0.2);
+        ctx.quadraticCurveTo(-hr * 1.0, -hr * 1.38, hr * 0.3, -hr * 1.24);
+        ctx.quadraticCurveTo(hr * 0.6, -hr * 1.2, hr * 0.68, -hr * 0.92);
+        ctx.stroke();
+        ctx.strokeStyle = 'rgba(255,255,255,0.2)'; ctx.lineWidth = hr * 0.05;
+        ctx.beginPath();
+        ctx.moveTo(-hr * 0.58, -hr * 0.88);
+        ctx.quadraticCurveTo(-hr * 0.66, -hr * 1.33, hr * 0.3, -hr * 1.26);
+        ctx.stroke();
+        // the cup: shell, pad, a darker centre and a tiny LED
+        fillEll(ctx, cx, cy, hr * 0.36, hr * 0.42, -0.1, hp);
+        fillEll(ctx, cx, cy, hr * 0.26, hr * 0.31, -0.1, mix(hp, '#ffffff', 0.16));
+        fillEll(ctx, cx, cy, hr * 0.13, hr * 0.16, -0.1, mix(hp, '#000000', 0.3));
+        fillEll(ctx, cx + hr * 0.16, cy + hr * 0.28, hr * 0.035, hr * 0.035, 0, '#5ad0ff');
+        ctx.restore();
         break;
       }
       case 'santa': {
@@ -921,6 +1027,7 @@
     drawBody(ctx, m, g, p);
     var h = headPos(g, p);
     drawNeck(ctx, m, g, p, h.x, h.y);
+    if (m.lanyard && !p.silhouette) drawLanyard(ctx, m, g, p);
     drawWing(ctx, m, g, p);
     ctx.save();
     ctx.translate(h.x, h.y);

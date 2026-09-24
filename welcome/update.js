@@ -32,18 +32,30 @@
     engine.mount(document.body);
     engine.start();
     window.__duck = engine;
-    // A quick hello — the "try it" card on the page shows the new
-    // reading-along and selection tricks with the real duck
+    // A quick hello, then the new duck shows off her laptop nap
     setTimeout(function () { engine.trigger('quack'); }, 2200);
-    setTimeout(function () { engine.trigger('flap'); }, 5200);
+    setTimeout(function () { engine.trigger('sleep'); }, 4500);
+    // The "try it" card toggles free roam for this page's duck only
+    var btn = document.getElementById('roamBtn');
+    if (btn) {
+      btn.onclick = function () {
+        var roam = !!engine.cfg.follow;   // about to switch
+        engine.apply({ follow: !roam });
+        btn.textContent = MSG(roam ? 'uTryFollow' : 'uTryRoam') ||
+          (roam ? 'Wieder dem Cursor folgen' : 'Freilauf ausprobieren');
+      };
+    }
   }
 
+  // This page's duck is the new IT duck, whatever the popup says — the
+  // user's own settings are only read, never written here
   if (isExt) {
     chrome.storage.sync.get(window.CursorDuckDefaults, function (loaded) {
-      loaded.ducklings = Math.max(loaded.ducklings || 0, 2);
+      loaded.model = 'techie';
+      loaded.follow = true;
       start(loaded);
     });
   } else {
-    start({ model: 'mallard', size: 1.1, ducklings: 2, sound: false });
+    start({ model: 'techie', size: 1.1, sound: false });
   }
 })();

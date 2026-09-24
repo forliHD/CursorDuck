@@ -45,8 +45,11 @@
     chonk: 0,        // 0..1 → runder, breiter
     // Extras
     crest: null,     // {len, color, kind:'tuft'|'spike'|'fan'}
-    hat: null,       // 'pirate'|'crown'|'party'|'ninja'|'tophat'|'wizard'|'chef'|'astro'|'cap'|'halo'|'horns'|'cowboy'
-    glasses: null,   // 'sun'|'round'|'visor'|'eyepatch'|'monocle'
+    hat: null,       // 'pirate'|'crown'|'party'|'ninja'|'tophat'|'wizard'|'chef'|'astro'|'cap'|'halo'|'horns'|'cowboy'|'headphones'
+    glasses: null,   // 'sun'|'round'|'visor'|'eyepatch'|'monocle'|'nerd'
+    print: null,     // short text printed on the chest ("</>")
+    printColor: null,
+    lanyard: null,   // '#rrggbb': a lanyard with a badge hangs from the neck
     // Effekte
     glow: null,      // '#rrggbb'
     ghost: 0,        // 0..1 Transparenz
@@ -56,6 +59,8 @@
     stars: 0,        // Sternen-Körper (Galaxy)
     confetti: 0,     // Konfetti beim Quaken
     goldNap: 0,      // naps in a little gold hoard (engine state 'goldnap')
+    codeNap: 0,      // falls asleep at her laptop instead (engine state 'codenap')
+    debugDuck: 0,    // explains her bugs to a rubber duck (idle action 'debug')
     quackPitch: 1.0  // Stimmlage
   };
 
@@ -333,6 +338,28 @@
       goldNap: 1, sparkle: 0.2, quackPitch: 0.82
     }),
     duck({
+      // The IT department's duck: heather-grey hoodie (the body, collar as
+      // neck ring) with a "</>" print, thick glasses and a lanyard badge.
+      // Falls asleep at her laptop (engine state 'codenap'), debugs with a
+      // rubber duck (idle action 'debug') and now and then a one-liner
+      // replaces the quack.
+      id: 'techie', name: 'IT-Ente', emoji: '💻', tier: 'epic',
+      body: '#5e6573', bodyDark: '#434955', belly: '#7b8290',
+      head: '#ffd83d', headDark: '#e8b91b', neckRing: '#525966',
+      beak: '#ff8a1f', beakDark: '#dd6a06',
+      wing: '#575e6c', wingBar: '#3d4350', tail: '#4b515e', foot: '#ff8a1f',
+      eye: '#ffffff', pupil: '#221a12',
+      hat: 'headphones', glasses: 'nerd',
+      print: '</>', printColor: '#eef0f4', lanyard: '#e04b4b',
+      codeNap: 1, debugDuck: 1, quackPitch: 0.95,
+      sayings: ['It works on my machine.', 'Have you tried turning it off and on again?',
+                'sudo quack', '404: bread not found', "It's not a bug, it's a feature.",
+                "There's no place like 127.0.0.1", 'git blame says: you.',
+                'Have you cleared your cache?', 'Duck typing. Literally.',
+                'Rubber duck? I AM the duck.', 'Deploy on Friday? Quack no.',
+                '99 little bugs in the code …']
+    }),
+    duck({
       id: 'rainbow', name: 'Regenbogen-Ente', emoji: '🌈', tier: 'legendary',
       body: '#ff7a7a', bodyDark: '#d95a5a', belly: '#fff0f0',
       head: '#ff7a7a', headDark: '#d95a5a',
@@ -433,11 +460,13 @@
     { id: 'horns',    kind: 'hat',     name: 'Hörnchen',        stat: 'startles',      goal: 50,  ach: 'achStartle2' },
     { id: 'pirate',   kind: 'hat',     name: 'Piratenhut',      stat: 'fish',          goal: 100, ach: 'achFish3' },
     { id: 'crown',    kind: 'hat',     name: 'Krone',           stat: 'pets',          goal: 500, ach: 'achPets3' },
+    { id: 'headphones', kind: 'hat',   name: 'Kopfhörer',       stat: 'codeNaps',      goal: 1,   ach: 'achCode1' },
     { id: 'sun',      kind: 'glasses', name: 'Sonnenbrille',    stat: 'pets',          goal: 10,  ach: 'achPets1' },
     { id: 'round',    kind: 'glasses', name: 'Runde Brille',    stat: 'modelSwitches', goal: 10,  ach: 'achStyle' },
     { id: 'eyepatch', kind: 'glasses', name: 'Augenklappe',     stat: 'fish',          goal: 25,  ach: 'achFish2' },
     { id: 'monocle',  kind: 'glasses', name: 'Monokel',         stat: 'goldNaps',      goal: 10,  ach: 'achGold2' },
-    { id: 'visor',    kind: 'glasses', name: 'Visor',           stat: 'surfs',         goal: 100, ach: 'achSurf2' }
+    { id: 'visor',    kind: 'glasses', name: 'Visor',           stat: 'surfs',         goal: 100, ach: 'achSurf2' },
+    { id: 'nerd',     kind: 'glasses', name: 'Nerdbrille',      stat: 'codeNaps',      goal: 10,  ach: 'achCode2' }
   ];
 
   var BY_ID = {};

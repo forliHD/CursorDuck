@@ -37,6 +37,7 @@
     trick_visitor: 'Visitor',
     trick_waddle: 'Shore leave',
     trick_disco: 'Disco',
+    trick_debug: 'Debug',
     another: 'Another duck',
     soundOn: 'Sound on',
     soundOff: 'Sound off',
@@ -245,7 +246,7 @@
 
   var TRICKS = [
     ['quack', '📣'], ['flap', '🪶'], ['crumbs', '🍞'], ['fish', '🐟'],
-    ['visitor', '💕'], ['waddle', '🚶'], ['disco', '🪩']
+    ['visitor', '💕'], ['waddle', '🚶'], ['disco', '🪩'], ['debug', '🐤']
   ];
   function renderTricks() {
     var box = $('#tricks');

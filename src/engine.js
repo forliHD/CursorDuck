@@ -18,6 +18,19 @@
   }
   // party palette for the disco ball, its spots and the colored notes
   var DISCO_COLS = ['#ff5fa2', '#59d7ff', '#ffe066', '#7cf29a', '#c58bff', '#ff9f43'];
+  // syntax colours on the techie's laptop screen (keyword, string, text, comment, name, number)
+  var CODE_COLS = ['#c792ea', '#c3e88d', '#e6e6e6', '#6b7a8f', '#82aaff', '#f78c6c'];
+
+  function rrect(ctx, x, y, w, h, r) {
+    r = Math.max(0, Math.min(r, w / 2, h / 2));
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+  }
 
   var DEFAULTS = {
     enabled: true,
@@ -38,7 +51,8 @@
     sleepAfter: 15,     // Sekunden Cursor-Stillstand bis zum Nickerchen
     duckName: '',       // Taufname, wird bei voller Streichel-Leiste gesagt
     hat: '',            // wardrobe: '' = the model's own, 'none' = bare, else a hat kind
-    glasses: ''         // same for glasses
+    glasses: '',        // same for glasses
+    follow: true        // off = free roam: she lives on the page instead of trailing the cursor
   };
 
   // ── Sound ─────────────────────────────────────────────────────
@@ -263,9 +277,12 @@
     ns.start(t0, Math.random() * 0.3); ns.stop(t0 + 0.06);
   };
 
-  Sound.prototype.quack = function (pitch, joy) {
+  // `soft` = muttering under her breath (rubber-duck debugging): the same
+  // voice at less than half the volume
+  Sound.prototype.quack = function (pitch, joy, soft) {
     var ac = this._ready(); if (!ac) return;
     var p = pitch || 1;
+    var loud = soft ? 0.45 : 1;
     if (this.buffers.quack) {
       // mostly the main quack, sometimes one of the real-duck variants
       var name = 'quack';
@@ -277,11 +294,11 @@
       }
       // model pitch = playback rate; a little jitter keeps her lively
       var qr = p * rand(0.96, 1.05);
-      this._play(name, qr, 1);
+      this._play(name, qr, loud);
       if (joy) {
         // joy quacks twice, the second one a touch higher and quicker
         var gap = Math.max(0.1, this.buffers[name].duration / qr * 0.82);
-        this._play(name, qr * 1.12, 0.85, ac.currentTime + gap);
+        this._play(name, qr * 1.12, 0.85 * loud, ac.currentTime + gap);
       }
       return;
     }
@@ -289,11 +306,30 @@
     var t0 = ac.currentTime + 0.01;
     if (joy) {
       // Joy quacks in two syllables: "quack-quack!", second one higher
-      this._syllable(t0, p, 0.16, true, 0.95);
-      this._syllable(t0 + 0.155, p * 1.09, 0.14, true, 0.8);
+      this._syllable(t0, p, 0.16, true, 0.95 * loud);
+      this._syllable(t0 + 0.155, p * 1.09, 0.14, true, 0.8 * loud);
     } else {
-      this._syllable(t0, p, 0.21, false, 1);
+      this._syllable(t0, p, 0.21, false, loud);
     }
+  };
+
+  // Keystroke on the techie's laptop: the beak "tok" played short, quick
+  // and quiet — `heavy` is the face-plant onto the keys (slower, louder).
+  // Synth fallback: a tiny sine tick.
+  Sound.prototype.key = function (heavy) {
+    var ac = this._ready(); if (!ac) return;
+    var rate = heavy ? rand(0.62, 0.7) : rand(1.55, 1.95);
+    var gain = heavy ? 0.9 : 0.22;
+    if (this.buffers.peck) { this._play('peck', rate, gain); return; }
+    if (!this._canSynth('peck')) return;
+    var t0 = ac.currentTime + 0.005;
+    var o = ac.createOscillator(); o.type = 'sine';
+    o.frequency.setValueAtTime(heavy ? 700 : 1900, t0);
+    o.frequency.exponentialRampToValueAtTime(heavy ? 420 : 1300, t0 + 0.03);
+    var g = ac.createGain();
+    this._env(g, t0, gain * 1.6, heavy ? 0.06 : 0.025, 0.002);
+    o.connect(g); g.connect(this.master);
+    o.start(t0); o.stop(t0 + 0.08);
   };
 
   // Water splash. Sample path: bigger splashes play slower (deeper) and
@@ -450,7 +486,8 @@
     { id: 'bathe', w: 1.2, dur: [2.2, 3.0] },
     { id: 'bob', w: 2.4, dur: [1.2, 2.2] },
     { id: 'dance', w: 0.8, dur: [2.6, 3.4] },
-    { id: 'waddle', w: 0.8, dur: [6.15, 6.15] }   // Landgang: feste Choreo-Länge
+    { id: 'waddle', w: 0.8, dur: [6.15, 6.15] },  // Landgang: feste Choreo-Länge
+    { id: 'debug', w: 1.4, dur: [5.5, 7.0], only: 'debugDuck' }   // rubber-duck debugging (techie)
   ];
 
   // High-motion idle actions skipped when the OS asks for reduced
@@ -458,17 +495,21 @@
   // tricks (popup buttons) always play.
   var CALM_SKIP = { shake: 1, spin: 1, dance: 1, bathe: 1 };
 
-  function weightedAction(calm) {
-    var total = 0, i;
+  // `only` names a model flag: such actions are exclusive to models that
+  // carry it (the trick buttons may still start them for everybody).
+  function weightedAction(calm, model) {
+    var total = 0, i, act;
     for (i = 0; i < IDLE_ACTIONS.length; i++) {
-      if (calm && CALM_SKIP[IDLE_ACTIONS[i].id]) continue;
-      total += IDLE_ACTIONS[i].w;
+      act = IDLE_ACTIONS[i];
+      if ((calm && CALM_SKIP[act.id]) || (act.only && !(model && model[act.only]))) continue;
+      total += act.w;
     }
     var r = Math.random() * total;
     for (i = 0; i < IDLE_ACTIONS.length; i++) {
-      if (calm && CALM_SKIP[IDLE_ACTIONS[i].id]) continue;
-      r -= IDLE_ACTIONS[i].w;
-      if (r <= 0) return IDLE_ACTIONS[i];
+      act = IDLE_ACTIONS[i];
+      if ((calm && CALM_SKIP[act.id]) || (act.only && !(model && model[act.only]))) continue;
+      r -= act.w;
+      if (r <= 0) return act;
     }
     return IDLE_ACTIONS[0];
   }
@@ -521,10 +562,41 @@
   Duck.prototype.setState = function (s, dur) {
     if (this.state === s) return;
     if (this.state === 'goldnap') this.gnInit = false;   // leaving mid-dive
+    if (this.state === 'codenap') this.cnInit = false;   // leaving mid-typing
+    if (this.state === 'roamwalk') this.rwInit = false;  // leaving mid-walk (follow switched on)
+    // free roam keeps its own nap rhythm: how long she sleeps, how long she stays up
+    if (this.e.roam && !this.baby && !this.wild) {
+      if (s === 'sleep') this.e.roam.wakeIn = rand(45, 120);
+      else if (this.state === 'sleep') { this.e.roam.napIn = rand(180, 300); this.e.roam.restT = 60; }
+    }
     this.state = s;
     this.stTime = 0;
     this.stDur = dur || 1;
     this.actionTick = 0;
+  };
+
+  // Does the cursor disturb her nap or bedtime ritual? Following the cursor,
+  // any movement does; in free roam only a cursor that moves close by.
+  Duck.prototype.disturbed = function (cdist) {
+    if (this.e.pointerIdle >= 0.2) return false;
+    return this.e.cfg.follow || this.baby || cdist < this.radius() * 4;
+  };
+
+  // The startled bit of waking up, shared by every wake-up path (cursor,
+  // scroll, music): a hop out of the gold hoard with coins flying, or a
+  // jolt up from the laptop keyboard.
+  Duck.prototype.wakeJolt = function () {
+    var e = this.e, r = this.radius();
+    if (this.hoardNap && e.hoard) {
+      this.hopY = r * 0.8;
+      e.fx.coinBurst(this.x, this.y - r * 0.5, 6, 0.7);
+      e.sound.coins(0.6);
+    } else if (this.codeNap && e.laptop) {
+      this.hopY = r * 0.45;
+      this.a.headDip = 0;               // head snaps up off the keys
+      e.sound.key(true);
+      e.laptop.jolt = 1;                // the held key lets go
+    }
   };
 
   // The water shake-off that ends dabbling, diving, peekaboo & Co. Under
@@ -534,9 +606,13 @@
     this.setState(this.e.cfg.reduceMotion ? 'idle' : 'shake', dur);
   };
 
-  // Gold-hoard models take the scenic route into bed (dive first)
+  // Some models take the scenic route into bed: the tycoon dives into her
+  // gold first, the techie falls asleep at her laptop
   Duck.prototype.sleepState = function () {
-    return (this.model.goldNap && !this.baby) ? 'goldnap' : 'sleep';
+    if (this.baby) return 'sleep';
+    if (this.model.goldNap) return 'goldnap';
+    if (this.model.codeNap) return 'codenap';
+    return 'sleep';
   };
 
   Duck.prototype.say = function (txt, color) {
@@ -567,7 +643,7 @@
       walk: a.walk, hop: this.hopY,
       // no own waterline while tucked into the nest or the gold hoard
       water: !this.nesting && !this.hoardNap,
-      reflection: this.e.cfg.reflection && !this.baby && !this.hoardNap
+      reflection: this.e.cfg.reflection && !this.baby && !this.hoardNap && !this.codeNap
     };
   };
 
@@ -596,8 +672,12 @@
     var maxSpeed = (this.baby ? 520 : 430) * cfg.speed * (boost || 1) * alert;
     if (dist > stopDist) {
       var want = clamp((dist - stopDist) * 3.4, 0, maxSpeed);
-      // Sprint, wenn die Ente weit abgehängt wurde
-      if (dist > 420) want = Math.min(maxSpeed * 1.9, want * 1.5);
+      // Sprint, wenn die Ente weit abgehängt wurde — in free roam she takes
+      // her wander legs at a leisurely pace instead
+      if (dist > 420 && (cfg.follow || this.baby || this.wild ||
+          (this.state !== 'swim' && this.state !== 'idle'))) {
+        want = Math.min(maxSpeed * 1.9, want * 1.5);
+      }
       var ux = dx / dist, uy = dy / dist;
       // Enten schlängeln beim Paddeln leicht seitlich (sanfter bei Reduced Motion)
       var wobAmp = cfg.reduceMotion ? 0.04 : 0.10;
@@ -682,18 +762,28 @@
     // Bäuchlein leert sich mit der Zeit von selbst
     this.fullness = Math.max(0, this.fullness - dt * 0.22);
 
-    var dx = px - this.x, dy = py - this.y;
+    // Movement goal: the cursor — or, in free roam, her own wander goal.
+    // `dist` is the distance to that goal; reactions that need real
+    // closeness (petting, pecking, dizziness, dance) use `cdist`, the
+    // distance to the true cursor, which is the same thing when following.
+    var roam = (!cfg.follow && !this.baby && e.roam) ? e.roam : null;
+    var gx = roam ? roam.x : px, gy = roam ? roam.y : py;
+    var dx = gx - this.x, dy = gy - this.y;
     var dist = Math.sqrt(dx * dx + dy * dy);
+    var cdx = px - this.x, cdy = py - this.y;
+    var cdist = roam ? Math.sqrt(cdx * cdx + cdy * cdy) : dist;
     var r = this.radius();
     // user-set keep-away distance so she doesn't sit on the text being read
     var stopDist = r * 1.9 * (this.baby ? 1 : clamp(cfg.distance || 1, 1, 3));
+    // in free roam she goes all the way to her goal
+    var goalStop = roam ? r * 0.35 : stopDist;
     var st = this.state;
 
     // ── Streicheln erkennen ─────────────────────────────────
     // (nicht beim Tauchen, an Land oder mitten im Platzen)
     var inside = this.hit(px, py);
     var petting = inside && e.pointerSpeed > 55 &&
-      st !== 'dive' && st !== 'waddle' && st !== 'burst';
+      st !== 'dive' && st !== 'waddle' && st !== 'roamwalk' && st !== 'burst';
     if (petting) {
       if (e.pointerSpeed > 2100 && this.pet < 0.15 && st !== 'startle') {
         this.setState('startle', 0.8);
@@ -726,15 +816,17 @@
     } else {
       this.petHold -= dt;
       this.pet = Math.max(0, this.pet - dt * (this.petHold > 0 ? 0.12 : 0.7));
-      if (st === 'pet' && this.petHold <= 0) this.setState(dist > stopDist * 1.4 ? 'swim' : 'idle', 1);
+      if (st === 'pet' && this.petHold <= 0) this.setState(dist > (roam ? r : stopDist * 1.4) ? 'swim' : 'idle', 1);
     }
 
     // ── Aufmerksamer Blick: Kopfwinkel zum Cursor ──────────
     // Im lokalen Rahmen der Ente (+x = Blickrichtung): deutlich sichtbare
     // Kopfneigung zum Cursor. Zustände dürfen das überschreiben.
     // Beim Tippen/Markieren guckt sie stattdessen zum Text (nur Mama).
-    var lx = (e.typeT > 0 && !this.baby) ? e.typeX : px;
-    var ly = (e.typeT > 0 && !this.baby) ? e.typeY : py;
+    // Roaming, a far-away cursor is not worth a look: she watches her way.
+    var farCursor = roam && cdist > 420;
+    var lx = (e.typeT > 0 && !this.baby) ? e.typeX : (farCursor ? gx : px);
+    var ly = (e.typeT > 0 && !this.baby) ? e.typeY : (farCursor ? gy : py);
     var lookX = (lx - this.x) * (this.dirF >= 0 ? 1 : -1);
     var lookY = ly - (this.y - r * 1.55);
     this.lookAng = clamp(Math.atan2(lookY, Math.max(lookX, r * 0.8)), -0.55, 0.6);
@@ -742,19 +834,21 @@
     // ── Abgehängt? Spielerei abbrechen und hinterher ───────
     st = this.state;
     // In aufmerksamen Zuständen dreht sie sich immer zum Cursor
+    // (roaming only to a cursor nearby — otherwise she keeps her heading)
+    var turnDx = farCursor ? 0 : cdx;
     if ((st === 'idle' || st === 'look' || st === 'bob' || st === 'quack') &&
-        Math.abs(dx) > r * 0.55) {
-      this.face = dx > 0 ? 1 : -1;
+        Math.abs(turnDx) > r * 0.55) {
+      this.face = turnDx > 0 ? 1 : -1;
     }
-    if (INTERRUPTIBLE[st] && dist > stopDist * 3 && e.pointerSpeed > 60) {
+    if (!roam && INTERRUPTIBLE[st] && dist > stopDist * 3 && e.pointerSpeed > 60) {
       this.quacked = false; this.peckDone = false; this.dove = false;
       this.surfaced = false; this.dabbleUp = false; this.splashed = false;
       this.setState('swim', 1);
       st = 'swim';
     }
     // Cursor macht einen großen Sprung (Fenster/iframe gewechselt) → kurz aufmerken
-    if (!this.baby && e.alertPing && dist > 260 &&
-        st !== 'sleep' && st !== 'goldnap' && st !== 'pet' &&
+    if (!this.baby && !roam && e.alertPing && dist > 260 &&
+        st !== 'sleep' && st !== 'goldnap' && st !== 'codenap' && st !== 'pet' &&
         st !== 'startle' && st !== 'burst') {
       this.say('!', '#4a90d9');
     }
@@ -762,8 +856,8 @@
     // ── Schwindel: Cursor kreist um die Ente ───────────────
     if (!this.baby) {
       var circleable = st === 'idle' || st === 'swim' || st === 'bob' || st === 'look';
-      if (circleable && dist > r * 0.8 && dist < r * 7 && e.pointerSpeed > 140) {
-        var ang = Math.atan2(dy, dx);
+      if (circleable && cdist > r * 0.8 && cdist < r * 7 && e.pointerSpeed > 140) {
+        var ang = Math.atan2(cdy, cdx);
         if (this.lastAng != null) {
           var dAng = ang - this.lastAng;
           if (dAng > Math.PI) dAng -= TAU; else if (dAng < -Math.PI) dAng += TAU;
@@ -785,13 +879,13 @@
       var attentive = st === 'idle' || st === 'swim' || st === 'bob' || st === 'look' || st === 'quack';
       // Wackelnder Cursor: erst mal innehalten und zuschauen (Vorfreude) —
       // sonst schwimmt sie mitten ins Gewackel und landet beim Streicheln.
-      if ((st === 'idle' || st === 'swim') && e.wiggleN >= 2 && !inside && dist < 340) {
+      if ((st === 'idle' || st === 'swim') && e.wiggleN >= 2 && !inside && cdist < 340) {
         this.watchT = 0.45;
       }
       this.watchT = Math.max(0, (this.watchT || 0) - dt);
       // Tanz-Aufforderung: Cursor wackelt schnell hin und her in ihrer Nähe.
       // spinAcc-Guard: wer kreist, will den Schwindel, kein Tänzchen.
-      if (attentive && e.wiggleN >= 4 && !inside && dist < 420 &&
+      if (attentive && e.wiggleN >= 4 && !inside && cdist < 420 &&
           Math.abs(this.spinAcc) < TAU * 0.5) {
         e.wiggleN = 0;
         this.setState('dance', rand(2.6, 3.4));
@@ -833,12 +927,8 @@
       if (e.musicOn) {
         if (e.mediaPing) {
           e.mediaPing = false;
-          if (st === 'sleep' || st === 'goldnap' || st === 'tuckin') {
-            if (this.hoardNap && e.hoard) {
-              this.hopY = r * 0.8;
-              e.fx.coinBurst(this.x, this.y - r * 0.5, 6, 0.7);
-              e.sound.coins(0.6);
-            }
+          if (st === 'sleep' || st === 'goldnap' || st === 'codenap' || st === 'tuckin') {
+            this.wakeJolt();
             this.setState('wake', 0.7);
             this.say('♪', '#4a90d9');
             st = 'wake';
@@ -848,7 +938,7 @@
         this.grooveCd = (this.grooveCd || 0) - dt;
         // music beats preening & co.: any interruptible pastime gives way
         var groovy = st === 'idle' || (INTERRUPTIBLE[st] && st !== 'dance') ||
-          (st === 'swim' && dist < stopDist * 2.5);
+          (st === 'swim' && (roam || dist < stopDist * 2.5));
         if (groovy && this.grooveCd <= 0) {
           this.mediaDance = true;
           this.setState('dance', rand(3.2, 4.6));
@@ -917,6 +1007,8 @@
             // bedded in gold: she dreams in glitter
             e.fx.sparkle(e.hoard.x + rand(-0.7, 0.7) * e.hoard.r,
               e.hoard.y - rand(0.15, 0.8) * e.hoard.r, '#ffe9a8', rand(3, 6));
+          } else if (this.codeNap && e.laptop) {
+            // the screen keeps her company (the glow is drawn with the laptop)
           } else if (e.isNight()) {
             // nachts träumt sie in Sternchen
             e.fx.sparkle(hz.x - r * rand(0.1, 0.6), hz.y - r * rand(0.6, 1.2), '#b9c8ff', rand(3, 5));
@@ -931,18 +1023,27 @@
           this.vx = 0; this.vy = 0;
           this.x = approach(this.x, e.hoard.x, 6, dt);
           this.y = approach(this.y, e.hoard.y + 1, 6, dt);
+        } else if (this.codeNap && e.laptop) {
+          // face on the keys: stays seated, the head resting on the near end
+          // of the keyboard (low enough to lie on it, never below the deck)
+          var lpS = e.laptop;
+          this.vx = 0; this.vy = 0;
+          this.x = approach(this.x, lpS.x + lpS.side * (lpS.r * 0.95 + r * 0.4), 6, dt);
+          this.y = approach(this.y, lpS.y + lpS.r * 0.06, 6, dt);
+          this.face = lpS.x > this.x ? 1 : -1;
+          t.headDip = 0.55; t.headRot = 0.3; t.sleep = 0.35;
         } else {
           this.vx = approach(this.vx, 0, 1.5, dt);
           this.vy = approach(this.vy, 0, 1.5, dt);
         }
-        if (e.pointerIdle < 0.2 || (!this.hoardNap && dist > r * 4)) {
-          if (this.hoardNap && e.hoard) {
-            // startled hop out of the coins (the hoard sinks on its own)
-            this.hopY = r * 0.8;
-            this.vx = (px > this.x ? 1 : -1) * 90;
-            e.fx.coinBurst(this.x, this.y - r * 0.5, 6, 0.7);
-            e.sound.coins(0.6);
-          }
+        // Following: any cursor movement wakes her (or drifting far off).
+        // Roaming: only a cursor moving close by, or her own alarm clock.
+        var woken = roam
+          ? (this.disturbed(cdist) || roam.wakeIn <= 0)
+          : (e.pointerIdle < 0.2 || (!this.hoardNap && !this.codeNap && dist > r * 4));
+        if (woken) {
+          if (this.hoardNap && e.hoard) this.vx = (px > this.x ? 1 : -1) * 90;
+          this.wakeJolt();
           this.setState('wake', 0.7);
           this.say('!', '#ffb03d');
           e.sound.quack(this.model.quackPitch * 0.9);
@@ -954,7 +1055,7 @@
         // takes a gleeful leap and dives in — Scrooge style — then sleeps
         // buried in coins (the 'sleep' state with hoardNap set).
         if (!this.gnInit) { this.gnInit = true; this.gnPhase = 'go'; this.gnSide = 0; }
-        if (e.pointerIdle < 0.2) {   // cursor moved → bedtime cancelled
+        if (this.disturbed(cdist)) {   // cursor moved → bedtime cancelled
           this.setState('swim', 1);
           break;
         }
@@ -1011,11 +1112,160 @@
         break;
       }
 
+      case 'codenap': {
+        // Techie bedtime: her laptop rises beside her, she paddles over,
+        // types a few more lines with drooping eyes, nods off and lands
+        // face first on the keyboard — then sleeps there (the 'sleep'
+        // state with codeNap set) while the screen runs its screensaver.
+        if (!this.cnInit) {
+          this.cnInit = true; this.cnPhase = 'go'; this.cnT = 0;
+          this.cnBuilt = this.cnGrumbled = this.cnNodSaid = false;
+        }
+        if (this.disturbed(cdist)) {   // cursor came by → bedtime cancelled
+          this.setState('swim', 1);
+          break;
+        }
+        var lp = e.laptop;
+        if (!lp) {
+          // laptop rises in the next engine step — drift until it's there
+          this.vx = approach(this.vx, 0, 3, dt);
+          this.vy = approach(this.vy, 0, 3, dt);
+          break;
+        }
+        var seatX = lp.x + lp.side * (lp.r * 0.95 + r * 0.4);
+        var seatY = lp.y + lp.r * 0.06;
+        if (this.cnPhase === 'go') {
+          this.swim(dt, seatX, seatY, 5, 0.85);
+          if (Math.abs(lp.x - this.x) > r * 0.3) this.face = lp.x > this.x ? 1 : -1;
+          t.eyeOpen = 0.7; t.headRot = -0.05;
+          if (lp.appear > 0.85 && Math.hypot(seatX - this.x, seatY - this.y) < r * 0.6) {
+            this.cnPhase = 'type'; this.cnT = 0; this.cnDur = rand(4.2, 6);
+            this.vx = 0; this.vy = 0;
+          }
+          break;
+        }
+        // seated: stay put, face the screen
+        this.vx = 0; this.vy = 0;
+        this.x = approach(this.x, seatX, 8, dt);
+        this.y = approach(this.y, seatY, 8, dt);
+        this.face = lp.x > this.x ? 1 : -1;
+        this.cnT += dt;
+        if (this.cnPhase === 'type') {
+          var tk = clamp(this.cnT / this.cnDur, 0, 1);
+          var tired = tk * tk;   // she fades faster toward the end
+          // keystrokes in little bursts: the head bobs and a wing taps along
+          this.keyCd = (this.keyCd || 0) - dt;
+          if (this.keyCd <= 0) {
+            this.keyCd = (0.1 + tired * 0.25) * rand(0.6, 1.5);
+            e.sound.key();
+            lp.keyPulse = 1;
+            e.laptopType(lp);
+          }
+          t.headDip = 0.3 + lp.keyPulse * 0.12 + tired * 0.28;
+          t.headRot = 0.08;
+          t.wingLift = 0.3; t.wingFlap = lp.keyPulse * 0.22;
+          t.eyeOpen = 1 - tired * 0.7;
+          // the build in the middle: a bar sweeps, then a tick or a cross
+          if (!this.cnBuilt && tk > 0.45) { this.cnBuilt = true; e.laptopBuild(lp); }
+          if (lp.badge > 0 && !lp.badgeOk && !this.cnGrumbled) {
+            this.cnGrumbled = true;
+            this.say('hmpf', '#c0392b');
+          }
+          if (tk >= 1) { this.cnPhase = 'doze'; this.cnT = 0; }
+        } else {
+          // doze: the head sinks in three nods, jerking back up each time,
+          // then the face lands on the keys
+          var NOD = 0.5;
+          if (this.cnT < NOD * 3) {
+            var nk = (this.cnT % NOD) / NOD, nn = Math.floor(this.cnT / NOD);
+            t.headDip = 0.35 + nn * 0.08 + nk * nk * 0.25;
+            t.eyeOpen = 0.35 - nk * 0.3;
+            t.headRot = 0.1;
+            t.wingLift = 0.25;
+            if (nk < 0.1) this.cnNodSaid = false;
+            if (nk > 0.92 && !this.cnNodSaid) {
+              this.cnNodSaid = true;
+              if (nn === 1) this.say('!', '#ffb03d');
+            }
+          } else {
+            // face-plant: a held key floods the screen, key caps fly
+            this.a.headDip = 0.8; this.a.squash = 1.14; this.a.eyeOpen = 0;
+            e.sound.key(true);
+            lp.flood = 0.001;
+            lp.keyPulse = 1;
+            if (cfg.effects) {
+              var hk = this.headWorld();
+              for (var kc = 0; kc < 4; kc++) e.fx.keycap(hk.x + rand(-10, 10), hk.y + 4);
+            }
+            e.stats.codeNaps = (e.stats.codeNaps || 0) + 1;
+            e.saveStats();
+            this.cnInit = false;
+            this.codeNap = true;
+            this.setState('sleep', 99);
+          }
+        }
+        break;
+      }
+
+      case 'debug': {
+        // Rubber-duck debugging: a little rubber duck rises in front of
+        // her, she explains the bug (nodding, muttering, … ? !), the duck
+        // squeaks, she gets it (💡) and the duck sinks away again.
+        var bd = e.buddy;
+        if (!bd) {
+          this.vx = approach(this.vx, 0, 4, dt);
+          this.vy = approach(this.vy, 0, 4, dt);
+          break;
+        }
+        this.vx = approach(this.vx, 0, 4, dt);
+        this.vy = approach(this.vy, 0, 4, dt);
+        if (Math.abs(bd.x - this.x) > r * 0.3) this.face = bd.x > this.x ? 1 : -1;
+        var dgk = this.stTime / this.stDur;
+        if (dgk < 0.7) {
+          // explaining, with pauses for thought
+          var talk = Math.sin(this.stTime * 1.7) > -0.2 ? 1 : 0.15;
+          t.headRot = -0.1 + Math.sin(this.stTime * 5.5) * 0.14 * talk;
+          t.beakOpen = Math.max(0, Math.sin(this.stTime * 11)) * 0.35 * talk;
+          t.wingLift = 0.35 + Math.max(0, Math.sin(this.stTime * 2.7)) * 0.3;
+          this.actionTick -= dt;
+          if (this.actionTick <= 0) {
+            this.actionTick = 1.25;
+            this.say(['…', '?', '!'][(this.dbgN || 0) % 3], '#6b7d92');
+            this.dbgN = (this.dbgN || 0) + 1;
+            e.sound.quack(this.model.quackPitch * 0.9, false, true);
+          }
+        } else {
+          if (!this.dbgAha) {
+            this.dbgAha = true;
+            bd.squeak = 0.5;
+            e.sound.quack(1.45);   // the rubber duck has spoken
+            this.say('💡', '#ffd23d');
+            this.a.squash = 1.12;
+            this.hopY = r * 0.3;
+          }
+          t.eyeHappy = 1; t.headRot = -0.2;
+          if (!this.dbgThanks && dgk > 0.85) {
+            this.dbgThanks = true;
+            e.sound.quack(this.model.quackPitch * 1.2, true);
+          }
+        }
+        if (this.stTime > this.stDur) {
+          this.dbgAha = this.dbgThanks = false; this.dbgN = 0;
+          this.setState('idle', 1);
+        }
+        break;
+      }
+
       case 'wake':
         t.eyeOpen = 1; t.wingFlap = clamp(1 - this.stTime * 2, 0, 1);
         t.beakOpen = clamp(0.7 - this.stTime * 1.6, 0, 1);
         t.squash = 1 + Math.max(0, 0.12 - this.stTime * 0.4);
-        if (this.stTime > this.stDur) this.setState('swim', 1);
+        // up from the keyboard: a puzzled look at what she typed in her sleep
+        if (this.codeNap && e.laptop && !this.cnPuzzled && this.stTime > 0.3) {
+          this.cnPuzzled = true;
+          this.say('?', '#59b6f7');
+        }
+        if (this.stTime > this.stDur) { this.cnPuzzled = false; this.setState('swim', 1); }
         break;
 
       // ── Idle-Aktionen ────────────────────────────────────
@@ -1135,8 +1385,8 @@
           this.actionTick = 0.14;
           e.fx.bubble(this.x + rand(-r * 0.6, r * 0.6), this.y - rand(0, 6));
         }
-        // Unterwasser bewegt sie sich Richtung Cursor
-        if (t.submerge > 0.6) this.swim(dt, px, py, r, 0.9);
+        // Unterwasser bewegt sie sich Richtung Cursor (bzw. Ziel)
+        if (t.submerge > 0.6) this.swim(dt, gx, gy, r, 0.9);
         if (vk > 0.78 && !this.surfaced) {
           this.surfaced = true;
           e.fx.splash(this.x, this.y, 1.4);
@@ -1270,7 +1520,7 @@
         // Gute-Nacht-Ritual: Mama schwimmt ans Nest, wartet bis alle
         // Küken drin liegen, stupst ihnen ein Küsschen zu — dann schläft
         // sie selbst ein. Bewegt sich der Cursor, ist die Nacht vorbei.
-        if (e.pointerIdle < 0.2) {
+        if (this.disturbed(cdist)) {
           this.tuckKiss = this.tuckHeart = false;
           this.setState('swim', 1);
           break;
@@ -1632,13 +1882,13 @@
       case 'idle':
         // Kopf folgt dem Cursor (Drehen übernimmt der Block vor dem Automaten)
         t.headRot = this.lookAng;
-        if (cfg.distance > 1.05 && dist < stopDist * 0.7) {
+        if (cfg.distance > 1.05 && cdist < stopDist * 0.7) {
           // keep-away distance set: after a peck (or a cursor stop right on
           // her) she backs off again instead of parking on the text
-          var bx = (this.x - px) / (dist || 1), by = (this.y - py) / (dist || 1);
+          var bx = (this.x - px) / (cdist || 1), by = (this.y - py) / (cdist || 1);
           this.swim(dt, px + bx * stopDist, py + by * stopDist, 4, 0.5);
         } else {
-          this.swim(dt, px, py, stopDist, 0.6);
+          this.swim(dt, gx, gy, goalStop, 0.6);
         }
         this.nextIdle -= dt * cfg.playfulness;
         this.peckCd -= dt;
@@ -1656,8 +1906,22 @@
             break;
           }
         }
-        if (dist > stopDist * 1.6) { this.setState('swim', 1); break; }
-        if (e.pointerIdle > cfg.sleepAfter * (e.isNight() ? 0.5 : 1) && !e.musicOn && e.typeT <= 0) {
+        // a new goal (roaming) or a cursor that moved on → off she goes,
+        // in free roam sometimes on foot
+        if (dist > (roam ? r * 1.2 : stopDist * 1.6)) {
+          this.setState(roam && roam.walk ? 'roamwalk' : 'swim', 1);
+          break;
+        }
+        // bedtime: the cursor has been resting for a while — or, roaming,
+        // her own clock says so. Roaming she first settles down (no dozing
+        // off mid-glide) and stays up a minimum after each nap, else a
+        // resting cursor would put her straight back to sleep.
+        var cursorRests = e.pointerIdle > cfg.sleepAfter * (e.isNight() ? 0.5 : 1);
+        var sleepy = roam
+          ? ((cursorRests && roam.restT <= 0) || roam.napIn <= 0) &&
+            Math.hypot(this.vx, this.vy) < 30
+          : cursorRests;
+        if (sleepy && !e.musicOn && e.typeT <= 0) {
           if (e.babies.length) {
             // Erst die Küken ins Nest bringen, dann selbst schlafen
             this.tuckKiss = this.tuckHeart = false;
@@ -1670,28 +1934,104 @@
           break;
         }
         // peck reach grows with the keep-away distance, else she'd never get a turn
-        if (cfg.peck && this.peckCd <= 0 && dist < Math.max(r * 3.4, stopDist * 1.8) && e.pointerIdle > 0.6) {
+        if (cfg.peck && this.peckCd <= 0 && cdist < Math.max(r * 3.4, stopDist * 1.8) && e.pointerIdle > 0.6) {
           this.peckDone = false;
           this.setState('peck', 0.62);
           break;
         }
         if (this.nextIdle <= 0) {
-          var act = weightedAction(cfg.reduceMotion);
+          var act = weightedAction(cfg.reduceMotion, this.model);
           this.nextIdle = rand(2.2, 6.5) / cfg.playfulness;
           this.setState(act.id, rand(act.dur[0], act.dur[1]));
         }
         break;
 
+      case 'roamwalk': {
+        // Free roam on foot: hop out of the water, waddle to the goal on
+        // her little legs (the shore-leave gait), plop back in on arrival.
+        var RW_OUT = 0.7, RW_IN = 0.8;
+        var ro = e.roam;
+        if (!ro) { this.rwInit = false; this.setState('idle', 1); break; }
+        if (!this.rwInit) {
+          this.rwInit = true; this.rwPhase = 'out'; this.rwT = 0; this.rwSplash = false;
+          e.fx.splash(this.x, this.y, 0.9);
+          e.sound.splash(0.7);
+          for (var rw0 = 0; rw0 < 6; rw0++) {
+            e.fx.droplet(this.x + rand(-r, r), this.y - r * rand(0.2, 1),
+              rand(-80, 80), -rand(30, 120), rand(1, 1.9));
+          }
+        }
+        this.rwT += dt;
+        this.vx = 0; this.vy = 0;
+        t.walk = 1;
+        if (this.rwPhase === 'out') {
+          var rwk = this.rwT / RW_OUT;
+          this.hopY = Math.sin(clamp(rwk, 0, 1) * Math.PI) * r * 0.55;
+          t.wingFlap = (1 - rwk) * 0.5;
+          if (this.rwT >= RW_OUT) { this.rwPhase = 'walk'; this.rwT = 0; }
+        } else if (this.rwPhase === 'walk') {
+          var wdx = ro.x - this.x, wdy = ro.y - this.y;
+          var wdist = Math.sqrt(wdx * wdx + wdy * wdy) || 0.001;
+          var stepLen = Math.min(wdist, 95 * cfg.speed * dt);
+          this.x += wdx / wdist * stepLen;
+          this.y += wdy / wdist * stepLen;
+          if (Math.abs(wdx) > 0.4) this.face = wdx > 0 ? 1 : -1;
+          // Watschel-Gang wie beim Landgang: Trippel-Schritte, Kippeln
+          this.paddle += dt * 9;
+          t.lean = Math.sin(this.paddle) * 0.09;
+          t.wobble = Math.sin(this.paddle) * 0.3;
+          this.hopY = Math.abs(Math.sin(this.paddle)) * r * 0.07;
+          t.headRot = -0.06 + Math.sin(this.paddle * 0.5) * 0.05;
+          this.actionTick -= dt;
+          if (this.actionTick <= 0) {
+            this.actionTick = 0.3;
+            e.fx.ripple(this.x + rand(-r * 0.3, r * 0.3), this.y, 2, 13, 0.55, 'rgba(255,255,255,0.4)', 1.2);
+            if (this.rwT < 1.6) {
+              e.fx.droplet(this.x + rand(-r * 0.5, r * 0.5), this.y - r * 0.5,
+                rand(-30, 30), rand(10, 60), rand(0.8, 1.4));
+            }
+          }
+          if (wdist < 2 || this.rwT > 12) { this.rwPhase = 'in'; this.rwT = 0; }
+        } else {
+          var rwk2 = clamp(this.rwT / RW_IN, 0, 1);
+          this.hopY = Math.sin(rwk2 * Math.PI) * r * 0.95;
+          t.wingFlap = 0.5;
+          t.walk = rwk2 > 0.55 ? 0 : 1;
+          t.eyeHappy = 1;
+          if (!this.rwSplash && rwk2 > 0.82) {
+            this.rwSplash = true;
+            e.fx.splash(this.x, this.y, 1.5);
+            e.sound.splash(1.2);
+            for (var rws = 0; rws < 6; rws++) {
+              e.fx.droplet(this.x + rand(-r, r), this.y - 2,
+                rand(-170, 170), -rand(80, 240), rand(1.2, 2.2));
+            }
+          }
+          if (this.rwT > RW_IN) {
+            this.rwInit = false;
+            // a shore leave for the badges, but at most one a minute — else
+            // free roam hands out the waddle marathon for free
+            if (e.time - (e.roamWaddleT || -99) > 60) {
+              e.roamWaddleT = e.time;
+              e.stats.waddles = (e.stats.waddles || 0) + 1;
+              e.saveStats();
+            }
+            this.setState('bob', 1.2);
+          }
+        }
+        break;
+      }
+
       case 'swim':
       default:
         if (e.crumbsInView() && !this.baby) { this.setState('feed', 99); break; }
-        this.swim(dt, px, py, stopDist, 1);
+        this.swim(dt, gx, gy, goalStop, roam ? 0.55 : 1);
         var spd0 = Math.sqrt(this.vx * this.vx + this.vy * this.vy);
         t.lean = clamp(-spd0 * 0.00022 - (dist > 420 ? 0.06 : 0), -0.14, 0);
         // Blick zum Ziel, überlagert vom Planing-Nicken bei Tempo
         t.headRot = clamp(this.lookAng * 0.55 - spd0 * 0.00025, -0.5, 0.45);
         t.wingLift = clamp((spd0 - 300) / 500, 0, 0.5);
-        if (dist < stopDist * 1.15) this.setState('idle', 1);
+        if (dist < (roam ? r * 0.6 : stopDist * 1.15)) this.setState('idle', 1);
         break;
     }
 
@@ -1780,6 +2120,7 @@
 
   // ── Küken ─────────────────────────────────────────────────────
   var babyOf = DuckRender.babyOf;   // Modell-Variante lebt im Renderer
+  var RUBBER = DuckModels.get('rubber');   // the techie's debugging buddy
 
   // ── Engine ────────────────────────────────────────────────────
   function Engine(opts) {
@@ -1816,6 +2157,9 @@
     this.visitorCd = rand(120, 300);
     this.nest = null;         // Küken-Nest, taucht auf wenn Mama schläft
     this.hoard = null;        // gold pile for the tycoon's bedtime dive
+    this.laptop = null;       // the techie's laptop, out while she codes and naps on it
+    this.buddy = null;        // rubber duck she explains her bugs to
+    this.roam = null;         // free-roam planner state (cfg.follow off)
     this.mediaOn = false;     // page plays video/audio with sound → she grooves
     this.musicOn = false;     // mediaOn minus reduced motion (manual disco still counts)
     this.mediaPing = false;   // one-frame rising-edge signal for the duck
@@ -1826,7 +2170,76 @@
     this.discoCd = 0;         // seconds of music until the next ball drops
     this._bound = {};
     this.setModel(this.cfg.model);
+    if (!this.cfg.follow) this.planRoam(true);
   }
+
+  // ── Free roam ─────────────────────────────────────────────────
+  // With cfg.follow off she lives on the page instead of trailing the
+  // cursor: this planner hands her wander goals (some of them on foot),
+  // she naps on her own rhythm, and a cursor that rests nearby gets a
+  // curious visit. Everything that needs real closeness (petting, pecking,
+  // dizziness, dance, peekaboo) keeps working on the true pointer.
+  Engine.prototype.planRoam = function (first) {
+    var d = this.duck, r = d.radius(), cfg = this.cfg;
+    var m = r * 2;
+    var maxX = Math.max(m, this.w - m), maxY = Math.max(m, this.h - m);
+    // she stays out of your way: no goals near the cursor (the distance slider sets how near)
+    var keep = r * 1.9 * clamp(cfg.distance || 1, 1, 3) * 2.2;
+    var x = d.x, y = d.y, tries = 0;
+    do {
+      if (Math.random() < 0.65) {
+        // mostly short hops, now and then a trip across the page
+        var ang = Math.random() * TAU, len = rand(120, 360);
+        x = d.x + Math.cos(ang) * len; y = d.y + Math.sin(ang) * len;
+      } else {
+        x = rand(m, maxX); y = rand(m, maxY);
+      }
+      x = clamp(x, m, maxX); y = clamp(y, m, maxY);
+      tries++;
+    } while (tries < 6 && Math.hypot(x - this.px, y - this.py) < keep);
+    var ro = this.roam || (this.roam = {
+      napIn: rand(180, 300), wakeIn: 0, restT: 0, visitIn: rand(40, 90)
+    });
+    ro.x = x; ro.y = y;
+    ro.walk = !first && Math.random() < 0.25 && Math.hypot(x - d.x, y - d.y) < 420;
+    ro.arrived = false; ro.goT = 0; ro.visit = false;
+    return ro;
+  };
+
+  Engine.prototype.tickRoam = function (dt) {
+    var ro = this.roam, d = this.duck, r = d.radius();
+    var st = d.state;
+    if (st === 'sleep') { ro.wakeIn -= dt; return; }
+    ro.napIn -= dt;
+    ro.restT = Math.max(0, (ro.restT || 0) - dt);
+    // only calm moments count: hunting, feeding, greeting own the movement
+    if (st !== 'idle' && st !== 'bob' && st !== 'look') return;
+    if (!ro.arrived) {
+      ro.goT += dt;
+      if (Math.hypot(ro.x - d.x, ro.y - d.y) < r * 1.2) {
+        ro.arrived = true;
+        ro.pauseT = rand(1.5, 6) / this.cfg.playfulness;   // how long she lingers
+      } else if (ro.goT > 20) {
+        this.planRoam();   // unreachable somehow — pick another spot
+      }
+      return;
+    }
+    ro.pauseT -= dt;
+    ro.visitIn -= dt;
+    // curiosity: a cursor resting nearby gets a visit — a look, and a peck
+    // if pecking is on — before she wanders off again
+    if (ro.visitIn <= 0 && this.pointerIdle > 2 && Math.hypot(this.px - d.x, this.py - d.y) < 600) {
+      ro.visitIn = rand(40, 90);
+      var keep = r * 1.9 * clamp(this.cfg.distance || 1, 1, 3);
+      var vdx = d.x - this.px, vdy = d.y - this.py, vd = Math.hypot(vdx, vdy) || 1;
+      var m = r * 2;
+      ro.x = clamp(this.px + vdx / vd * keep, m, Math.max(m, this.w - m));
+      ro.y = clamp(this.py + vdy / vd * keep, m, Math.max(m, this.h - m));
+      ro.walk = false; ro.arrived = false; ro.goT = 0; ro.visit = true;
+      return;
+    }
+    if (ro.pauseT <= 0) this.planRoam();
+  };
 
   // Page media (video/audio with sound) started or stopped — reported by
   // the host page, which knows the DOM; the duck dances while it plays.
@@ -1886,8 +2299,8 @@
       if (!r || r.width < 4) return;
       var x = r.left + r.width / 2, y = r.top + r.height / 2;
       if (Math.hypot(x - d.x, y - d.y) > 420) return;
-      if (d.state === 'dive' || d.state === 'waddle' || d.state === 'burst' ||
-          d.state === 'sleep' || d.state === 'goldnap') return;
+      if (d.state === 'dive' || d.state === 'waddle' || d.state === 'roamwalk' || d.state === 'burst' ||
+          d.state === 'sleep' || d.state === 'goldnap' || d.state === 'codenap') return;
       this._selCd = 4;
       d.face = d.x <= x ? 1 : -1;
       this.typeX = x; this.typeY = y; this.typeT = 1.6;   // kurz hingucken
@@ -2034,7 +2447,12 @@
   Engine.prototype.apply = function (cfg) {
     var modelChanged = cfg.model !== undefined && cfg.model !== this.cfg.model;
     var wardrobeChanged = cfg.hat !== undefined || cfg.glasses !== undefined;
+    var followChanged = cfg.follow !== undefined && !!cfg.follow !== !!this.cfg.follow;
     for (var k in cfg) if (cfg[k] !== undefined) this.cfg[k] = cfg[k];
+    if (followChanged) {
+      // free roam on: first wander goal right away; off: back to the cursor
+      if (this.cfg.follow) this.roam = null; else this.planRoam(true);
+    }
     this.sound.on = !!this.cfg.sound;
     this.sound.vol = this.cfg.volume;
     if (this.sound.on) this.sound.preload();   // fetch samples early
@@ -2436,6 +2854,12 @@
       this.canvas.width = Math.round(this.w * dpr);
       this.canvas.height = Math.round(this.h * dpr);
     }
+    // a wander goal outside the new viewport would strand her at the edge
+    if (this.roam && this.duck) {
+      var rm = this.duck.radius() * 2;
+      this.roam.x = clamp(this.roam.x, rm, Math.max(rm, this.w - rm));
+      this.roam.y = clamp(this.roam.y, rm, Math.max(rm, this.h - rm));
+    }
   };
 
   Engine.prototype.setPointer = function (x, y) {
@@ -2462,7 +2886,7 @@
       var dist = Math.hypot(ev.clientX - d.x, ev.clientY - d.y);
       if (self.cfg.effects) self.fx.ripple(ev.clientX, ev.clientY, 4, 34, 0.7, 'rgba(255,255,255,0.5)', 2);
       if (dist < d.radius() * 2.6 && d.state !== 'dive' &&
-          d.state !== 'waddle' && d.state !== 'burst') {
+          d.state !== 'waddle' && d.state !== 'roamwalk' && d.state !== 'burst') {
         // Ente direkt angeklickt → sie quakt zurück
         d.setState('quack', 1.0);
         d.quacked = false;
@@ -2475,7 +2899,7 @@
       var dist = ev.clientX !== undefined ? Math.hypot(ev.clientX - d.x, ev.clientY - d.y) : 0;
       if (dist < d.radius() * 2.6) {
         // Doppelklick auf die Ente → Flügelschlagen (wie gehabt)
-        if (d.state !== 'dive' && d.state !== 'waddle' && d.state !== 'burst') {
+        if (d.state !== 'dive' && d.state !== 'waddle' && d.state !== 'roamwalk' && d.state !== 'burst') {
           d.setState('flap', 1.3);
         }
       } else if (self.cfg.feed) {
@@ -2535,15 +2959,11 @@
       var dk = self.duck;
       if (dk) {
         if (dk.state === 'sleep' && Math.abs(kick) > 150) {
-          if (dk.hoardNap) {
-            dk.hopY = dk.radius() * 0.8;
-            self.fx.coinBurst(dk.x, dk.y - dk.radius() * 0.5, 6, 0.7);
-            self.sound.coins(0.6);
-          }
+          dk.wakeJolt();
           dk.setState('wake', 0.7);
           dk.say('!', '#ffb03d');
-        } else if (dk.state === 'goldnap' && Math.abs(kick) > 150) {
-          dk.setState('swim', 1);   // dive plans cancelled by the earthquake
+        } else if ((dk.state === 'goldnap' || dk.state === 'codenap') && Math.abs(kick) > 150) {
+          dk.setState('swim', 1);   // bedtime plans cancelled by the earthquake
         }
         dk.vy += kick * 0.55;
         if (self.cfg.effects && Math.abs(kick) > 100 && Math.random() < 0.4) {
@@ -2745,13 +3165,14 @@
       this.discoOn = false;
     }
 
+    if (this.roam) this.tickRoam(dt);
     this.duck.update(dt);
 
     // ── Küken-Nest: taucht auf, wenn Mama schläft (oder zudeckt) ──
     // ('goldnap' counts too: the nest must not sink while mama is still
     // busy diving into her gold next door)
     var mamaSleeps = this.duck.state === 'sleep' || this.duck.state === 'tuckin' ||
-      this.duck.state === 'goldnap';
+      this.duck.state === 'goldnap' || this.duck.state === 'codenap';
     if (mamaSleeps && this.babies.length && !this.nest) {
       var d0 = this.duck, nr0 = d0.radius();
       var nSide = d0.x > this.w / 2 ? -1 : 1;
@@ -2823,6 +3244,18 @@
       }
       if (hrd.sink && hrd.appear < 0.03) this.hoard = null;
     }
+
+    // ── Laptop: out while the techie codes and naps on it (through the
+    //    wake-up, so she can look puzzled at the screen first) ──
+    var wantsLaptop = !!(dk0.model.codeNap &&
+      (dk0.state === 'codenap' || ((dk0.state === 'sleep' || dk0.state === 'wake') && dk0.codeNap)));
+    if (wantsLaptop && !this.laptop) this.spawnLaptop();
+    if (this.laptop) this.tickLaptop(dt, wantsLaptop);
+
+    // ── Rubber duck: out while she explains her bug to it ──
+    var wantsBuddy = dk0.state === 'debug';
+    if (wantsBuddy && !this.buddy) this.spawnBuddy();
+    if (this.buddy) this.tickBuddy(dt, wantsBuddy);
 
     // Küken folgen der Spur der Mama — außer das Nest ruft oder es
     // liegen Krumen im Wasser.
@@ -2897,7 +3330,7 @@
     // Wenn Mama abgetaucht/geplatzt ist, gibt es nichts zu verdecken
     // (im Goldhaufen ebenso — sonst schieben die Küken sie wieder raus)
     var duckSolid = dState !== 'dive' && dState !== 'peekaboo' &&
-      dState !== 'burst' && !this.duck.vanish && !this.duck.hoardNap;
+      dState !== 'burst' && !this.duck.vanish && !this.duck.hoardNap && !this.duck.codeNap;
     for (var pass = 0; pass < 2; pass++) {
       for (var i = 0; i < group.length; i++) {
         for (var j = i + 1; j < group.length; j++) {
@@ -3057,10 +3490,14 @@
       if (!b.nesting) order.push({ y: b.y, k: 'b', o: b });
     }
     // Im Goldhaufen bildet die Ente mit dem Haufen eine Einheit
-    // (Rückwand → Ente → Vorderrand), genau wie die Küken im Nest.
-    if (!(this.duck.hoardNap && this.hoard)) order.push({ y: this.duck.y, k: 'd' });
+    // (Rückwand → Ente → Vorderrand), genau wie die Küken im Nest — und
+    // ebenso am Laptop (Bildschirm → Ente → Tastaturkante).
+    var inProp = (this.duck.hoardNap && this.hoard) || (this.duck.codeNap && this.laptop);
+    if (!inProp) order.push({ y: this.duck.y, k: 'd' });
     if (this.nest) order.push({ y: this.nest.y, k: 'n' });
     if (this.hoard) order.push({ y: this.hoard.y, k: 'g' });
+    if (this.laptop) order.push({ y: this.laptop.y, k: 'l' });
+    if (this.buddy) order.push({ y: this.buddy.y, k: 'u' });
     order.sort(function (p, q) { return p.y - q.y; });
 
     for (var oi = 0; oi < order.length; oi++) {
@@ -3069,6 +3506,8 @@
       else if (it.k === 'b') DuckRender.draw(ctx, it.o.model, it.o.pose());
       else if (it.k === 'd') DuckRender.draw(ctx, this.duck.model, this.duck.pose());
       else if (it.k === 'g') this.drawHoard(ctx);
+      else if (it.k === 'l') this.drawLaptop(ctx);
+      else if (it.k === 'u') this.drawBuddy(ctx);
       else this.drawNest(ctx);
     }
     if (this.cfg.effects) this.fx.draw(ctx);
@@ -3280,6 +3719,292 @@
     ctx.restore();
   };
 
+  // ── Laptop (techie bedtime) ───────────────────────────────────
+  // Rises beside her like the gold hoard. Seen from the front-right: the
+  // screen is a wide panel at the back, leaning a little toward the viewer,
+  // the keyboard deck in front of it — she sits at the deck's end.
+  Engine.prototype.spawnLaptop = function () {
+    var d = this.duck, r = d.radius();
+    // toward the middle of the page, and never on top of the nest
+    var side = d.x > this.w / 2 ? -1 : 1;
+    if (this.nest && !this.nest.sink) side = this.nest.x > d.x ? -1 : 1;
+    var R = Math.max(26 * this.cfg.size, r * 1.35);
+    this.laptop = {
+      x: clamp(d.x + side * (r * 2.2 + R), R + 24, this.w - R - 24),
+      y: clamp(d.y, R * 1.75 + 12, this.h - 40),   // the open screen must fit above
+      r: R, side: -side,                            // she sits on the side she came from
+      appear: 0, sink: false, lid: 1, t: 0, glow: 0,
+      lines: [{ ind: 0, toks: [] }], depth: 0, keyPulse: 0, keyHot: 0,
+      build: null, badge: 0, badgeOk: true, flood: 0, saver: null, jolt: 0
+    };
+    if (this.cfg.effects) {
+      this.fx.ripple(this.laptop.x, this.laptop.y, 6, R * 1.4, 1.2, 'rgba(255,255,255,0.4)', 1.6);
+    }
+    return this.laptop;
+  };
+
+  // One keystroke on the screen: a coloured token, indented like a real
+  // file, with line breaks and blocks that open and close now and then
+  Engine.prototype.laptopType = function (lp) {
+    var line = lp.lines[lp.lines.length - 1];
+    var used = 0.06 + line.ind * 0.07;
+    for (var i = 0; i < line.toks.length; i++) used += line.toks[i].w + 0.03;
+    lp.keyHot = (Math.random() * 27) | 0;
+    if (line.toks.length && (used > 0.66 || Math.random() < 0.22)) {
+      if (Math.random() < 0.35) lp.depth = clamp(lp.depth + (Math.random() < 0.55 ? 1 : -1), 0, 3);
+      lp.lines.push({ ind: lp.depth, toks: [] });
+      if (lp.lines.length > 6) lp.lines.shift();
+      return;
+    }
+    var first = !line.toks.length;
+    line.toks.push({
+      w: rand(0.06, 0.2),
+      c: first ? (Math.random() < 0.5 ? 0 : 4) : (Math.random() * CODE_COLS.length) | 0
+    });
+  };
+
+  Engine.prototype.laptopBuild = function (lp) {
+    lp.build = { k: 0, dur: rand(0.9, 1.4), fail: Math.random() < 0.2 };
+  };
+
+  Engine.prototype.tickLaptop = function (dt, wanted) {
+    var lp = this.laptop, d = this.duck;
+    lp.t += dt;
+    if (!wanted && !lp.sink) {
+      // lid down (clack), then it sinks like the nest and the hoard
+      lp.sink = true;
+      d.codeNap = false;
+      this.sound.key(true);
+      if (this.cfg.effects) {
+        for (var b = 0; b < 4; b++) this.fx.bubble(lp.x + rand(-lp.r, lp.r) * 0.6, lp.y + rand(-4, 4));
+      }
+    }
+    lp.lid = approach(lp.lid, lp.sink ? 0 : 1, lp.sink ? 9 : 6, dt);
+    lp.appear = approach(lp.appear, lp.sink ? 0 : 1, lp.sink ? 4 : 2.6, dt);
+    lp.keyPulse = Math.max(0, lp.keyPulse - dt * 9);
+    lp.glow = approach(lp.glow, (!lp.sink && lp.appear > 0.5) ? (lp.saver ? 0.45 : 1) : 0, 3, dt);
+    if (lp.build) {
+      lp.build.k = Math.min(1, lp.build.k + dt / lp.build.dur);
+      if (lp.build.k >= 1) { lp.badge = 1.1; lp.badgeOk = !lp.build.fail; lp.build = null; }
+    }
+    lp.badge = Math.max(0, lp.badge - dt);
+    if (lp.jolt) { lp.flood = 0; lp.saver = null; lp.jolt = 0; }   // woke up: the key lets go
+    if (lp.flood > 0) {
+      lp.flood += dt;
+      // the held key runs for a bit, then the screensaver takes over
+      if (lp.flood > 2.6 && !lp.saver && d.codeNap) {
+        lp.saver = { x: 0.35, y: 0.4, vx: 0.26, vy: 0.19, col: pick(DISCO_COLS) };
+      }
+    }
+    if (lp.saver) {
+      // the bouncing logo: a new colour per wall, a little sparkle for the corner
+      var sv = lp.saver, hit = 0;
+      sv.x += sv.vx * dt; sv.y += sv.vy * dt;
+      if (sv.x < 0) { sv.x = 0; sv.vx = -sv.vx; hit++; } else if (sv.x > 0.7) { sv.x = 0.7; sv.vx = -sv.vx; hit++; }
+      if (sv.y < 0) { sv.y = 0; sv.vy = -sv.vy; hit++; } else if (sv.y > 0.78) { sv.y = 0.78; sv.vy = -sv.vy; hit++; }
+      if (hit) {
+        var ci = (DISCO_COLS.indexOf(sv.col) + 1 + ((Math.random() * 4) | 0)) % DISCO_COLS.length;
+        sv.col = DISCO_COLS[ci];
+        if (hit === 2 && this.cfg.effects) {
+          this.fx.sparkle(lp.x - lp.side * lp.r * 0.2, lp.y - lp.r * 1.25, '#ffffff', 7);
+        }
+      }
+    }
+    if (lp.sink && lp.appear < 0.03) this.laptop = null;
+  };
+
+  Engine.prototype.drawLaptop = function (ctx) {
+    var lp = this.laptop;
+    if (!lp || lp.appear < 0.02) return;
+    this.drawLaptopPart(ctx, true);
+    if (this.duck.codeNap) DuckRender.draw(ctx, this.duck.model, this.duck.pose());
+    this.drawLaptopPart(ctx, false);
+  };
+
+  Engine.prototype.drawLaptopPart = function (ctx, back) {
+    var lp = this.laptop, ap = lp.appear, R = lp.r;
+    var y0 = lp.y + (1 - ap) * R * 1.2;     // rises from below / sinks away
+    var bx0 = -R * 1.15, bx1 = R * 0.75, by = -R * 0.36;   // back edge of the deck
+    ctx.save();
+    ctx.globalAlpha *= Math.min(1, ap * 1.5) * this.cfg.opacity;
+    ctx.translate(lp.x, y0);
+    ctx.scale(lp.side, 1);                   // keyboard end toward her
+    if (back) {
+      // contact ring on the water
+      ctx.strokeStyle = 'rgba(255,255,255,0.35)';
+      ctx.lineWidth = 1.6;
+      ctx.beginPath();
+      ctx.ellipse(-R * 0.1, R * 0.1, R * 1.3, R * 0.3, 0, 0, TAU);
+      ctx.stroke();
+      // screen light on the water and on her
+      if (lp.glow > 0.02) {
+        var pulse = 0.85 + 0.15 * Math.sin(lp.t * 2.1);
+        var gl = ctx.createRadialGradient(-R * 0.2, -R * 0.5, R * 0.1, -R * 0.2, -R * 0.5, R * 2.2);
+        gl.addColorStop(0, 'rgba(90,208,255,' + (0.22 * lp.glow * pulse).toFixed(3) + ')');
+        gl.addColorStop(1, 'rgba(90,208,255,0)');
+        ctx.fillStyle = gl;
+        ctx.beginPath(); ctx.ellipse(-R * 0.2, -R * 0.3, R * 2.4, R * 1.4, 0, 0, TAU); ctx.fill();
+      }
+      // the screen: hinged at the deck's back edge, leaning a little toward
+      // the viewer (a shear); the lid folds down on the way out
+      var H = R * 1.25 * lp.lid, inset = R * 0.07;
+      if (H > 1) {
+        var k = R * 0.1 / H;
+        ctx.save();
+        ctx.transform(1, 0, -k, 1, k * by, 0);
+        ctx.fillStyle = '#1c1f26';
+        rrect(ctx, bx0, by - H, bx1 - bx0, H, R * 0.05); ctx.fill();
+        // the panel only while the lid is open enough to hold one
+        if (H > inset * 2.5) {
+          this.drawScreen(ctx, bx0 + inset, by - H + inset, bx1 - bx0 - inset * 2, H - inset * 2);
+        }
+        ctx.restore();
+      }
+      // deck top face and its keys, the one just hit lit up
+      ctx.fillStyle = '#2c3038';
+      ctx.beginPath();
+      ctx.moveTo(bx0, by); ctx.lineTo(bx1, by); ctx.lineTo(R * 0.95, 0); ctx.lineTo(-R * 0.95, 0);
+      ctx.closePath(); ctx.fill();
+      for (var row = 0; row < 3; row++) {
+        var ky = by + R * 0.05 + row * R * 0.095;
+        var shift = (ky - by) / (0 - by) * R * 0.2;   // the deck's perspective skew
+        for (var col = 0; col < 9; col++) {
+          var kx = bx0 + R * 0.14 + shift + col * R * 0.19;
+          ctx.fillStyle = (lp.keyPulse > 0 && lp.keyHot === row * 9 + col) ? '#5ad0ff' : '#3b414f';
+          ctx.fillRect(kx, ky, R * 0.14, R * 0.06);
+        }
+      }
+    } else {
+      // deck front face: the edge she sits behind
+      ctx.fillStyle = '#1d2027';
+      ctx.fillRect(-R * 0.95, 0, R * 1.9, R * 0.12);
+      ctx.fillStyle = 'rgba(255,255,255,0.14)';
+      ctx.fillRect(-R * 0.95, 0, R * 1.9, R * 0.02);
+    }
+    ctx.restore();
+  };
+
+  // What's on the screen: an editor with coloured code, a build bar and
+  // its verdict, the flood of a held key, or the screensaver
+  Engine.prototype.drawScreen = function (ctx, x, y, w, h) {
+    var lp = this.laptop;
+    ctx.save();
+    rrect(ctx, x, y, w, h, w * 0.02); ctx.clip();
+    if (lp.saver) {
+      ctx.fillStyle = '#05070a'; ctx.fillRect(x, y, w, h);
+      var sv = lp.saver, lw = w * 0.3, lh0 = h * 0.22;
+      var lx = x + sv.x * w, ly = y + sv.y * h;
+      ctx.fillStyle = sv.col;
+      rrect(ctx, lx, ly, lw, lh0, lh0 * 0.3); ctx.fill();
+      // a tiny duck on the logo
+      ctx.fillStyle = 'rgba(255,255,255,0.92)';
+      ctx.beginPath(); ctx.ellipse(lx + lw * 0.45, ly + lh0 * 0.62, lw * 0.22, lh0 * 0.2, 0, 0, TAU); ctx.fill();
+      ctx.beginPath(); ctx.arc(lx + lw * 0.62, ly + lh0 * 0.36, lh0 * 0.17, 0, TAU); ctx.fill();
+      ctx.beginPath();
+      ctx.moveTo(lx + lw * 0.74, ly + lh0 * 0.34); ctx.lineTo(lx + lw * 0.86, ly + lh0 * 0.4);
+      ctx.lineTo(lx + lw * 0.74, ly + lh0 * 0.46); ctx.closePath(); ctx.fill();
+      ctx.restore();
+      return;
+    }
+    ctx.fillStyle = '#0d1117'; ctx.fillRect(x, y, w, h);
+    // title bar with three little lights
+    ctx.fillStyle = '#161b22'; ctx.fillRect(x, y, w, h * 0.13);
+    var lights = ['#ff5f57', '#febc2e', '#28c840'];
+    for (var i = 0; i < 3; i++) {
+      ctx.fillStyle = lights[i];
+      ctx.beginPath(); ctx.arc(x + w * (0.05 + i * 0.06), y + h * 0.065, h * 0.03, 0, TAU); ctx.fill();
+    }
+    var lh = h * 0.105, ty = y + h * 0.19;
+    if (lp.flood > 0) {
+      // a key is stuck: the same character floods the editor line by line
+      var n = Math.min(66, Math.floor(lp.flood * 45));
+      ctx.fillStyle = '#c3e88d';
+      for (var f = 0; f < n; f++) {
+        ctx.fillRect(x + w * (0.06 + (f % 11) * 0.08), ty + Math.floor(f / 11) * lh, w * 0.055, lh * 0.55);
+      }
+      ctx.restore();
+      return;
+    }
+    for (var li = 0; li < lp.lines.length; li++) {
+      var line = lp.lines[li];
+      var cx = x + w * (0.06 + line.ind * 0.07), cy = ty + li * lh;
+      for (var ti = 0; ti < line.toks.length; ti++) {
+        var tok = line.toks[ti];
+        ctx.fillStyle = CODE_COLS[tok.c];
+        ctx.fillRect(cx, cy, w * tok.w, lh * 0.55);
+        cx += w * (tok.w + 0.03);
+      }
+      if (li === lp.lines.length - 1 && Math.floor(lp.t * 2.5) % 2 === 0) {
+        ctx.fillStyle = '#e6e6e6';
+        ctx.fillRect(cx, cy, w * 0.02, lh * 0.6);   // the caret
+      }
+    }
+    if (lp.build) {
+      ctx.fillStyle = '#21262d'; ctx.fillRect(x + w * 0.06, y + h * 0.88, w * 0.88, h * 0.06);
+      ctx.fillStyle = '#82aaff'; ctx.fillRect(x + w * 0.06, y + h * 0.88, w * 0.88 * lp.build.k, h * 0.06);
+    }
+    if (lp.badge > 0) {
+      // build verdict: a green tick or a red cross, top right
+      var bs = h * 0.22, bxp = x + w - bs * 1.3, byp = y + h * 0.2;
+      ctx.fillStyle = lp.badgeOk ? '#238636' : '#b62324';
+      rrect(ctx, bxp, byp, bs, bs, bs * 0.25); ctx.fill();
+      ctx.strokeStyle = '#ffffff'; ctx.lineWidth = Math.max(1, bs * 0.14); ctx.lineCap = 'round';
+      ctx.beginPath();
+      if (lp.badgeOk) {
+        ctx.moveTo(bxp + bs * 0.25, byp + bs * 0.52); ctx.lineTo(bxp + bs * 0.45, byp + bs * 0.72);
+        ctx.lineTo(bxp + bs * 0.78, byp + bs * 0.3);
+      } else {
+        ctx.moveTo(bxp + bs * 0.28, byp + bs * 0.28); ctx.lineTo(bxp + bs * 0.72, byp + bs * 0.72);
+        ctx.moveTo(bxp + bs * 0.72, byp + bs * 0.28); ctx.lineTo(bxp + bs * 0.28, byp + bs * 0.72);
+      }
+      ctx.stroke();
+    }
+    ctx.restore();
+  };
+
+  // ── Rubber duck (debugging buddy) ─────────────────────────────
+  Engine.prototype.spawnBuddy = function () {
+    var d = this.duck, r = d.radius();
+    var face = d.face >= 0 ? 1 : -1;
+    this.buddy = {
+      x: clamp(d.x + face * r * 1.9, r, this.w - r), y: d.y + r * 0.1,
+      face: -face, appear: 0, sink: false, t: 0, phase: Math.random() * TAU, squeak: 0
+    };
+    if (this.cfg.effects) this.fx.ripple(this.buddy.x, this.buddy.y, 4, r * 1.2, 1.0, 'rgba(255,255,255,0.4)', 1.4);
+    return this.buddy;
+  };
+
+  Engine.prototype.tickBuddy = function (dt, wanted) {
+    var bd = this.buddy;
+    bd.t += dt;
+    if (!wanted && !bd.sink) {
+      bd.sink = true;
+      if (this.cfg.effects) {
+        for (var b = 0; b < 3; b++) this.fx.bubble(bd.x + rand(-8, 8), bd.y + rand(-2, 4));
+      }
+    }
+    bd.appear = approach(bd.appear, bd.sink ? 0 : 1, bd.sink ? 5 : 3, dt);
+    bd.squeak = Math.max(0, bd.squeak - dt);
+    if (bd.sink && bd.appear < 0.03) this.buddy = null;
+  };
+
+  Engine.prototype.drawBuddy = function (ctx) {
+    var bd = this.buddy;
+    if (!bd || bd.appear < 0.02) return;
+    var r = this.duck.radius() * 0.5;
+    var sq = bd.squeak > 0 ? Math.sin(bd.squeak * 20) * 0.08 : 0;
+    ctx.save();
+    ctx.globalAlpha *= this.cfg.opacity;
+    DuckRender.draw(ctx, RUBBER, {
+      x: bd.x, y: bd.y, r: r, dir: bd.face, t: this.time + bd.phase,
+      bob: Math.sin(this.time * 2.6 + bd.phase) * r * 0.08,
+      submerge: 1 - bd.appear, squash: 1 + sq,
+      beakOpen: bd.squeak > 0 ? 0.6 : 0, eyeHappy: bd.squeak > 0 ? 1 : 0,
+      reflection: this.cfg.reflection
+    });
+    ctx.restore();
+  };
+
   // ── Debug/Steuer-API ──────────────────────────────────────────
   // Deterministisch weiterrechnen (für Tests/Screenshots, unabhängig von rAF)
   Engine.prototype.simulate = function (seconds, dt) {
@@ -3342,6 +4067,12 @@
     if (action === 'burst') {
       this.duck.burstOh = this.duck.burstPop = this.duck.burstBack = false;
       this.duck.setState('burst', 3.2);
+      return action;
+    }
+    if (action === 'debug') {
+      // the whole conversation with the rubber duck, whatever `dur` says
+      this.duck.dbgAha = this.duck.dbgThanks = false; this.duck.dbgN = 0;
+      this.duck.setState('debug', rand(5.5, 7));
       return action;
     }
     this.duck.setState(action, dur || 1.6);

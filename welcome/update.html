@@ -36,12 +36,12 @@
   b { color:var(--accent); }
   .tip { color:var(--muted); font-size:14px; margin-top:26px; text-align:center; }
   h2 { font-size:18px; margin:0 0 10px; }
-  textarea {
-    width:100%; border:1px solid var(--line); border-radius:10px; padding:10px 12px;
-    font:inherit; background:transparent; color:var(--ink); resize:vertical;
-  }
-  textarea:focus { outline:none; border-color:var(--accent); }
   .try { margin:12px 0 0; color:var(--muted); }
+  .try button {
+    font:inherit; font-weight:600; color:#fff; background:var(--accent); border:0;
+    border-radius:10px; padding:8px 14px; margin-right:8px; cursor:pointer;
+  }
+  .try button:hover { filter:brightness(1.08); }
 </style>
 </head>
 <body>
@@ -51,19 +51,16 @@
 
   <div class="card">
     <ul>
-      <li><b data-i18n="uF1b">Mitlesen &amp; Fokus-Modus:</b> <span data-i18n="uF1t">Tippst du in ein Textfeld, schaut sie zum Feld statt zum Cursor und nickt dabei nicht ein. Bei Passwortfeldern und Vollbild-Videos tritt sie ab — danach meldet sie sich mit „!“ zurück.</span></li>
-      <li><b data-i18n="uF2b">Selektions-Snack:</b> <span data-i18n="uF2t">Markierst du Text in ihrer Nähe, knabbert sie am Rand der Markierung — „nom“. (Sie sieht nur, wo der Text liegt, nie was drinsteht.)</span></li>
-      <li><b data-i18n="uF3b">Einschlafen nach Wunsch:</b> <span data-i18n="uF3t">Neuer Regler von 5 bis 60 Sekunden, bis sie den Kopf ins Gefieder steckt.</span></li>
-      <li><b data-i18n="uF4b">Ruhiger Modus:</b> <span data-i18n="uF4t">Ist im System „Bewegung reduzieren“ aktiv, lässt sie Pirouetten, Schütteln, Baden, Tanzen und Discokugel weg — nur die Kunststück-Knöpfe im Popup dürfen noch alles.</span></li>
-      <li><b data-i18n="uF5b">Name, Stammgast &amp; neue Enten:</b> <span data-i18n="uF5t">Gib ihr im Popup einen Namen — bei voller Streichel-Leiste sagt sie ihn. Wer 30 Tage in Folge vorbeischaut, holt sich das Diamant-Abzeichen „Stammgast“. Und im Januar und Februar warten Neujahrs- und Valentins-Ente.</span></li>
-      <li><b data-i18n="uF6b">Popup &amp; Touch:</b> <span data-i18n="uF6t">Soundboard zum Anhören aller Klänge und ein Suchfeld fürs Modell-Raster. Auf Touchscreens folgt sie dem Finger: Tipp auf die Ente = Quaken, Doppeltipp = Flattern oder Füttern.</span></li>
+      <li><b data-i18n="uF1b">💻 IT-Ente:</b> <span data-i18n="uF1t">Hoodie, Kopfhörer, dicke Brille und ein eigener Laptop: Wird sie müde, tippt sie noch ein paar Zeilen, nickt ein und landet mit dem Gesicht auf der Tastatur — Bildschirmschoner inklusive. Zwischendurch debuggt sie mit einer Quietsche-Ente und sagt Dinge wie „It works on my machine.“</span></li>
+      <li><b data-i18n="uF2b">🧭 Freilauf:</b> <span data-i18n="uF2t">Neuer Schalter im Popup: „Folgt dem Mauszeiger“ aus, und sie lebt auf der Seite — schwimmt und watschelt eigene Wege, macht Nickerchen, wann sie will, und kommt zum Picken vorbei, wenn dein Cursor in der Nähe ruht.</span></li>
+      <li><b data-i18n="uF3b">🎩 Garderobe &amp; Erfolge:</b> <span data-i18n="uF3t">Kopfhörer und Nerdbrille für jedes Modell, freigeschaltet durch die Laptop-Nickerchen der IT-Ente — drei neue Abzeichen, 63 insgesamt.</span></li>
     </ul>
   </div>
 
   <div class="card">
     <h2 data-i18n="uTryTitle">Probier's gleich aus</h2>
-    <textarea rows="2" data-i18n-ph="uTryType" placeholder="Tipp hier etwas — sie liest mit …"></textarea>
-    <p class="try" data-i18n="uTrySelect">Markier diesen Satz mit der Maus, wenn sie in der Nähe schwimmt — sie knabbert am Rand.</p>
+    <p class="try" data-i18n="uTryLaptop">Die IT-Ente schwimmt hier auf der Seite — gleich legt sie sich an ihren Laptop. Klick auf sie, und sie quakt zurück.</p>
+    <p class="try"><button type="button" id="roamBtn" data-i18n="uTryRoam">Freilauf ausprobieren</button> <span data-i18n="uTryRoamHint">Nur auf dieser Seite — deine Einstellungen bleiben, wie sie sind.</span></p>
   </div>
 
   <p class="tip" data-i18n="uTip">Alles Weitere wie gehabt: Popup über das Enten-Symbol, Alt+Shift+D schaltet sie an und aus.</p>

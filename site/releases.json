@@ -1,9 +1,33 @@
 [
   {
+    "version": "1.8.0",
+    "date": "2026-09-24",
+    "github": true,
+    "title": {
+      "en": "IT duck & free roam",
+      "de": "IT-Ente & Freilauf"
+    },
+    "items": {
+      "en": [
+        "💻 IT duck: Hoodie, headphones, thick glasses and her own laptop: when she gets sleepy she types a few lines, nods off and face-plants onto the keyboard — screensaver included. In between she debugs with a rubber duck and drops lines like “It works on my machine.”",
+        "🧭 Free roam: New switch in the popup: turn off “Follows the cursor” and she lives on the page instead — swims and waddles her own routes, naps when she feels like it, and comes over for a peck when your cursor rests nearby.",
+        "🎩 Wardrobe & achievements: Headphones and nerd glasses for every model, unlocked by the IT duck's laptop naps — three new badges, 63 in total."
+      ],
+      "de": [
+        "💻 IT-Ente: Hoodie, Kopfhörer, dicke Brille und ein eigener Laptop: Wird sie müde, tippt sie noch ein paar Zeilen, nickt ein und landet mit dem Gesicht auf der Tastatur — Bildschirmschoner inklusive. Zwischendurch debuggt sie mit einer Quietsche-Ente und sagt Dinge wie „It works on my machine.“",
+        "🧭 Freilauf: Neuer Schalter im Popup: „Folgt dem Mauszeiger“ aus, und sie lebt auf der Seite — schwimmt und watschelt eigene Wege, macht Nickerchen, wann sie will, und kommt zum Picken vorbei, wenn dein Cursor in der Nähe ruht.",
+        "🎩 Garderobe & Erfolge: Kopfhörer und Nerdbrille für jedes Modell, freigeschaltet durch die Laptop-Nickerchen der IT-Ente — drei neue Abzeichen, 63 insgesamt."
+      ]
+    }
+  },
+  {
     "version": "1.7.0",
     "date": "2026-09-21",
     "github": true,
-    "title": { "en": "Reading along, selection snack & calm mode", "de": "Mitlesen, Selektions-Snack & ruhiger Modus" },
+    "title": {
+      "en": "Reading along, selection snack & calm mode",
+      "de": "Mitlesen, Selektions-Snack & ruhiger Modus"
+    },
     "items": {
       "en": [
         "📝 Reading along & focus mode: type into a text field and she watches the field instead of the cursor, and won't doze off. On password fields and fullscreen videos she steps aside, then reports back with a “!”.",
@@ -27,7 +51,10 @@
     "version": "1.6.0",
     "date": "2026-09-18",
     "github": true,
-    "title": { "en": "Music dance & wardrobe", "de": "Musik-Tanz & Garderobe" },
+    "title": {
+      "en": "Music dance & wardrobe",
+      "de": "Musik-Tanz & Garderobe"
+    },
     "items": {
       "en": [
         "🎵 Music & video: when a video or song with sound plays on the page, embedded players included, she dances along in rounds, the ducklings bob to the beat and a sleeping duck wakes up for the first beat. Every now and then a little disco ball sinks in and the whole family goes wild.",
@@ -53,7 +80,10 @@
     "version": "1.5.0",
     "date": "2026-08-28",
     "github": true,
-    "title": { "en": "Tycoon Duck & real sounds", "de": "Milliardärs-Ente & echte Geräusche" },
+    "title": {
+      "en": "Tycoon Duck & real sounds",
+      "de": "Milliardärs-Ente & echte Geräusche"
+    },
     "items": {
       "en": [
         "💰 Tycoon Duck: top hat, monocle and a red tailcoat. When she gets sleepy a gold hoard rises from the water, she takes a run-up, dives in headfirst and sleeps buried in her riches.",
@@ -73,7 +103,10 @@
     "version": "1.4.0",
     "date": "2026-08-27",
     "github": true,
-    "title": { "en": "Visionary & Easter Duck, bedtime ritual", "de": "Visionärs- & Oster-Ente, Gute-Nacht-Ritual" },
+    "title": {
+      "en": "Visionary & Easter Duck, bedtime ritual",
+      "de": "Visionärs- & Oster-Ente, Gute-Nacht-Ritual"
+    },
     "items": {
       "en": [
         "💡 Visionary Duck: black turtleneck, round glasses and twelve lines she drops while quacking, from “One more thing …” to “Quack different.”",
@@ -99,7 +132,10 @@
     "version": "1.3.0",
     "date": "2026-08-24",
     "github": true,
-    "title": { "en": "Shore leave, overfeeding pop & dance duet", "de": "Landgang, Überfütterungs-Plopp & Tanz-Duett" },
+    "title": {
+      "en": "Shore leave, overfeeding pop & dance duet",
+      "de": "Landgang, Überfütterungs-Plopp & Tanz-Duett"
+    },
     "items": {
       "en": [
         "🚶 Shore leave: every now and then she climbs out of the water, waddles a proud circle on procedurally drawn legs and jumps back in right where she left.",
@@ -119,7 +155,10 @@
     "version": "1.2.0",
     "date": "2026-08-19",
     "github": true,
-    "title": { "en": "Visitors, achievements & more", "de": "Besuch, Erfolge & mehr" },
+    "title": {
+      "en": "Visitors, achievements & more",
+      "de": "Besuch, Erfolge & mehr"
+    },
     "items": {
       "en": [
         "💕 Visitors: every few minutes a wild duck swims by for a quack duet with music notes and hearts.",
@@ -145,7 +184,10 @@
     "version": "1.1.2",
     "date": "2026-08-19",
     "github": false,
-    "title": { "en": "English & Firefox", "de": "Englisch & Firefox" },
+    "title": {
+      "en": "English & Firefox",
+      "de": "Englisch & Firefox"
+    },
     "items": {
       "en": [
         "🌍 Second language: the interface follows your browser language, English or German.",
@@ -163,7 +205,10 @@
     "version": "1.0.1",
     "date": "2026-08-10",
     "github": false,
-    "title": { "en": "The duck moves in", "de": "Die Ente zieht ein" },
+    "title": {
+      "en": "The duck moves in",
+      "de": "Die Ente zieht ein"
+    },
     "items": {
       "en": [
         "🦆 First release on the Chrome Web Store: a duck that follows the cursor with real physics, wake and bow wave.",

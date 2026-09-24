@@ -91,6 +91,9 @@
     <p><b>Schwindel:</b> Den Cursor ein paarmal schnell um die Ente kreisen lassen → ihr wird schwummrig 😵.</p>
     <p><b>Goldhaufen:</b> Wähl die 💰&nbsp;Milliardärs-Ente und lass sie einschlafen (oder drück „Schlafen") →
     ein Goldhaufen taucht auf und sie springt kopfüber hinein.</p>
+    <p><b>Laptop:</b> Wähl die 💻&nbsp;IT-Ente und drück „Schlafen" → sie tippt noch ein paar Zeilen, nickt ein und
+    landet mit dem Gesicht auf der Tastatur. „Debuggen" holt ihr eine Quietsche-Ente zum Erklären.</p>
+    <p><b>Freilauf:</b> Häkchen „Folgt dem Cursor" raus → sie zieht ihre eigenen Bahnen, mal schwimmend, mal zu Fuß.</p>
     <p><b>Sounds:</b> Alle Geräusche einzeln anhören im <a href="sounds.html">Sound-Studio&nbsp;🔊</a>.</p>
   </div>
 
@@ -130,6 +133,7 @@
   <label>Verspieltheit <span class="val" id="playV">1.0</span></label>
   <input type="range" id="playfulness" min="0.2" max="3" step="0.1" value="1">
 
+  <div class="chk"><input type="checkbox" id="follow" checked><label for="follow" style="margin:0">Folgt dem Cursor (aus = Freilauf)</label></div>
   <div class="chk"><input type="checkbox" id="sound"><label for="sound" style="margin:0">Quaken (Ton)</label></div>
   <div class="chk"><input type="checkbox" id="effects" checked><label for="effects" style="margin:0">Wasser-Effekte</label></div>
   <div class="chk"><input type="checkbox" id="reflection" checked><label for="reflection" style="margin:0">Spiegelung</label></div>
@@ -177,7 +181,7 @@
     };
   });
 
-  ['sound', 'effects', 'reflection', 'peck', 'feed'].forEach(function (id) {
+  ['follow', 'sound', 'effects', 'reflection', 'peck', 'feed'].forEach(function (id) {
     var el = document.getElementById(id);
     el.onchange = function () { var p = {}; p[id] = el.checked; engine.apply(p); };
   });
@@ -190,7 +194,7 @@
     ['startle', 'Schreck'], ['pet', 'Streicheln'],
     ['crumbs', 'Füttern 🍞'], ['fish', 'Fisch 🐟'], ['dizzy', 'Schwindel 😵'],
     ['dance', 'Tänzchen 💃'], ['peekaboo', 'Kuckuck 🫣'], ['visitor', 'Besuch 💕'],
-    ['waddle', 'Landgang 🚶'], ['burst', 'Platzen 🎈']
+    ['waddle', 'Landgang 🚶'], ['burst', 'Platzen 🎈'], ['debug', 'Debuggen 🐤']
   ];
   var rowEl = document.getElementById('actions');
   ACTIONS.forEach(function (a) {

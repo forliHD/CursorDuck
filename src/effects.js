@@ -138,6 +138,15 @@
     }
   };
 
+  // A key cap popping off the keyboard (the techie's face-plant)
+  FX.prototype.keycap = function (x, y) {
+    return this.add({
+      k: 'keycap', x: x, y: y, vx: (Math.random() - 0.5) * 120, vy: -90 - Math.random() * 90,
+      size: 3.5 + Math.random() * 2, life: 0.8 + Math.random() * 0.4,
+      rot: Math.random() * TAU, vrot: (Math.random() - 0.5) * 14
+    });
+  };
+
   FX.prototype.puff = function (x, y, color) {
     for (var i = 0; i < 7; i++) {
       var a = Math.random() * TAU;
@@ -164,6 +173,7 @@
           p.vy += 620 * dt; p.x += p.vx * dt; p.y += p.vy * dt;
           break;
         case 'confetti':
+        case 'keycap':
           p.vy += 380 * dt; p.vx *= (1 - 1.2 * dt);
           p.x += p.vx * dt; p.y += p.vy * dt; p.rot += p.vrot * dt;
           break;
@@ -323,6 +333,16 @@
           ctx.rotate(p.rot);
           ctx.fillStyle = p.color;
           ctx.fillRect(-p.size * 0.5, -p.size * 0.32, p.size, p.size * 0.64);
+          break;
+        case 'keycap':
+          // a dark key with a lighter top face
+          ctx.globalAlpha = fade;
+          ctx.translate(p.x, p.y);
+          ctx.rotate(p.rot);
+          ctx.fillStyle = '#2c3038';
+          ctx.fillRect(-p.size * 0.5, -p.size * 0.5, p.size, p.size);
+          ctx.fillStyle = '#4a5162';
+          ctx.fillRect(-p.size * 0.38, -p.size * 0.42, p.size * 0.76, p.size * 0.6);
           break;
         case 'coin':
           // spin around the vertical axis: width breathes with the flip

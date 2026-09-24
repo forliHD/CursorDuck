@@ -8,7 +8,7 @@
     playfulness: 1.0, sound: false, volume: 0.35, effects: true,
     reflection: true, opacity: 1.0,
     peck: true, feed: true, sleepAfter: 15, duckName: '',
-    hat: '', glasses: '', randomOnStart: false, disabledHosts: []
+    hat: '', glasses: '', follow: true, randomOnStart: false, disabledHosts: []
   };
 
   var cfg = null;
@@ -201,14 +201,14 @@
     ['volume', function (v) { return Math.round(v * 100) + ' %'; }],
     ['sleepAfter', function (v) { return Math.round(v) + ' s'; }]
   ];
-  var CHECKS = ['peck', 'feed', 'effects', 'reflection', 'sound', 'randomOnStart'];
+  var CHECKS = ['follow', 'peck', 'feed', 'effects', 'reflection', 'sound', 'randomOnStart'];
   var TRICKS = [
     ['quack', 'Quaken', '📣'], ['flap', 'Flattern', '🪶'], ['preen', 'Putzen', '🧼'],
     ['dabble', 'Gründeln', '🙃'], ['dive', 'Tauchen', '🤿'], ['spin', 'Pirouette', '🌀'],
     ['bathe', 'Baden', '🛁'], ['shake', 'Schütteln', '💦'], ['sleep', 'Nickerchen', '😴'],
     ['crumbs', 'Füttern', '🍞'], ['fish', 'Fisch-Jagd', '🐟'], ['dizzy', 'Schwindel', '😵'],
     ['dance', 'Tänzchen', '💃'], ['peekaboo', 'Kuckuck', '🫣'], ['waddle', 'Landgang', '🚶'],
-    ['visitor', 'Besuch', '💕'], ['disco', 'Disco', '🪩']
+    ['visitor', 'Besuch', '💕'], ['disco', 'Disco', '🪩'], ['debug', 'Debuggen', '🐤']
   ];
 
   // [Stat-Schlüssel, Ziel, Emoji, i18n-Key, Name (Fallback), Erklärung (Fallback), Stufe]
@@ -257,6 +257,9 @@
     ['goldNaps', 1, '💰', 'achGold1', 'Geldbad', 'Die Milliardärs-Ente ist zum ersten Mal in ihren Goldhaufen gesprungen.', 'bronze'],
     ['goldNaps', 10, '🪙', 'achGold2', 'Goldkind', '10 Goldbäder. Die Münzen haben inzwischen ihren Abdruck.', 'silver'],
     ['goldNaps', 50, '🏦', 'achGold3', 'Krösus', '50-mal im Gold geschlafen. Sie zählt es nachts nach — jede Münze.', 'gold'],
+    ['codeNaps', 1, '⌨️', 'achCode1', 'Tastatur-Kissen', 'Die IT-Ente ist zum ersten Mal am Laptop eingeschlafen — mit dem Gesicht auf der Tastatur.', 'bronze'],
+    ['codeNaps', 10, '🌙', 'achCode2', 'Nachtschicht', '10 Laptop-Nickerchen. Der Bildschirmschoner kennt sie inzwischen mit Namen.', 'silver'],
+    ['codeNaps', 50, '🖥️', 'achCode3', 'Legacy-System', '50-mal am Laptop eingeschlafen. Ihr Code läuft trotzdem in Produktion.', 'gold'],
     ['nests', 5, '🪺', 'achNest', 'Gute-Nacht-Geschichte', 'Bring die Küken 5-mal ins Nest — Mama stupst sie höchstpersönlich zu Bett.', 'bronze'],
     ['nests', 25, '🍼', 'achNest2', 'Kita-Leitung', '25-mal die Küken ins Nest gebracht. Mit Gute-Nacht-Lied, versteht sich.', 'silver'],
     ['nests', 100, '👑', 'achNest3', 'Entenmutter des Jahres', '100 Nest-Abende. Die Küken haben eine Dankesrede vorbereitet.', 'gold'],
@@ -267,7 +270,7 @@
     ['modelSwitches', 100, '🎭', 'achStyle2', 'Identitätskrise', '100 Modellwechsel. Wer bin ich — und wenn ja, wie viele Enten?', 'silver'],
     ['modelSwitches', 500, '🪞', 'achStyle3', 'Tausend Gesichter', '500 Modellwechsel. Der Spiegel hat aufgegeben.', 'gold'],
     ['legendary', 1, '✨', 'achLegend', 'Es glitzert!', 'Wähle eine legendäre Ente: Regenbogen, Galaxie oder Gold.', 'gold'],
-    ['quotes', 10, '🎤', 'achQuote', 'Keynote-Fan', 'Hör dir 10 Sprüche der Visionärs-Ente an. One more thing …', 'bronze'],
+    ['quotes', 10, '🎤', 'achQuote', 'Keynote-Fan', 'Hör dir 10 Sprüche der Visionärs- oder IT-Ente an. One more thing …', 'bronze'],
     ['quotes', 50, '📱', 'achQuote2', 'Keynote-Stammgast', '50 Sprüche. Du hast Frontrow-Tickets für jede Präsentation.', 'silver'],
     ['quotes', 200, '💫', 'achQuote3', 'Reality Distortion Field', '200 Sprüche. Du glaubst inzwischen alles, was sie sagt.', 'gold'],
     ['waddles', 5, '🚶', 'achWaddle', 'Landratte', 'Sieh ihr 5-mal beim Landgang zu — oder stups ihn im Popup an.', 'bronze'],
