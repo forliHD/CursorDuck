@@ -35,7 +35,12 @@ audio file must be CC0/public domain and documented in `audio/SOURCES.md`.
   `src/render.js` draws, `src/engine.js` holds physics and the behaviour state
   machine, `src/effects.js` holds particles.
 - Motion is time-interpolated (`approach()`), never frame-based.
-- The duck lives in a canvas inside a Shadow DOM with `pointer-events: none`.
+- The duck lives in a canvas inside a Shadow DOM with `pointer-events: none`. The canvas
+  is a small stage sized to the scene (`sceneBounds()` / `fitStage()`), not the viewport,
+  and calm scenes repaint at ~30 fps — call `engine.wake()` when something must show at
+  once.
+- `src/content.js` boots the engine in the top frame only; `src/frame.js` is the only
+  script injected into sub-frames (cursor relay and media heartbeat).
 
 ## Releases
 

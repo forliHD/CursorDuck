@@ -118,10 +118,14 @@ until then she stays polite and mute.)
   opt-in, which would leave the duck invisible). Permissions: only `storage` and
   `activeTab`. No network access, no data collection, no external dependencies.
 - The duck lives in a **canvas inside a Shadow DOM** with `pointer-events: none` at the
-  very top of the stack — clicks, text selection and page CSS remain untouched.
-- Inside `<iframe>`s only a tiny listener runs that reports the cursor position to the top
-  window; drawing happens exclusively in the top window (one duck per tab, not one per frame).
-- The animation pauses automatically when the tab goes into the background.
+  very top of the stack — clicks, text selection and page CSS remain untouched. The canvas
+  is only as big as the scene (a small fixed layer that travels with the duck), so a
+  resting duck costs very little; calm scenes repaint at about 30 fps, anything in motion
+  at the display's refresh rate.
+- Inside `<iframe>`s only a tiny listener runs (`src/frame.js`) that reports the cursor
+  position to the top window; drawing happens exclusively in the top window (one duck per
+  tab, not one per frame).
+- The animation stops completely while the tab is hidden and resumes when it comes back.
 - All motion is time-interpolated and therefore independent of the frame rate.
 - The interface (popup, welcome page, model names) is bilingual via `_locales/`: German and
   English. The browser picks automatically by its language; everything except German gets

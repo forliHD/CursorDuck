@@ -1,5 +1,24 @@
 [
   {
+    "version": "1.8.1",
+    "date": "2026-10-21",
+    "github": true,
+    "title": {
+      "en": "Lighter on the CPU",
+      "de": "Leichter für den Prozessor"
+    },
+    "items": {
+      "en": [
+        "⚡ Lower idle CPU: the duck now draws on a small layer the size of the scene instead of a page-sized canvas, and a resting duck repaints at about 30 fps instead of 60 — about 95 % fewer painted pixels, roughly a third less renderer load and half the GPU load on a MacBook.",
+        "🪟 Hidden tabs stop the animation completely, and iframes only relay the cursor instead of loading the whole engine."
+      ],
+      "de": [
+        "⚡ Weniger Prozessorlast im Leerlauf: Die Ente zeichnet jetzt auf einer kleinen Fläche in Szenengröße statt auf einem seitengroßen Canvas, und eine ruhende Ente wird mit etwa 30 statt 60 Bildern pro Sekunde gemalt — rund 95 % weniger gemalte Pixel, etwa ein Drittel weniger Renderer- und halb so viel GPU-Last auf einem MacBook.",
+        "🪟 Versteckte Tabs stoppen die Animation vollständig, und iframes leiten nur noch den Cursor weiter, statt die ganze Engine zu laden."
+      ]
+    }
+  },
+  {
     "version": "1.8.0",
     "date": "2026-09-24",
     "github": true,
