@@ -2250,6 +2250,7 @@
     if (want && !this.mediaOn) {
       this.mediaPing = true;
       this.discoCd = rand(6, 12);   // first ball drops soon after the music starts
+      this.wake();
     }
     this.mediaOn = want;
   };
@@ -2362,7 +2363,9 @@
     ctx.strokeStyle = 'rgba(60,70,90,0.55)';
     ctx.lineWidth = 1.2;
     ctx.beginPath();
-    ctx.moveTo(d.x, Math.min(0, by - 400));
+    // The string used to run off the top of the page. The canvas was the
+    // viewport, so that part was clipped anyway — start at the top edge.
+    ctx.moveTo(d.x, Math.max(0, Math.min(by - 400, by - R)));
     ctx.lineTo(d.x, by - R);
     ctx.stroke();
     var g = ctx.createRadialGradient(d.x - R * 0.35, by - R * 0.35, R * 0.1, d.x, by, R);
@@ -2795,12 +2798,18 @@
     var host = document.createElement('div');
     host.setAttribute('data-cursor-duck', '');
     var s = host.style;
+    // The host is only as big as the ducks. A viewport-sized canvas is a
+    // full-screen transparent layer, and clearing it every frame forces the
+    // compositor (and the window server) to blend the whole page at 60 Hz
+    // even while she is just bobbing in one spot.
     s.setProperty('position', 'fixed', 'important');
-    s.setProperty('inset', '0', 'important');
     s.setProperty('left', '0', 'important');
     s.setProperty('top', '0', 'important');
-    s.setProperty('width', '100%', 'important');
-    s.setProperty('height', '100%', 'important');
+    s.setProperty('width', '1px', 'important');
+    s.setProperty('height', '1px', 'important');
+    s.setProperty('transform-origin', '0 0', 'important');
+    s.setProperty('transform', 'translate3d(0,0,0)', 'important');
+    s.setProperty('will-change', 'transform', 'important');
     s.setProperty('pointer-events', 'none', 'important');
     s.setProperty('z-index', '2147483647', 'important');
     s.setProperty('border', '0', 'important');
@@ -2813,7 +2822,7 @@
 
     var shadow = host.attachShadow ? host.attachShadow({ mode: 'open' }) : host;
     var canvas = document.createElement('canvas');
-    canvas.style.cssText = 'position:absolute;left:0;top:0;width:100%;height:100%;display:block;pointer-events:none;';
+    canvas.style.cssText = 'position:absolute;left:0;top:0;display:block;pointer-events:none;';
     shadow.appendChild(canvas);
     (parent || document.documentElement).appendChild(host);
 
@@ -2821,39 +2830,24 @@
     this.canvas = canvas;
     this.ctx = canvas.getContext('2d');
     this.resize();
-    // Size changes arrive asynchronously from the browser instead of being
-    // polled: reading clientWidth every few frames forced a synchronous
-    // layout of the whole page on busy sites — a steady source of jank.
-    if (typeof ResizeObserver === 'function') {
-      var self = this;
-      this._ro = new ResizeObserver(function () { self.resize(); });
-      this._ro.observe(host);
-    }
     this.bindInput();
     return this;
   };
 
   Engine.prototype.resize = function () {
-    // Die echte Host-Größe nehmen, sonst verzerrt eine Scrollbar das Canvas
-    var rect = this.host && this.host.getBoundingClientRect();
-    var w = rect && rect.width ? rect.width : root.innerWidth;
-    var h = rect && rect.height ? rect.height : root.innerHeight;
-    // Hintergrund-Tabs/Prerender melden gern 0×0 — das würde die Ente in die
-    // Ecke klemmen. Dann lieber die letzte bekannte Größe behalten.
-    if (!w || !h) { w = this.w || 800; h = this.h || 600; }
+    // visualViewport tracks the layout viewport, scrollbar included the same
+    // way clientX is. Reading it does not force a page layout. A hidden tab
+    // reports 0×0 — keep the last real size so she doesn't jump to the corner.
+    var vv = root.visualViewport;
+    var w = vv && vv.width ? vv.width : root.innerWidth;
+    var h = vv && vv.height ? vv.height : root.innerHeight;
+    if (!w || !h) return;
+    var dprBase = Math.min(2, root.devicePixelRatio || 1);
+    if (dprBase !== this.dprBase) this.stage = null;
+    this.dprBase = dprBase;
+    if (Math.abs(w - this.w) < 0.5 && Math.abs(h - this.h) < 0.5) return;
     this.w = w;
     this.h = h;
-    // Retina crispness where it's cheap, but cap the overlay at ~6 megapixels:
-    // a full-screen 5K canvas at 2× would be 15 MP to composite every frame.
-    // Laptop screens stay at full 2×; only very large displays scale down.
-    var dpr = Math.min(2, root.devicePixelRatio || 1);
-    var cap = Math.sqrt(6e6 / Math.max(1, this.w * this.h));
-    dpr = Math.max(1, Math.min(dpr, cap));
-    this.dpr = dpr;
-    if (this.canvas) {
-      this.canvas.width = Math.round(this.w * dpr);
-      this.canvas.height = Math.round(this.h * dpr);
-    }
     // a wander goal outside the new viewport would strand her at the edge
     if (this.roam && this.duck) {
       var rm = this.duck.radius() * 2;
@@ -2865,6 +2859,15 @@
   Engine.prototype.setPointer = function (x, y) {
     this.px = x; this.py = y;
     this.pointerIdle = 0;
+    // A resting duck is drawn at a low rate. A real pointer update has to
+    // wake that loop on the next frame, or she would lag the cursor.
+    this.wake();
+  };
+
+  // Back to full frame rate until the scene is calm again.
+  Engine.prototype.wake = function () {
+    this._busy = true;
+    if (this.running && !this._inFrame) this._ensureLoop();
   };
 
   Engine.prototype.bindInput = function () {
@@ -2877,6 +2880,7 @@
     };
     b.resize = function () { self.resize(); };
     b.down = function (ev) {
+      self.wake();
       self.sound.unlock();
       // browsers replay a tap as mousedown/click/dblclick right after
       // touchend — the touch path below has already handled it
@@ -2912,6 +2916,7 @@
     };
     // Tippen (Mitlesen) und Markieren (Selektions-Snack)
     b.key = function () {
+      self.wake();
       self.sound.unlock();
       self.pokeTyping();
     };
@@ -2947,6 +2952,7 @@
     // Scroll-Strömung: Scrollen erzeugt eine kurze "Strömung", die die
     // Enten mitzieht (Seite runter → Wasser zieht nach oben und umgekehrt).
     b.pageScroll = function () {
+      self.wake();
       var y = root.scrollY || root.pageYOffset || 0;
       var x = root.scrollX || root.pageXOffset || 0;
       if (self._scrollY == null) { self._scrollY = y; self._scrollX = x; return; }
@@ -3004,9 +3010,15 @@
     root.addEventListener('keydown', b.key, { passive: true, capture: true });
     document.addEventListener('selectionchange', b.sel, false);
     root.addEventListener('resize', b.resize, { passive: true });
+    if (root.visualViewport) root.visualViewport.addEventListener('resize', b.resize, { passive: true });
     root.addEventListener('scroll', b.pageScroll, { passive: true });
     root.addEventListener('message', b.msg, false);
     document.addEventListener('visibilitychange', b.vis, false);
+    // bfcache (pagehide) does not always pair with visibilitychange
+    b.hide = function () { self.pause(); };
+    b.show = function () { if (!document.hidden) self.resume(); };
+    root.addEventListener('pagehide', b.hide, false);
+    root.addEventListener('pageshow', b.show, false);
   };
 
   Engine.prototype.unbindInput = function () {
@@ -3022,35 +3034,82 @@
     document.removeEventListener('selectionchange', b.sel);
     if (this._selTimer) { clearTimeout(this._selTimer); this._selTimer = 0; }
     root.removeEventListener('resize', b.resize);
+    if (root.visualViewport) root.visualViewport.removeEventListener('resize', b.resize);
     root.removeEventListener('scroll', b.pageScroll);
     root.removeEventListener('message', b.msg);
     document.removeEventListener('visibilitychange', b.vis);
+    root.removeEventListener('pagehide', b.hide);
+    root.removeEventListener('pageshow', b.show);
   };
 
   // ── Loop ──────────────────────────────────────────────────────
+  // Calm scenes (bobbing in place, asleep, a leftover ripple) are drawn at
+  // ~30 fps. The bob is about a pixel and a half tall, so the extra frames
+  // only repainted the same picture. Cursor, swimming, fish and disco stay
+  // on the display refresh. Particles ride along at the scene's rate.
+  Engine.prototype._ensureLoop = function () {
+    if (!this.running || this._loopQueued || this._inFrame) return;
+    if (this._calmTimer) { clearTimeout(this._calmTimer); this._calmTimer = 0; }
+    this._loopQueued = true;
+    var self = this;
+    this.raf = requestAnimationFrame(function (ts) { self._onFrame(ts); });
+  };
+
+  Engine.prototype._armCalm = function (ms) {
+    if (!this.running || this._calmTimer || this._loopQueued) return;
+    var self = this;
+    this._calmTimer = setTimeout(function () {
+      self._calmTimer = 0;
+      self._ensureLoop();
+    }, ms);
+  };
+
+  Engine.prototype._onFrame = function (ts) {
+    this._loopQueued = false;
+    if (!this.running) return;
+    if (!this.last) { this.last = ts; this._ensureLoop(); return; }
+    var gap = ts - this.last;
+    var hot = this._busy || (this.cfg.follow && this.pointerIdle < 0.08);
+    // 32 ms ≈ 30 fps. Arriving early (a pointer wake during the wait) holds
+    // the calm cadence instead of chaining another full-rate frame.
+    if (!hot && gap < 32) { this._armCalm(Math.max(4, 32 - gap)); return; }
+    var dt = Math.min(hot ? 0.05 : 0.1, gap / 1000);
+    this.last = ts;
+    this._inFrame = true;
+    this.step(dt);
+    this._busy = this.sceneBusy();
+    this.render();
+    this._inFrame = false;
+    if (!this.running) return;
+    hot = this._busy || (this.cfg.follow && this.pointerIdle < 0.08);
+    if (hot) this._ensureLoop();
+    else this._armCalm(20);
+  };
+
   Engine.prototype.start = function () {
     this.halted = false;
     if (this.running) return;
+    // A background tab must not start the loop. visibilitychange resumes it.
+    // rAF in a hidden tab is throttled, not stopped, and each tick still
+    // used to repaint the canvas.
+    if (typeof document !== 'undefined' && document.hidden) return;
     if (this.host) this.host.style.setProperty('display', 'block', 'important');
     this.running = true;
     this.last = 0;
-    var self = this;
-    var loop = function (ts) {
-      if (!self.running) return;
-      self.raf = requestAnimationFrame(loop);
-      if (!self.last) { self.last = ts; return; }
-      var dt = Math.min(0.05, (ts - self.last) / 1000);
-      self.last = ts;
-      self.step(dt);
-      self.render();
-    };
-    this.raf = requestAnimationFrame(loop);
+    this._busy = true;
+    this._ensureLoop();
   };
 
   // pause/resume follow tab visibility; stop() is the user-level off switch
   // (disabled or site paused). A stopped engine must survive tab switches —
   // resume() used to restart it, which un-paused sites after every switch.
-  Engine.prototype.pause = function () { this.running = false; if (this.raf) cancelAnimationFrame(this.raf); };
+  Engine.prototype.pause = function () {
+    this.running = false;
+    this._loopQueued = false;
+    this._inFrame = false;
+    if (this.raf) cancelAnimationFrame(this.raf);
+    if (this._calmTimer) { clearTimeout(this._calmTimer); this._calmTimer = 0; }
+  };
   Engine.prototype.resume = function () {
     if (this.cfg.enabled && !this.halted) { this.last = 0; this.start(); }
   };
@@ -3062,25 +3121,19 @@
   Engine.prototype.destroy = function () {
     this.stop();
     this.unbindInput();
-    if (this._ro) { this._ro.disconnect(); this._ro = null; }
     if (this.host && this.host.parentNode) this.host.parentNode.removeChild(this.host);
   };
 
   Engine.prototype.step = function (dt) {
     this.time += dt;
 
-    // Größe gelegentlich nachziehen: Seiten, die im Hintergrund ohne Layout
-    // laden, oder Scrollbars, die auftauchen, lösen kein resize-Event aus.
-    // (Only as a fallback without ResizeObserver — reading clientWidth
-    // forces a synchronous page layout, which is exactly what stutters.)
-    if (!this._ro) {
-      this.sizeCheck = (this.sizeCheck || 0) + 1;
-      if (this.sizeCheck >= 30) {
-        this.sizeCheck = 0;
-        var cw = this.host ? this.host.clientWidth : root.innerWidth;
-        var ch = this.host ? this.host.clientHeight : root.innerHeight;
-        if (cw && ch && (Math.abs(cw - this.w) > 1 || Math.abs(ch - this.h) > 1)) this.resize();
-      }
+    // Scrollbars can show up without a window resize. visualViewport is a
+    // viewport property, not a layout read — clientWidth on the page would
+    // force a synchronous layout of the whole document.
+    this.sizeCheck = (this.sizeCheck || 0) + 1;
+    if (this.sizeCheck >= 30) {
+      this.sizeCheck = 0;
+      this.resize();
     }
 
     // Zeigergeschwindigkeit
@@ -3470,11 +3523,173 @@
     }
   };
 
+  // States whose pose only breathes. Everything else (dance, peck, dive…)
+  // wants the display refresh.
+  var CALM_STATE = { idle: 1, bob: 1, look: 1, swim: 1, sleep: 1 };
+
+  Engine.prototype.sceneBusy = function () {
+    var d = this.duck;
+    if (!d) return false;
+    if (this.cfg.follow && this.pointerIdle < 0.2) return true;
+    // Real swimming is hundreds of px/s. A few dozen is the idle sway of a
+    // duckling holding station, which the slow frame rate still shows.
+    if (Math.abs(d.vx) + Math.abs(d.vy) > 48) return true;
+    if (!CALM_STATE[d.state]) return true;
+    if (d.hopY > 0.6) return true;
+    // Particles ride along at whatever rate the scene is already on. A ripple
+    // left over from stopping must not pin the whole page at 60 fps.
+    if (this.fish || this.visitor || this.disco) return true;
+    var babies = this.babies, i, b;
+    for (i = 0; i < babies.length; i++) {
+      b = babies[i];
+      if (Math.abs(b.vx) + Math.abs(b.vy) > 48) return true;
+      if (!b.nesting && b.babyActT > 0) return true;
+    }
+    if (this.nest && (this.nest.sink || this.nest.appear < 0.98)) return true;
+    if (this.hoard && (this.hoard.sink || this.hoard.appear < 0.98)) return true;
+    if (this.laptop) return true;
+    if (this.buddy && (this.buddy.sink || this.buddy.appear < 0.98 || this.buddy.squeak > 0)) return true;
+    return false;
+  };
+
+  function growBox(b, x0, y0, x1, y1) {
+    if (x0 < b.x0) b.x0 = x0;
+    if (y0 < b.y0) b.y0 = y0;
+    if (x1 > b.x1) b.x1 = x1;
+    if (y1 > b.y1) b.y1 = y1;
+  }
+
+  // Generous sprite box: hats, reflection, wing-flap, glow shadow and hop.
+  Engine.prototype.addDuckBounds = function (b, d) {
+    if (!d) return;
+    var sc = (d.model && d.model.scale) || 1;
+    var r = d.radius() * sc;
+    var glow = (d.model && d.model.glow) ? r * 2.4 : 0;
+    var hop = Math.abs(d.hopY || 0);
+    growBox(b, d.x - r * 3.8 - glow, d.y - r * 5.4 - hop - glow,
+      d.x + r * 3.8 + glow, d.y + r * 2.8 + glow);
+  };
+
+  Engine.prototype.sceneBounds = function () {
+    var b = { x0: Infinity, y0: Infinity, x1: -Infinity, y1: -Infinity };
+    var i, far = 320;
+    this.addDuckBounds(b, this.duck);
+    this.addDuckBounds(b, this.visitor);
+    for (i = 0; i < this.babies.length; i++) this.addDuckBounds(b, this.babies[i]);
+    if (this.nest && this.nest.appear > 0.02) {
+      var n = this.nest;
+      growBox(b, n.x - n.r * 1.7, n.y - n.r * 1.4, n.x + n.r * 1.7, n.y + n.r * 1.2);
+    }
+    if (this.hoard && this.hoard.appear > 0.02) {
+      var h = this.hoard;
+      growBox(b, h.x - h.r * 1.8, h.y - h.r * 1.6, h.x + h.r * 1.8, h.y + h.r * 1.0);
+    }
+    if (this.laptop && this.laptop.appear > 0.02) {
+      var lp = this.laptop, R = lp.r;
+      growBox(b, lp.x - R * 2.9, lp.y - R * 3.4, lp.x + R * 2.9, lp.y + R * 1.4);
+    }
+    if (this.buddy && this.buddy.appear > 0.02) {
+      var br = this.duck.radius() * 0.7;
+      growBox(b, this.buddy.x - br * 3.2, this.buddy.y - br * 4.2,
+        this.buddy.x + br * 3.2, this.buddy.y + br * 2.4);
+    }
+    if (this.fish && this.fish.alpha > 0.02) {
+      var f = this.fish, fr = 18 * clamp(this.cfg.size, 0.7, 1.6);
+      growBox(b, f.x - fr * 2.4, f.y - fr * 1.8, f.x + fr * 2.4, f.y + fr * 1.6);
+    }
+    for (i = 0; i < this.crumbs.length; i++) {
+      var c = this.crumbs[i];
+      if (c.x < -far || c.y < -far || c.x > this.w + far || c.y > this.h + far) continue;
+      growBox(b, c.x - c.size * 2.4, c.y - c.size * 2.4, c.x + c.size * 2.4, c.y + c.size * 2.4);
+    }
+    if (this.disco && this.disco.appear > 0.02) {
+      var dsc = this.disco, dr = this.duck.radius();
+      var ball = Math.max(9, dr * 0.42);
+      var by = dsc.y - (1 - dsc.appear) * 160;
+      // spots travel out to ~3.4 radii and the ellipse adds another half;
+      // the string starts at the top of the viewport, not hundreds of px above it
+      var reach = dr * 6;
+      var stringTop = Math.max(0, Math.min(by - 400, by - ball));
+      growBox(b, dsc.x - reach, stringTop - 4, dsc.x + reach, this.duck.y + dr * 2.2);
+      growBox(b, dsc.x - ball - 8, by - ball - 8, dsc.x + ball + 8, by + ball + 8);
+    }
+    if (this.fx && this.fx.expandBounds) this.fx.expandBounds(b);
+    if (!(b.x1 > b.x0) || !(b.y1 > b.y0)) {
+      b.x0 = 0; b.y0 = 0; b.x1 = 1; b.y1 = 1;
+    }
+    // Off-screen pixels were never visible: the previous canvas was exactly
+    // the viewport. A short margin lets a sprite cross the edge without the
+    // 64px snap cutting it, and stops a disco string from allocating a tall
+    // bitmap above the page.
+    var margin = 24;
+    if (b.x0 < -margin) b.x0 = -margin;
+    if (b.y0 < -margin) b.y0 = -margin;
+    if (b.x1 > this.w + margin) b.x1 = this.w + margin;
+    if (b.y1 > this.h + margin) b.y1 = this.h + margin;
+    return b;
+  };
+
+  Engine.prototype.fitStage = function (b) {
+    var pad = 16;
+    var x0 = b.x0 - pad, y0 = b.y0 - pad, x1 = b.x1 + pad, y1 = b.y1 + pad;
+    var SNAP = 64;
+    var x = Math.floor(x0 / SNAP) * SNAP;
+    var y = Math.floor(y0 / SNAP) * SNAP;
+    var w = Math.max(SNAP, Math.ceil(x1 / SNAP) * SNAP - x);
+    var h = Math.max(SNAP, Math.ceil(y1 / SNAP) * SNAP - y);
+    // Scattered crumbs or a disco string can cover the page. Past that,
+    // one viewport-sized layer is the old ceiling — never bigger.
+    if (w * h > this.w * this.h * 0.85) {
+      x = 0; y = 0;
+      w = Math.max(1, Math.ceil(this.w));
+      h = Math.max(1, Math.ceil(this.h));
+    }
+    var s = this.stage;
+    if (s && x0 >= s.x && y0 >= s.y && x1 <= s.x + s.w && y1 <= s.y + s.h) {
+      // Keep the allocation while the duck swims inside it, but don't hold
+      // onto a stage left over from a splash or a long swim.
+      if (s.w < w * 1.45 && s.h < h * 1.45) return;
+    }
+    this.stage = { x: x, y: y, w: w, h: h };
+    this.applyStage();
+  };
+
+  Engine.prototype.applyStage = function () {
+    var s = this.stage, canvas = this.canvas, host = this.host;
+    if (!s || !canvas) return;
+    // Same pixel cap as before, but it now applies to the stage. A duck-sized
+    // stage stays at full device scale; only a viewport-sized one scales down.
+    var base = this.dprBase || Math.min(2, root.devicePixelRatio || 1);
+    var cap = Math.sqrt(6e6 / Math.max(1, s.w * s.h));
+    var dpr = Math.max(1, Math.min(base, cap));
+    this.dpr = dpr;
+    var bw = Math.max(1, Math.round(s.w * dpr));
+    var bh = Math.max(1, Math.round(s.h * dpr));
+    if (canvas.width !== bw || canvas.height !== bh) {
+      canvas.width = bw;
+      canvas.height = bh;
+    }
+    canvas.style.width = s.w + 'px';
+    canvas.style.height = s.h + 'px';
+    if (host) {
+      host.style.setProperty('width', s.w + 'px', 'important');
+      host.style.setProperty('height', s.h + 'px', 'important');
+      host.style.setProperty('transform', 'translate3d(' + s.x + 'px,' + s.y + 'px,0)', 'important');
+    }
+  };
+
   Engine.prototype.render = function () {
     var ctx = this.ctx;
     if (!ctx) return;
-    ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
-    ctx.clearRect(0, 0, this.w, this.h);
+    var box = this.sceneBounds();
+    this.fitStage(box);
+    var s = this.stage;
+    if (!s) return;
+    var dpr = this.dpr || 1;
+    // Device pixels, so a fractional dpr can't leave a dirty sliver.
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+    ctx.setTransform(dpr, 0, 0, dpr, -s.x * dpr, -s.y * dpr);
 
     // Fisch & Brotkrumen liegen im/auf dem Wasser → unter die Enten
     if (this.fish || this.crumbs.length) this.drawExtras(ctx);
@@ -4016,6 +4231,7 @@
   };
 
   Engine.prototype.trigger = function (action, dur) {
+    this.wake();
     if (action === 'fish') {
       if (!this.fish) this.spawnFish();
       this.fish.alpha = 1;

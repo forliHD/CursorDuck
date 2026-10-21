@@ -33,6 +33,26 @@
 
   FX.prototype.clear = function () { this.parts.length = 0; };
 
+  // World-space box around every live particle, so the stage canvas can
+  // stay small instead of covering the viewport. `box` is {x0,y0,x1,y1}.
+  FX.prototype.expandBounds = function (box) {
+    var parts = this.parts, i, p, pad, wide;
+    for (i = 0; i < parts.length; i++) {
+      p = parts[i];
+      if (p.k === 'ripple') pad = Math.max(p.r0, p.r1) + (p.lw || 2) * 2;
+      else if (p.k === 'text') {
+        wide = String(p.txt || '').length;
+        pad = (p.size || 16) * (0.8 + 0.62 * wide);
+      } else if (p.k === 'zzz') pad = (p.size || 12) * 2.4;
+      else if (p.k === 'puff') pad = (p.size || 8) + 8;
+      else pad = (p.size || 8) * 2.6;
+      if (p.x - pad < box.x0) box.x0 = p.x - pad;
+      if (p.y - pad < box.y0) box.y0 = p.y - pad;
+      if (p.x + pad > box.x1) box.x1 = p.x + pad;
+      if (p.y + pad > box.y1) box.y1 = p.y + pad;
+    }
+  };
+
   // ── Spawner ───────────────────────────────────────────────────
   FX.prototype.ripple = function (x, y, r0, r1, life, color, lw) {
     return this.add({ k: 'ripple', x: x, y: y, r0: r0, r1: r1, life: life || 1.4, color: color || 'rgba(255,255,255,0.55)', lw: lw || 2 });

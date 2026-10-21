@@ -2,46 +2,29 @@
  * (c) 2026 Lucas Reiser (forliHD) — Alle Rechte vorbehalten. Siehe LICENSE.
  *
  * CursorDuck — Content-Script-Bootstrap
- * Top-Frame: Ente rendern. Sub-Frames: nur Cursor-Position nach oben melden.
+ * Top frame only. Sub-frames relay the cursor from src/frame.js so the
+ * engine (and its canvas) is not created once per iframe.
  */
 (function () {
   'use strict';
 
+  if (window.top !== window.self) return;
+
   var isExt = typeof chrome !== 'undefined' && chrome.storage && chrome.runtime && chrome.runtime.id;
 
   // Is a video/audio with sound playing in this document? Muted autoplay
-  // hero videos don't count — nobody dances to those.
+  // hero videos don't count — nobody dances to those. Live collections,
+  // so this doesn't re-run a selector query every tick.
   function mediaPlayingHere() {
-    var els = document.querySelectorAll('video, audio');
-    for (var i = 0; i < els.length; i++) {
-      var m = els[i];
-      if (!m.paused && !m.ended && !m.muted && m.volume > 0 && m.readyState >= 2) return true;
+    var lists = [document.getElementsByTagName('video'), document.getElementsByTagName('audio')];
+    for (var n = 0; n < lists.length; n++) {
+      var els = lists[n];
+      for (var i = 0; i < els.length; i++) {
+        var m = els[i];
+        if (!m.paused && !m.ended && !m.muted && m.volume > 0 && m.readyState >= 2) return true;
+      }
     }
     return false;
-  }
-
-  // ── Sub-Frames: Cursorposition an das Top-Fenster melden ──────
-  if (window.top !== window.self) {
-    var lastSend = 0;
-    window.addEventListener('mousemove', function (ev) {
-      var now = Date.now();
-      if (now - lastSend < 16) return;
-      lastSend = now;
-      try {
-        window.parent.postMessage({ __cursorDuck: 1, x: ev.clientX, y: ev.clientY }, '*');
-      } catch (e) { /* cross-origin, egal */ }
-    }, { passive: true, capture: true });
-    // Embedded players (YouTube & Co.) live in iframes: heartbeat while
-    // playing, one final "off" when the media stops
-    var mediaWas = false;
-    setInterval(function () {
-      var on = mediaPlayingHere();
-      if (on || mediaWas) {
-        try { window.top.postMessage({ __cursorDuck: 1, media: on }, '*'); } catch (e) { /* egal */ }
-      }
-      mediaWas = on;
-    }, 1000);
-    return;
   }
 
   if (!isExt) return; // Demo-Seite bootet selbst
@@ -185,7 +168,7 @@
     if (d.media) frameMedia.push({ win: ev.source, t: Date.now() });
   }, false);
   setInterval(function () {
-    if (!engine) return;
+    if (document.hidden || !engine) return;
     var now = Date.now(), any = mediaPlayingHere();
     for (var i = frameMedia.length - 1; i >= 0; i--) {
       if (now - frameMedia[i].t > 2500) frameMedia.splice(i, 1);   // stale heartbeat
