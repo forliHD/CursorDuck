@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Cursor Duck test page</title>
+<style>
+  html, body { margin: 0; font: 15px/1.6 system-ui, sans-serif; background: #f6f8fb; color: #1d2b3a; }
+  main { position: relative; height: 3000px; }
+  .abs { position: absolute; }
+  #text { left: 40px; top: 40px; width: 520px; }
+  #link { left: 640px; top: 40px; }
+  #input { left: 40px; top: 200px; width: 200px; }
+  #area { left: 40px; top: 240px; width: 200px; height: 50px; }
+  #edit { left: 40px; top: 310px; width: 200px; height: 40px; border: 1px solid #99a; }
+  #sel { left: 260px; top: 200px; }
+  #btnDialog { left: 40px; top: 370px; }
+  #btnModal { left: 160px; top: 370px; }
+  #btnMenu { left: 280px; top: 370px; }
+  #btnFull { left: 400px; top: 370px; }
+  #frame { left: 40px; top: 420px; width: 300px; height: 110px; border: 1px solid #99a; }
+  #plain { left: 500px; top: 300px; width: 400px; height: 300px; background: #eef3f8; }
+  #modal { position: fixed; left: 500px; top: 40px; width: 200px; padding: 10px; background: #fff; border: 1px solid #667; }
+  #hiddenDialog { display: none; }
+</style>
+</head>
+<body>
+<main>
+  <p class="abs" id="text">Plain text the visitor may want to select. It goes on for a couple of lines so that a
+    mouse drag across it covers plenty of words, far away from wherever the duck is resting right now.</p>
+  <a class="abs" id="link" href="#clicked">a link to click</a>
+  <input class="abs" id="input" value="keep me">
+  <textarea class="abs" id="area">keep me too</textarea>
+  <div class="abs" id="edit" contenteditable="true">editable</div>
+  <select class="abs" id="sel"><option>one</option><option>two</option></select>
+  <button class="abs" id="btnDialog" type="button">native dialog</button>
+  <button class="abs" id="btnModal" type="button">custom modal</button>
+  <button class="abs" id="btnMenu" type="button">menu</button>
+  <button class="abs" id="btnFull" type="button">fullscreen</button>
+  <iframe class="abs" id="frame" src="frame.html"></iframe>
+  <div class="abs" id="plain"></div>
+</main>
+<dialog id="dlg"><p>native dialog</p></dialog>
+<div id="hiddenDialog" role="dialog" aria-modal="true">kept in the DOM, not shown</div>
+<script>
+  // What the page itself gets to see of the visitor's input.
+  window.__log = { click: [], mousemove: 0, pointermove: 0, mousedown: 0, mouseup: 0, keydown: [], selectstart: 0 };
+  var log = window.__log;
+  window.addEventListener('mousemove', function () { log.mousemove++; });
+  window.addEventListener('pointermove', function () { log.pointermove++; });
+  window.addEventListener('mousedown', function () { log.mousedown++; });
+  window.addEventListener('mouseup', function () { log.mouseup++; });
+  document.addEventListener('click', function (e) { log.click.push(e.target.id || e.target.tagName); });
+
+  document.getElementById('btnDialog').onclick = function () { document.getElementById('dlg').showModal(); };
+
+  var menuOpen = false, modal = null;
+  document.getElementById('btnMenu').onclick = function () { menuOpen = true; };
+  document.getElementById('btnModal').onclick = function () {
+    modal = document.createElement('div');
+    modal.id = 'modal';
+    modal.setAttribute('role', 'dialog');
+    modal.setAttribute('aria-modal', 'true');
+    modal.textContent = 'custom modal, closed by the page on Esc';
+    document.body.appendChild(modal);
+  };
+  document.getElementById('btnFull').onclick = function () { document.documentElement.requestFullscreen(); };
+
+  document.addEventListener('keydown', function (e) {
+    var entry = { key: e.key, prevented: e.defaultPrevented };
+    if (e.key === 'Escape') {
+      // a custom modal that closes itself and doesn't care about preventDefault
+      if (modal) { modal.remove(); modal = null; entry.closedModal = true; }
+      // a menu that claims the key properly
+      else if (menuOpen) { menuOpen = false; e.preventDefault(); entry.closedMenu = true; }
+    }
+    log.keydown.push(entry);
+  });
+  // Esc that reached the very end, after the extension's listener, unprevented?
+  window.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') log.keydown.push({ tail: true, prevented: e.defaultPrevented });
+  });
+</script>
+</body>
+</html>

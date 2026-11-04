@@ -1,0 +1,14 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>frame</title>
+<body style="margin:6px;font:13px system-ui">
+<p id="p" tabindex="0">focusable text in a frame</p>
+<input id="fi" value="frame field">
+<script>
+  // a widget that closes its own modal on Esc, without calling preventDefault
+  document.addEventListener('keydown', function (e) {
+    var m = document.getElementById('fmodal');
+    if (e.key === 'Escape' && m) m.remove();
+  });
+</script>
+</body>
