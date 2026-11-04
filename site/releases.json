@@ -1,5 +1,30 @@
 [
   {
+    "version": "1.9.0",
+    "date": "2026-11-04",
+    "github": true,
+    "title": {
+      "en": "Gifts, Esc & drifting leaves",
+      "de": "Geschenke, Esc & treibende Blätter"
+    },
+    "items": {
+      "en": [
+        "🤏 By the scruff: Hold the mouse button on her and drag: she quacks in outrage, flaps and kicks — and after you let go she paddles back with great dignity to exactly where she was. On touchscreens, long-press and drag. Links and text underneath stay clickable as ever.",
+        "🎁 A daily gift: Once a day she brings you something: a pebble, a shell, a snail — and very rarely a pearl or a golden egg. 14 pieces await you in the new collection in the popup.",
+        "🤫 Dive with Esc: Press Esc near her and the whole family dives out of sight. Esc again brings everybody back. Dialogs, fullscreen and text fields keep their Esc key, and the popup can switch this off.",
+        "🍂 Drifting leaves: From September to November an autumn leaf drifts across the water now and then. She gives it a nudge or dozes off under it.",
+        "🏆 Achievements & wardrobe: 9 new badges, 72 in total, and a leaf wreath for every model, unlocked by 7 different gifts."
+      ],
+      "de": [
+        "🤏 Am Schlafittchen: Halt die Maustaste auf ihr gedrückt und zieh: Sie quakt empört, flattert und strampelt — und paddelt nach dem Loslassen hoheitsvoll genau dahin zurück, wo sie war. Auf Touchscreens: lange drücken und ziehen. Links und Text darunter bleiben wie immer klickbar.",
+        "🎁 Das tägliche Geschenk: Einmal am Tag bringt sie dir etwas mit: Kiesel, Muschel, Schnecke — und ganz selten Perle oder goldenes Ei. 14 Stücke warten in der neuen Sammlung im Popup.",
+        "🤫 Abtauchen mit Esc: Esc in ihrer Nähe, und die ganze Familie taucht ab. Esc noch einmal holt alle zurück. Dialoge, Vollbild und Eingabefelder behalten ihre Esc-Taste, und im Popup lässt sich das abschalten.",
+        "🍂 Treibende Blätter: Von September bis November treibt ab und zu ein Herbstblatt übers Wasser. Sie stupst es an oder döst darunter.",
+        "🏆 Erfolge & Garderobe: 9 neue Abzeichen, 72 insgesamt, und ein Laubkranz für jedes Modell, freigeschaltet durch 7 verschiedene Geschenke."
+      ]
+    }
+  },
+  {
     "version": "1.8.1",
     "date": "2026-10-21",
     "github": true,

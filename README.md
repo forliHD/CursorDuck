@@ -47,12 +47,16 @@ her tricks.
 | **Rubber duck debugging** | Now and then the IT duck fetches a little rubber duck out of the water and explains her bug to it — muttering, “…”, “?”, “!” — until the rubber duck squeaks and the light bulb goes on. Then the helper sinks away again. |
 | **Free roam** | Switch off “Follows the cursor” in the popup and she lives on the page instead: she swims and waddles her own routes, lingers for her tricks, naps when she feels like it (waking on her own, or when your cursor comes close) and stays curious — a cursor resting nearby gets a visit and a peck. |
 | **Clicking** | Click the duck → she quacks back. Double-click the duck → wing flapping. |
+| **By the scruff** | Hold the mouse button on her and drag → she quacks in outrage, flaps and kicks, and after you let go she paddles back to exactly where she was. On touchscreens, long-press and drag. A press that doesn't move stays an ordinary click on whatever is underneath; off the duck the page never notices. |
+| **Dive with Esc** | Press Esc while she's near your cursor → the whole family dives out of sight and the overlay stops drawing altogether. Esc again brings them back. Text fields, open dialogs and fullscreen keep their Esc key; a switch in the popup turns this off. |
+| **A daily gift** | On your first page of the day she dives and comes up with a little present: pebble, shell, snail, feather, acorn, marble, button, cork, clover, starfish, old coin, pearl, message in a bottle or, very rarely, a golden egg. The popup keeps the collection, on your device only. |
+| **Drifting leaves** | From September to November an autumn leaf drifts across the water now and then. She gives it a nudge, or dozes off with it on her head. Not under “reduce motion”. |
 | **Reading along** | Type into a text field and she watches the field instead of the cursor — and won't doze off while you type. |
 | **Focus mode** | On password fields and fullscreen videos she steps aside; afterwards she reports back with a “!”. |
 | **Selection snack** | Select text near her and she nibbles at the edge of the selection — “nom”. She only sees where the text is, never what it says. |
 | **Touch** | On touchscreens she follows your finger: tap her to quack, double-tap to flap or feed. |
 | **Music & video** | When a video or audio track with sound plays on the page (embedded players included), she dances along in rounds, the ducklings bob to the beat, and a sleeping duck wakes up for the first beat. Every now and then a little disco ball sinks in on a string, throws colored spots on the water and the whole family goes wild for a few seconds — hops, wing flaps, colored notes, confetti, ducklings hopping in a wave. Pause the player and she stops. Muted autoplay videos don't count; the 🪩 trick button throws a party on demand. |
-| **Wardrobe** | 15 hats and 6 pairs of glasses can be put on any model — top hat, crown, halo, ninja mask, headphones, sunglasses, monocle, nerd glasses … Each piece is unlocked by an achievement (the lock tells you which one); the popup previews every piece on your current duck. |
+| **Wardrobe** | 16 hats and 6 pairs of glasses can be put on any model — top hat, crown, halo, ninja mask, leaf wreath, headphones, sunglasses, monocle, nerd glasses … Each piece is unlocked by an achievement (the lock tells you which one); the popup previews every piece on your current duck. |
 
 ## The duck models
 
@@ -79,7 +83,7 @@ cache?” (twelve lines as well).
 
 Rare models are marked in the popup (blue = rare, purple = epic, gold = legendary).
 The 🎲 button picks at random — legendaries are rare. The popup also holds
-**63 achievements in bronze, silver, gold and diamond tiers** — from petting fan through
+**72 achievements in bronze, silver, gold and diamond tiers** — from petting fan through
 “Identity crisis”, “Croesus” and “Legacy system” to “Duck whisperer” and the 30-day “Regular”; clicking an achievement reveals how
 to earn it, and the header counts what you've collected.
 
@@ -88,15 +92,15 @@ to earn it, and the header counts what you've collected.
 Size, speed, distance to the cursor (so she never sits on the text you're reading),
 number of ducklings, playfulness, opacity, sound on/off with volume, nap delay
 (5–60 seconds), “follows the cursor” (off: free roam), water effects, reflection,
-cursor pecking, crumb feeding, “new random model on every browser start”, “pause on
+cursor pecking, crumb feeding, “Esc near her dives the family”, “new random model on every browser start”, “pause on
 this site” with an editable list of paused sites (a domain covers its subdomains), and
 a name for your duck (she says it when the petting bar is full) — everything applies
 instantly, without reloading. The model grid has a search box, a soundboard previews
-every sound, and 18 buttons trigger tricks directly (including feeding, fish hunt,
-shore leave, visitors, the disco ball and rubber duck debugging).
+every sound, and 20 buttons trigger tricks directly (including feeding, fish hunt,
+shore leave, visitors, the disco ball, rubber duck debugging, a preview gift and a leaf).
 
 She honors your system's “reduce motion” setting: with it enabled, pirouettes, shaking,
-bathing, dancing and the disco ball are skipped automatically — the trick buttons in
+bathing, dancing, the disco ball and the drifting leaves are skipped automatically — the trick buttons in
 the popup still do everything on request.
 
 Keyboard shortcuts: `Alt+Shift+D` (on/off), `Alt+Shift+N` (next model).

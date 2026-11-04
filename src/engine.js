@@ -52,7 +52,8 @@
     duckName: '',       // Taufname, wird bei voller Streichel-Leiste gesagt
     hat: '',            // wardrobe: '' = the model's own, 'none' = bare, else a hat kind
     glasses: '',        // same for glasses
-    follow: true        // off = free roam: she lives on the page instead of trailing the cursor
+    follow: true,       // off = free roam: she lives on the page instead of trailing the cursor
+    escHide: true       // Esc near her: the family dives out of sight, Esc again brings them back
   };
 
   // ── Sound ─────────────────────────────────────────────────────
@@ -518,8 +519,17 @@
   // sonst putzt sie sich seelenruhig fertig und wirkt abgehängt.
   var INTERRUPTIBLE = {
     look: 1, preen: 1, flap: 1, shake: 1, quack: 1,
-    dabble: 1, spin: 1, bathe: 1, bob: 1, dance: 1
+    dabble: 1, spin: 1, bathe: 1, bob: 1, dance: 1, leafnudge: 1
   };
+
+  // Set pieces a click or a petting cursor must not break into.
+  var NO_CLICK = {
+    dive: 1, waddle: 1, roamwalk: 1, burst: 1,
+    dragged: 1, dragback: 1, gift: 1, hide: 1, surface: 1
+  };
+
+  // Calm enough to start something new (a gift, a leaf, a fish…).
+  var AT_LEISURE = { idle: 1, swim: 1, bob: 1, look: 1 };
 
   // ── Ente ──────────────────────────────────────────────────────
   function Duck(engine, model, isBaby) {
@@ -564,6 +574,11 @@
     if (this.state === 'goldnap') this.gnInit = false;   // leaving mid-dive
     if (this.state === 'codenap') this.cnInit = false;   // leaving mid-typing
     if (this.state === 'roamwalk') this.rwInit = false;  // leaving mid-walk (follow switched on)
+    if (this.state === 'waddle') this.wadInit = this.wadQuacked = this.wadSplash = false;   // picked up mid-walk
+    if (this.state === 'leafnudge') this.nudged = false;
+    // a popup button during the PLOPP used to leave her invisible for good
+    if (this.state === 'burst') { this.vanish = 0; this.burstOh = this.burstPop = this.burstBack = false; }
+    if (this.state === 'gift') this.e.finishGiftRun();   // interrupted: the gift still lands
     // free roam keeps its own nap rhythm: how long she sleeps, how long she stays up
     if (this.e.roam && !this.baby && !this.wild) {
       if (s === 'sleep') this.e.roam.wakeIn = rand(45, 120);
@@ -597,6 +612,23 @@
       e.sound.key(true);
       e.laptop.jolt = 1;                // the held key lets go
     }
+  };
+
+  // Everything a trick remembers about its own progress. Grabbing her or
+  // sending her under can cut any of them short.
+  Duck.prototype.resetActionFlags = function () {
+    this.quacked = this.peckDone = this.dove = this.surfaced = this.dabbleUp = false;
+    this.splashed = this.gulped = this.pkbDove = this.pkbUp = this.nudged = false;
+    this.tuckKiss = this.tuckHeart = this.dbgAha = this.dbgThanks = false;
+    this.burstOh = this.burstPop = this.burstBack = this.cnPuzzled = this.mediaDance = false;
+    this.watchT = 0; this.hoverT = 0; this.spinAcc = 0; this.lastAng = null;
+  };
+
+  // Can the cursor pick her up right now? Not while she is under water.
+  Duck.prototype.grabbable = function () {
+    var st = this.state;
+    return !this.vanish && this.a.submerge < 0.5 &&
+      st !== 'burst' && st !== 'hide' && st !== 'surface' && st !== 'dragged';
   };
 
   // The water shake-off that ends dabbling, diving, peekaboo & Co. Under
@@ -641,9 +673,11 @@
       blush: a.blush, sleep: a.sleep,
       wobble: a.wobble, beakOpen: a.beakOpen,
       walk: a.walk, hop: this.hopY,
-      // no own waterline while tucked into the nest or the gold hoard
-      water: !this.nesting && !this.hoardNap,
-      reflection: this.e.cfg.reflection && !this.baby && !this.hoardNap && !this.codeNap
+      // no own waterline while tucked into the nest or the gold hoard, or
+      // while she dangles from the cursor
+      water: !this.nesting && !this.hoardNap && this.state !== 'dragged',
+      reflection: this.e.cfg.reflection && !this.baby && !this.hoardNap && !this.codeNap &&
+        this.state !== 'dragged'
     };
   };
 
@@ -782,8 +816,7 @@
     // ── Streicheln erkennen ─────────────────────────────────
     // (nicht beim Tauchen, an Land oder mitten im Platzen)
     var inside = this.hit(px, py);
-    var petting = inside && e.pointerSpeed > 55 &&
-      st !== 'dive' && st !== 'waddle' && st !== 'roamwalk' && st !== 'burst';
+    var petting = inside && e.pointerSpeed > 55 && !NO_CLICK[st];
     if (petting) {
       if (e.pointerSpeed > 2100 && this.pet < 0.15 && st !== 'startle') {
         this.setState('startle', 0.8);
@@ -847,7 +880,7 @@
       st = 'swim';
     }
     // Cursor macht einen großen Sprung (Fenster/iframe gewechselt) → kurz aufmerken
-    if (!this.baby && !roam && e.alertPing && dist > 260 &&
+    if (!this.baby && !roam && e.alertPing && dist > 260 && !NO_CLICK[st] &&
         st !== 'sleep' && st !== 'goldnap' && st !== 'codenap' && st !== 'pet' &&
         st !== 'startle' && st !== 'burst') {
       this.say('!', '#4a90d9');
@@ -953,6 +986,171 @@
     }
 
     switch (st) {
+      case 'dragged': {
+        // Picked up by the scruff: she dangles from the cursor, legs going,
+        // wings going, and tells you exactly what she thinks of this.
+        var grab = e.drag;
+        if (!grab || !grab.active) { this.setState('swim', 1); break; }
+        // the legs lift the body by walk * 0.9 r; compensate so the spot you
+        // grabbed stays under the cursor. Through vx/vy, so heading still works.
+        var calmDrag = cfg.reduceMotion;
+        this.vx = (px + grab.offX - this.x) * 20;
+        this.vy = (py + grab.offY + a.walk * r * 0.9 - this.y) * 20;
+        this.hopY = 0;
+        t.walk = 1;
+        this.paddle += dt * (calmDrag ? 6 : 15);
+        t.wingFlap = calmDrag ? 0.3 : Math.abs(Math.sin(e.time * 17));
+        t.wobble = calmDrag ? 0 : Math.sin(e.time * 21) * 0.4;
+        t.lean = Math.sin(e.time * 3.1) * (calmDrag ? 0.03 : 0.12);
+        t.headRot = -0.3 + Math.sin(e.time * 7) * 0.08;
+        this.actionTick -= dt;
+        if (this.actionTick <= 0) {
+          this.actionTick = rand(0.75, 1.3);
+          this.dragBeak = 0.3;
+          e.sound.quack(this.model.quackPitch * rand(1.25, 1.5));
+          this.say(pick(['!!', '?!', '#@!', '!']), '#ff6b4a');
+          if (cfg.effects) e.fx.feather(this.x + rand(-r, r) * 0.6, this.y - r * rand(0.4, 1.2), this.model.belly);
+        }
+        this.dragBeak = Math.max(0, (this.dragBeak || 0) - dt);
+        t.beakOpen = this.dragBeak > 0 ? 0.95 : 0.12;
+        if (cfg.effects && !calmDrag && Math.random() < dt * 5) {
+          e.fx.droplet(this.x + rand(-r, r) * 0.5, this.y + rand(-2, 4), rand(-14, 14), rand(30, 80), rand(0.9, 1.6));
+        }
+        break;
+      }
+
+      case 'dragback': {
+        // Set down again: nose in the air, straight back to her old spot —
+        // only then does she take notice of the cursor again.
+        var home = this.dragHome;
+        if (!home) { this.setState('idle', 1); break; }
+        var hm = r * 1.2;
+        var homeX = clamp(home.x, hm, Math.max(hm, e.w - hm));
+        var homeY = clamp(home.y, hm, Math.max(hm, e.h - hm));
+        this.swim(dt, homeX, homeY, r * 0.15, 1.25);
+        t.headRot = -0.2; t.eyeOpen = 0.72;
+        t.wingLift = clamp(this.stTime < 0.5 ? 0.5 - this.stTime : 0, 0, 0.5);
+        if (!this.dragHmpf && this.stTime > 0.4) {
+          this.dragHmpf = true;
+          this.say('hmpf', '#c0392b');
+          e.sound.quack(this.model.quackPitch * 0.9);
+        }
+        if (Math.hypot(homeX - this.x, homeY - this.y) < r * 0.5 || this.stTime > this.stDur) {
+          this.dragHome = null; this.dragHmpf = false;
+          this.shakeOff(0.8);
+        }
+        break;
+      }
+
+      case 'hide':
+        // Esc: down she goes. Engine.step() parks the whole scene once it is empty.
+        t.submerge = 1; t.lean = 0.3;
+        this.vx = approach(this.vx, 0, 5, dt);
+        this.vy = approach(this.vy, 0, 5, dt);
+        this.actionTick -= dt;
+        if (this.actionTick <= 0 && !this.vanish) {
+          this.actionTick = 0.12;
+          e.fx.bubble(this.x + rand(-r * 0.6, r * 0.6), this.y - rand(0, 6));
+        }
+        if (this.stTime > 0.55) this.vanish = 1;
+        break;
+
+      case 'surface':
+        // Esc again: back up beside the cursor
+        t.eyeHappy = 1; t.headRot = -0.12;
+        this.vx = approach(this.vx, 0, 4, dt);
+        this.vy = approach(this.vy, 0, 4, dt);
+        if (!this.surfaced) {
+          this.surfaced = true;
+          e.fx.splash(this.x, this.y, 1.1);
+          e.sound.splash(0.9);
+          e.sound.quack(this.model.quackPitch * 1.2, true);
+          this.say('!', '#59b6f7');
+        }
+        if (this.stTime > this.stDur) { this.surfaced = false; this.shakeOff(0.7); }
+        break;
+
+      case 'gift': {
+        // First visit of the day: down she goes and comes up beside the
+        // cursor with something in her beak, shows it off and sets it on the
+        // water. Under reduced motion she skips the dive.
+        var job = this.giftRun;
+        if (!job) { this.setState('idle', 1); break; }
+        job.t += dt;
+        if (job.phase === 'down') {
+          t.submerge = 1; t.lean = 0.4;
+          this.vx = approach(this.vx, 0, 4, dt);
+          this.vy = approach(this.vy, 0, 4, dt);
+          if (!job.splashed) {
+            job.splashed = true;
+            e.fx.splash(this.x, this.y, 1);
+            e.sound.splash(0.8);
+          }
+          if (job.t > 0.7) {
+            var gSide = px > e.w - r * 5 ? -1 : (px < r * 5 ? 1 : (this.x < px ? -1 : 1));
+            var gKeep = stopDist * 1.1;
+            this.x = clamp(px + gSide * gKeep, r * 1.5, Math.max(r * 1.5, e.w - r * 1.5));
+            this.y = clamp(py + r * 0.5, r * 2.2, Math.max(r * 2.2, e.h - r * 1.2));
+            this.vx = 0; this.vy = 0;
+            this.carry = job.id;
+            e.fx.splash(this.x, this.y, 1.1);
+            e.sound.splash(0.9);
+            job.phase = 'up'; job.t = 0;
+          }
+        } else if (job.phase === 'up') {
+          t.eyeHappy = 1; t.headRot = -0.25;
+          this.vx = approach(this.vx, 0, 4, dt);
+          this.vy = approach(this.vy, 0, 4, dt);
+          if (job.t > 0.55) { job.phase = 'show'; job.t = 0; }
+        } else if (job.phase === 'show') {
+          // beak up, proud as anything
+          if (Math.abs(cdx) > r * 0.4) this.face = cdx > 0 ? 1 : -1;
+          t.headRot = -0.42; t.wingLift = 0.45; t.eyeHappy = 1;
+          t.squash = 1 + Math.sin(job.t * 9) * 0.03;
+          this.vx = approach(this.vx, 0, 4, dt);
+          this.vy = approach(this.vy, 0, 4, dt);
+          if (cfg.effects && Math.random() < dt * 7) {
+            var hg = this.headWorld();
+            e.fx.sparkle(hg.x + this.dirF * r * 0.9 + rand(-8, 8), hg.y + rand(-8, 8), '#fff3b0', rand(3, 5));
+          }
+          if (job.t > 0.85) { job.phase = 'place'; job.t = 0; }
+        } else {
+          // a bow toward the cursor, and there it floats
+          var pk2 = clamp(job.t / 0.55, 0, 1);
+          t.headDip = Math.sin(pk2 * Math.PI) * 0.6; t.lean = Math.sin(pk2 * Math.PI) * 0.16;
+          t.eyeHappy = 1;
+          if (pk2 > 0.55 && this.carry) e.placeGift();
+          if (pk2 >= 1) { this.giftRun = null; this.setState('idle', 1); }
+        }
+        break;
+      }
+
+      case 'leafnudge': {
+        // A leaf drifting past gets a good-natured tap with the beak.
+        var nl = e.leaf;
+        if (!nl || nl.on) { this.nudged = false; this.setState('idle', 1); break; }
+        var nSide = nl.x >= this.x ? 1 : -1;
+        this.face = nSide;
+        this.swim(dt, nl.x - nSide * r * 1.05, nl.y, r * 0.2, 0.5);
+        var lk = this.stTime / this.stDur;
+        var tap = Math.sin(clamp(lk * 1.6, 0, 1) * Math.PI);
+        t.headDip = tap * 0.55; t.lean = tap * 0.12; t.headRot = 0.08;
+        if (!this.nudged && lk > 0.3) {
+          this.nudged = true;
+          nl.vx += nSide * rand(20, 34);
+          nl.vy += rand(-9, 9);
+          if (!cfg.reduceMotion) nl.spin += nSide * rand(0.8, 1.6);
+          nl.cd = 6;
+          e.fx.ripple(nl.x, nl.y, 2, 18, 0.7, 'rgba(255,255,255,0.5)', 1.4);
+          e.sound.peck();
+          e.stats.leaves = (e.stats.leaves || 0) + 1;
+          e.saveStats();
+          if (Math.random() < 0.4) this.say('♪', '#c98a2e');
+        }
+        if (this.stTime > this.stDur) { this.nudged = false; this.setState('idle', 1); }
+        break;
+      }
+
       case 'pet':
         t.eyeHappy = 1; t.blush = clamp(this.pet * 1.6, 0, 1);
         t.wobble = Math.sin(e.time * 15) * 0.55 * clamp(this.pet * 2, 0, 1);
@@ -1040,7 +1238,7 @@
         // Roaming: only a cursor moving close by, or her own alarm clock.
         var woken = roam
           ? (this.disturbed(cdist) || roam.wakeIn <= 0)
-          : (e.pointerIdle < 0.2 || (!this.hoardNap && !this.codeNap && dist > r * 4));
+          : (e.pointerIdle < 0.2 || (!this.hoardNap && !this.codeNap && dist > Math.max(r * 4, stopDist * 1.3)));
         if (woken) {
           if (this.hoardNap && e.hoard) this.vx = (px > this.x ? 1 : -1) * 90;
           this.wakeJolt();
@@ -1933,6 +2131,22 @@
           }
           break;
         }
+        // A leaf drifting by: a tap with the beak or, with the cursor at
+        // rest, she settles down for a doze under it
+        var dl = e.leaf;
+        if (dl && !dl.on && dl.z <= 0 && dl.cd <= 0 && Math.hypot(dl.x - this.x, dl.y - this.y) < r * 2.8) {
+          dl.cd = 6;
+          // not sooner than half the nap setting, and whoever has a bedtime ritual
+          // (ducklings, gold hoard, laptop) keeps it: those get a nudge
+          if (e.pointerIdle > cfg.sleepAfter * 0.5 && !e.babies.length && this.sleepState() === 'sleep' &&
+              !e.musicOn && e.typeT <= 0 && Math.random() < 0.5) {
+            this.setState('sleep', 99);
+          } else {
+            this.nudged = false;
+            this.setState('leafnudge', 1.15);
+          }
+          break;
+        }
         // peck reach grows with the keep-away distance, else she'd never get a turn
         if (cfg.peck && this.peckCd <= 0 && cdist < Math.max(r * 3.4, stopDist * 1.8) && e.pointerIdle > 0.6) {
           this.peckDone = false;
@@ -2040,6 +2254,13 @@
       t.squash *= 1 + Math.min(1, this.fullness / 9) * 0.15;
     }
 
+    // A press on her that hasn't lifted her yet: she holds still under the finger
+    // (a long press takes half a second, and a glide would carry her out from under it)
+    if (e.drag && !e.drag.active) {
+      this.vx = approach(this.vx, 0, 12, dt);
+      this.vy = approach(this.vy, 0, 12, dt);
+    }
+
     // ── Physik & Animation ──────────────────────────────────
     var speed = this.integrate(dt);
 
@@ -2066,7 +2287,7 @@
     a.walk = approach(a.walk, t.walk, 6, dt);
 
     // ── Wasserspur ──────────────────────────────────────────
-    if (cfg.effects && a.submerge < 0.7) {
+    if (cfg.effects && a.submerge < 0.7 && this.state !== 'dragged') {
       this.rippleCd -= dt;
       if (this.rippleCd <= 0 && speed > 26) {
         this.rippleCd = clamp(0.36 - speed * 0.00035, 0.08, 0.36);
@@ -2168,6 +2389,15 @@
     this.disco = null;        // the disco ball, while it hangs over the party
     this.discoOn = false;     // true while the ball is down → everybody goes wild
     this.discoCd = 0;         // seconds of music until the next ball drops
+    this.drag = null;         // press or long-press on her: { x0, y0, offX, offY, homeX, homeY, active, touch }
+    this.submerged = false;   // Esc: the family is under water
+    this.subT = 0;            // seconds since the dive
+    this._parked = false;     // submerged and the scene is empty: no frames at all
+    this.giftQ = null;        // a gift waiting for a calm moment
+    this.giftObj = null;      // the gift floating on the water
+    this.giftName = null;     // host-provided localized gift name
+    this.leaf = null;         // at most one drifting leaf
+    this.leafCd = rand(25, 70);
     this._bound = {};
     this.setModel(this.cfg.model);
     if (!this.cfg.follow) this.planRoam(true);
@@ -2300,8 +2530,7 @@
       if (!r || r.width < 4) return;
       var x = r.left + r.width / 2, y = r.top + r.height / 2;
       if (Math.hypot(x - d.x, y - d.y) > 420) return;
-      if (d.state === 'dive' || d.state === 'waddle' || d.state === 'roamwalk' || d.state === 'burst' ||
-          d.state === 'sleep' || d.state === 'goldnap' || d.state === 'codenap') return;
+      if (NO_CLICK[d.state] || d.state === 'sleep' || d.state === 'goldnap' || d.state === 'codenap') return;
       this._selCd = 4;
       d.face = d.x <= x ? 1 : -1;
       this.typeX = x; this.typeY = y; this.typeT = 1.6;   // kurz hingucken
@@ -2443,6 +2672,7 @@
       b.x = this.duck.x - (i + 1) * 24;
       b.y = this.duck.y + 6;
       b.gap = 34 * this.cfg.size * (i + 1);
+      if (this.submerged) { b.vanish = 1; b.a.submerge = 1; b.diving = true; }
       this.babies.push(b);
     }
   };
@@ -2452,6 +2682,10 @@
     var wardrobeChanged = cfg.hat !== undefined || cfg.glasses !== undefined;
     var followChanged = cfg.follow !== undefined && !!cfg.follow !== !!this.cfg.follow;
     for (var k in cfg) if (cfg[k] !== undefined) this.cfg[k] = cfg[k];
+    // Hidden with Esc, then turned off, re-dressed or Esc switched off: there
+    // has to be a way back that doesn't involve a key that no longer works.
+    if (this.submerged && (!this.cfg.enabled || !this.cfg.escHide)) this.surface(true);
+    else if (this.submerged && (modelChanged || wardrobeChanged)) this.surface();
     if (followChanged) {
       // free roam on: first wander goal right away; off: back to the cursor
       if (this.cfg.follow) this.roam = null; else this.planRoam(true);
@@ -2761,6 +2995,9 @@
       ctx.restore();
     }
 
+    if (this.leaf && !this.leaf.on && this.leaf.z <= 0) this.drawLeafObj(ctx);
+    if (this.giftObj) this.drawGiftObj(ctx);
+
     for (i = 0; i < this.crumbs.length; i++) {
       var c = this.crumbs[i];
       var bob = Math.sin(t * 2.1 + c.phase) * 1.3;
@@ -2886,26 +3123,26 @@
       // touchend — the touch path below has already handled it
       if (ev.isTrusted && self._touchAt && Date.now() - self._touchAt < 700) return;
       var d = self.duck;
-      if (!d) return;
+      if (!d || self.submerged) return;
       var dist = Math.hypot(ev.clientX - d.x, ev.clientY - d.y);
       if (self.cfg.effects) self.fx.ripple(ev.clientX, ev.clientY, 4, 34, 0.7, 'rgba(255,255,255,0.5)', 2);
-      if (dist < d.radius() * 2.6 && d.state !== 'dive' &&
-          d.state !== 'waddle' && d.state !== 'roamwalk' && d.state !== 'burst') {
+      if (dist < d.radius() * 2.6 && !NO_CLICK[d.state]) {
         // Ente direkt angeklickt → sie quakt zurück
         d.setState('quack', 1.0);
         d.quacked = false;
       }
+      // the touch path calls this without a button and arms its own long press
+      // (ev.detail: the second press of a double-click belongs to the page's word selection)
+      if (ev.button === 0 && ev.detail < 2 && !ev.ctrlKey && !ev.shiftKey && !ev.metaKey && !ev.altKey) self.armDrag(ev, false);
     };
     b.dbl = function (ev) {
       if (ev.isTrusted && self._touchAt && Date.now() - self._touchAt < 700) return;
       var d = self.duck;
-      if (!d) return;
+      if (!d || self.submerged) return;
       var dist = ev.clientX !== undefined ? Math.hypot(ev.clientX - d.x, ev.clientY - d.y) : 0;
       if (dist < d.radius() * 2.6) {
         // Doppelklick auf die Ente → Flügelschlagen (wie gehabt)
-        if (d.state !== 'dive' && d.state !== 'waddle' && d.state !== 'roamwalk' && d.state !== 'burst') {
-          d.setState('flap', 1.3);
-        }
+        if (!NO_CLICK[d.state]) d.setState('flap', 1.3);
       } else if (self.cfg.feed) {
         // Doppelklick ins Wasser → Brotkrumen werfen
         self.throwCrumbs(ev.clientX, ev.clientY);
@@ -2915,10 +3152,48 @@
       if (document.hidden) self.pause(); else self.resume();
     };
     // Tippen (Mitlesen) und Markieren (Selektions-Snack)
-    b.key = function () {
+    b.key = function (ev) {
       self.wake();
       self.sound.unlock();
       self.pokeTyping();
+      // judged before the page's own handlers can close the dialog it belongs to
+      if (ev && (ev.key === 'Escape' || ev.key === 'Esc')) self._escBlocked = self.escBlocked(ev);
+    };
+    // Esc: bubble phase, so a page that handled the key (stopPropagation or
+    // preventDefault) simply keeps it. Never prevents or stops anything itself.
+    b.esc = function (ev) {
+      if (ev.key !== 'Escape' && ev.key !== 'Esc') return;
+      if (self.drag) { self.endDrag(true); return; }   // mid-drag it just lets her go
+      if (ev.repeat || ev.isComposing || ev.defaultPrevented || self._escBlocked) return;
+      if (ev.ctrlKey || ev.shiftKey || ev.metaKey || ev.altKey) return;
+      self.pressEsc();
+    };
+    // ── Picking her up ─────────────────────────────────────────
+    // Only armed by a press on her. A press that doesn't travel stays an
+    // ordinary click on whatever is underneath; these listeners exist only
+    // between press and release, so the page pays nothing the rest of the time.
+    b.dragMove = function (ev) {
+      var g = self.drag;
+      if (!g || g.touch || ev.pointerType === 'touch') return;
+      if (ev.buttons === 0) { self.endDrag(); return; }   // the release went missing
+      if (!g.active && Math.hypot(ev.clientX - g.x0, ev.clientY - g.y0) >= 5) self.beginDrag();
+      // the page saw the press, so it also gets the release — but no drag
+      if (g.active) ev.stopImmediatePropagation();
+    };
+    b.dragUp = function () { self.endDrag(); };
+    b.dragLost = function () { self.endDrag(); };
+    b.dragBlock = function (ev) { ev.preventDefault(); };
+    b.dragTouchMove = function (ev) {
+      var g = self.drag;
+      if (!g || !g.touch) return;
+      if (ev.touches && ev.touches.length > 1) { self.endDrag(); return; }
+      var t = ev.changedTouches && ev.changedTouches[0];
+      if (!g.active) {
+        // the finger set off before the long press was up: that's a scroll
+        if (t && Math.hypot(t.clientX - g.x0, t.clientY - g.y0) > 10) self.endDrag();
+        return;
+      }
+      if (ev.cancelable) ev.preventDefault();
     };
     // debounced: selectionchange fires for every mouse move of a drag
     // selection — one geometry read once the selection has settled is enough
@@ -2944,6 +3219,7 @@
       self._lastTap = now; self._lastTapX = t.clientX; self._lastTapY = t.clientY;
       b.down({ clientX: t.clientX, clientY: t.clientY });
       if (dbl) b.dbl({ clientX: t.clientX, clientY: t.clientY });
+      else self.armDrag({ clientX: t.clientX, clientY: t.clientY, target: ev.target }, true);
     };
     b.touchMove = function (ev) {
       var t = ev.changedTouches && ev.changedTouches[0];
@@ -2960,8 +3236,9 @@
       self._scrollY = y; self._scrollX = x;
       // crumbs lie on the page, not on the glass: they scroll with the content
       if (d || dx) self.shiftCrumbs(-dx, -d);
-      if (!self.running || Math.abs(d) < 3) return;
+      if (!self.running || self.submerged || Math.abs(d) < 3) return;
       var kick = clamp(-d * 0.9, -240, 240);
+      if (self.leaf && !self.leaf.on) self.leaf.vy += kick * 0.12;
       var dk = self.duck;
       if (dk) {
         if (dk.state === 'sleep' && Math.abs(kick) > 150) {
@@ -2989,6 +3266,15 @@
     // Cursor-Position aus iframes einsammeln
     b.msg = function (ev) {
       var data = ev.data;
+      // Esc pressed with the focus inside a sub-frame (frame.js checked its own fields)
+      if (data && data.__cursorDuck === 1 && data.esc) {
+        var inside = false;
+        try { inside = ev.source !== root && ev.source.top === root; } catch (e) { /* not one of ours */ }
+        if (!inside) return;
+        if (self.drag) self.endDrag(true);
+        else if (!self.escBlocked()) self.pressEsc();
+        return;
+      }
       // media reports from sub-frames carry no coordinates — the host handles those
       if (!data || data.__cursorDuck !== 1 || data.x === undefined) return;
       var frames = document.getElementsByTagName('iframe');
@@ -3008,6 +3294,7 @@
     root.addEventListener('touchstart', b.touch, { passive: true, capture: true });
     root.addEventListener('touchmove', b.touchMove, { passive: true, capture: true });
     root.addEventListener('keydown', b.key, { passive: true, capture: true });
+    root.addEventListener('keydown', b.esc, { passive: true });
     document.addEventListener('selectionchange', b.sel, false);
     root.addEventListener('resize', b.resize, { passive: true });
     if (root.visualViewport) root.visualViewport.addEventListener('resize', b.resize, { passive: true });
@@ -3031,6 +3318,8 @@
     root.removeEventListener('touchstart', b.touch, true);
     root.removeEventListener('touchmove', b.touchMove, true);
     root.removeEventListener('keydown', b.key, true);
+    root.removeEventListener('keydown', b.esc);
+    this.endDrag();
     document.removeEventListener('selectionchange', b.sel);
     if (this._selTimer) { clearTimeout(this._selTimer); this._selTimer = 0; }
     root.removeEventListener('resize', b.resize);
@@ -3048,7 +3337,7 @@
   // only repainted the same picture. Cursor, swimming, fish and disco stay
   // on the display refresh. Particles ride along at the scene's rate.
   Engine.prototype._ensureLoop = function () {
-    if (!this.running || this._loopQueued || this._inFrame) return;
+    if (!this.running || this._loopQueued || this._inFrame || this._parked) return;
     if (this._calmTimer) { clearTimeout(this._calmTimer); this._calmTimer = 0; }
     this._loopQueued = true;
     var self = this;
@@ -3081,6 +3370,7 @@
     this.render();
     this._inFrame = false;
     if (!this.running) return;
+    if (this._wantPark) { this.park(); return; }
     hot = this._busy || (this.cfg.follow && this.pointerIdle < 0.08);
     if (hot) this._ensureLoop();
     else this._armCalm(20);
@@ -3093,7 +3383,7 @@
     // rAF in a hidden tab is throttled, not stopped, and each tick still
     // used to repaint the canvas.
     if (typeof document !== 'undefined' && document.hidden) return;
-    if (this.host) this.host.style.setProperty('display', 'block', 'important');
+    if (this.host) this.host.style.setProperty('display', this._parked ? 'none' : 'block', 'important');
     this.running = true;
     this.last = 0;
     this._busy = true;
@@ -3104,6 +3394,7 @@
   // (disabled or site paused). A stopped engine must survive tab switches —
   // resume() used to restart it, which un-paused sites after every switch.
   Engine.prototype.pause = function () {
+    if (this.drag) this.endDrag(true);
     this.running = false;
     this._loopQueued = false;
     this._inFrame = false;
@@ -3168,6 +3459,8 @@
     if (!this.wiggleT) this.wiggleN = 0;
 
     this.updateFish(dt);
+    this.updateLeaf(dt);
+    this.tickGift(dt);
 
     // Wilde Ente: Besuch abwickeln bzw. gelegentlich einen ankündigen
     if (this.visitor) {
@@ -3192,7 +3485,7 @@
     // Reduced motion: no dancing to page media — only the popup's 🪩 button
     // (mediaHoldT) may still throw a party on request
     this.musicOn = this.mediaOn && (!this.cfg.reduceMotion || this.mediaHoldT > 0);
-    if (this.mediaOn && !this.disco && this.cfg.effects && !this.cfg.reduceMotion) {
+    if (this.mediaOn && !this.disco && this.cfg.effects && !this.cfg.reduceMotion && !this.submerged) {
       this.discoCd -= dt;
       if (this.discoCd <= 0) this.spawnDisco();
     }
@@ -3200,7 +3493,7 @@
       var dsc = this.disco, dk1 = this.duck, dr1 = dk1.radius();
       dsc.t += dt;
       dsc.spin += dt * 1.4;
-      var ending = !this.mediaOn || dsc.t > dsc.dur ||
+      var ending = !this.mediaOn || dsc.t > dsc.dur || this.submerged ||
         dk1.state === 'sleep' || dk1.state === 'pet' || dk1.state === 'burst';
       dsc.appear = approach(dsc.appear, ending ? 0 : 1, ending ? 3 : 3.5, dt);
       dsc.x = approach(dsc.x, dk1.x, 2.5, dt);
@@ -3369,6 +3662,7 @@
 
     this.resolveOverlaps(dt);
     this.fx.update(dt);
+    if (this.submerged) this.tickSubmerged(dt);
   };
 
   // Anti-Overlap: die Familie auseinanderhalten, damit kein Küken hinter
@@ -3478,6 +3772,23 @@
       else if (this.babyAct === 'doze') { t.eyeOpen = 0.05; t.headRot = 0.15; }
     }
 
+    // mama in the air: everybody flaps in sympathy
+    if (e.drag && e.drag.active && !this.nesting) {
+      t.wingFlap = Math.abs(Math.sin(e.time * 15 + this.phase));
+      t.beakOpen = Math.max(0, Math.sin(e.time * 9 + this.phase)) * 0.5;
+    }
+
+    // Esc: one after the other under the surface, and back up the same way
+    this.holdT = Math.max(0, (this.holdT || 0) - dt);
+    var under = (e.submerged && e.subT >= (this.hideAt || 0)) || this.holdT > 0;
+    if (under !== !!this.diving) {
+      this.diving = under;
+      if (under) { e.fx.splash(this.x, this.y, 0.45); e.sound.splash(0.3); }
+      else { this.vanish = 0; e.fx.splash(this.x, this.y, 0.5); e.sound.splash(0.35); }
+    }
+    a.submerge = approach(a.submerge, under ? 1 : 0, 9, dt);
+    if (under && a.submerge > 0.95) this.vanish = 1;
+
     // page media playing: the little ones bob to the beat, too — and under
     // the disco ball each one hops on its own beat (a wave through the row)
     var br = this.radius();
@@ -3539,6 +3850,7 @@
     // Particles ride along at whatever rate the scene is already on. A ripple
     // left over from stopping must not pin the whole page at 60 fps.
     if (this.fish || this.visitor || this.disco) return true;
+    if (this.giftObj && (this.giftObj.t < 0.5 || this.giftObj.life < 0.5)) return true;
     var babies = this.babies, i, b;
     for (i = 0; i < babies.length; i++) {
       b = babies[i];
@@ -3612,6 +3924,14 @@
       var stringTop = Math.max(0, Math.min(by - 400, by - ball));
       growBox(b, dsc.x - reach, stringTop - 4, dsc.x + reach, this.duck.y + dr * 2.2);
       growBox(b, dsc.x - ball - 8, by - ball - 8, dsc.x + ball + 8, by + ball + 8);
+    }
+    if (this.leaf) {
+      var lf = this.leaf, ls = lf.s * 1.5;
+      growBox(b, lf.x - ls, lf.y - lf.z - ls, lf.x + ls, lf.y + ls);
+    }
+    if (this.giftObj) {
+      var go = this.giftObj, gs = go.s * 2.6;
+      growBox(b, go.x - gs, go.y - gs, go.x + gs, go.y + gs);
     }
     if (this.fx && this.fx.expandBounds) this.fx.expandBounds(b);
     if (!(b.x1 > b.x0) || !(b.y1 > b.y0)) {
@@ -3692,7 +4012,7 @@
     ctx.setTransform(dpr, 0, 0, dpr, -s.x * dpr, -s.y * dpr);
 
     // Fisch & Brotkrumen liegen im/auf dem Wasser → unter die Enten
-    if (this.fish || this.crumbs.length) this.drawExtras(ctx);
+    if (this.fish || this.crumbs.length || this.leaf || this.giftObj) this.drawExtras(ctx);
     if (this.disco) this.drawDiscoLights(ctx);
 
     // Tiefensortierung: wer weiter unten schwimmt, ist weiter vorn —
@@ -3725,6 +4045,8 @@
       else if (it.k === 'u') this.drawBuddy(ctx);
       else this.drawNest(ctx);
     }
+    if (this.duck.carry) this.drawCarry(ctx);
+    if (this.leaf && (this.leaf.on || this.leaf.z > 0)) this.drawLeafObj(ctx);   // on her head, or still falling
     if (this.cfg.effects) this.fx.draw(ctx);
     if (this.disco) this.drawDiscoBall(ctx);   // hangs above everything
   };
@@ -4220,6 +4542,523 @@
     ctx.restore();
   };
 
+  // ── Picking her up ────────────────────────────────────────────
+  // Is this element something the press belongs to? Text fields and the like
+  // keep their caret and selection, she only ever gets the press on plain page.
+  function isFieldEl(el) {
+    if (!el || !el.tagName) return false;
+    var tag = el.tagName.toUpperCase();
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return true;
+    if (el.isContentEditable === true) return true;
+    var role = el.getAttribute ? el.getAttribute('role') : null;
+    return role === 'textbox' || role === 'searchbox' || role === 'combobox';
+  }
+
+  // The focused element, followed through open shadow roots.
+  function deepActive() {
+    var a = document.activeElement;
+    while (a && a.shadowRoot && a.shadowRoot.activeElement) a = a.shadowRoot.activeElement;
+    return a;
+  }
+
+  Engine.prototype.armDrag = function (ev, touch) {
+    var d = this.duck;
+    if (this.drag || !this.running || this.submerged || !d.grabbable()) return;
+    if (!d.hit(ev.clientX, ev.clientY)) return;
+    var target = ev.composedPath ? ev.composedPath()[0] : ev.target;
+    if (isFieldEl(target)) return;
+    var self = this, b = this._bound;
+    var g = this.drag = {
+      x0: ev.clientX, y0: ev.clientY, touch: !!touch, active: false, timer: 0,
+      offX: d.x - ev.clientX, offY: d.y - ev.clientY, homeX: d.x, homeY: d.y
+    };
+    // Held back at the press: Chromium goes on extending a selection once it has
+    // started, whatever happens to the mouse moves. (A double-click never arms, so
+    // the word under her still gets selected.) Native drags would swallow the moves.
+    root.addEventListener('selectstart', b.dragBlock, true);
+    root.addEventListener('dragstart', b.dragBlock, true);
+    root.addEventListener('blur', b.dragLost, false);
+    if (touch) {
+      // Long press. Sooner than the browser's own gesture and the first move
+      // would still scroll the page; once that gesture is up it won't.
+      g.timer = setTimeout(function () { g.timer = 0; if (self.drag === g) self.beginDrag(); }, 520);
+      root.addEventListener('touchmove', b.dragTouchMove, { passive: false, capture: true });
+      root.addEventListener('touchend', b.dragLost, true);
+      root.addEventListener('touchcancel', b.dragLost, true);
+      root.addEventListener('contextmenu', b.dragBlock, true);
+    } else {
+      root.addEventListener('pointermove', b.dragMove, true);
+      root.addEventListener('mousemove', b.dragMove, true);
+      root.addEventListener('mouseup', b.dragUp, true);
+    }
+  };
+
+  Engine.prototype.beginDrag = function () {
+    var g = this.drag, d = this.duck;
+    if (!g || g.active) return;
+    if (!d.grabbable()) { this.endDrag(); return; }   // dived in the meantime
+    // she may have moved on since the press: is she still under the pointer?
+    var r = d.radius();
+    if (Math.hypot(this.px - d.x, this.py - (d.y - r * 0.75)) > r * 2.2) { this.endDrag(); return; }
+    g.offX = d.x - this.px; g.offY = d.y - this.py;
+    g.homeX = d.x; g.homeY = d.y;
+    g.active = true;
+    if (d.state === 'sleep') d.wakeJolt();
+    d.resetActionFlags();
+    d.dragHmpf = false;
+    d.setState('dragged', 99);
+    d.actionTick = 0;   // the first complaint comes at once
+    this.wake();
+  };
+
+  // Release, or a press that never became a drag. `held`: the button is still
+  // down (Esc let her go), so the click only comes with the real release.
+  Engine.prototype.endDrag = function (held) {
+    var g = this.drag, b = this._bound;
+    if (!g) return;
+    this.drag = null;
+    if (g.timer) clearTimeout(g.timer);
+    root.removeEventListener('selectstart', b.dragBlock, true);
+    root.removeEventListener('dragstart', b.dragBlock, true);
+    root.removeEventListener('blur', b.dragLost, false);
+    root.removeEventListener('pointermove', b.dragMove, true);
+    root.removeEventListener('mousemove', b.dragMove, true);
+    root.removeEventListener('mouseup', b.dragUp, true);
+    root.removeEventListener('touchmove', b.dragTouchMove, true);
+    root.removeEventListener('touchend', b.dragLost, true);
+    root.removeEventListener('touchcancel', b.dragLost, true);
+    if (g.touch) {
+      // Windows raises the long-press context menu on release
+      setTimeout(function () { root.removeEventListener('contextmenu', b.dragBlock, true); }, 400);
+    }
+    if (!g.active) return;
+    if (!g.touch) this.swallowClick(held === true);
+    var d = this.duck, r = d.radius();
+    d.dragHome = { x: g.homeX, y: g.homeY };
+    d.hopY = 0;
+    d.setState('dragback', 9);
+    if (this.cfg.effects) {
+      this.fx.splash(d.x, d.y, 1.2);
+      for (var i = 0; i < 4; i++) this.fx.droplet(d.x + rand(-r, r), d.y - r * 0.5, rand(-120, 120), -rand(60, 180), rand(1, 2));
+    }
+    this.sound.splash(1);
+    this.stats.drags = (this.stats.drags || 0) + 1;
+    this.saveStats();
+    this.wake();
+  };
+
+  // A drag ends in a click on whatever lies under the cursor (or under the
+  // press). That one is ours: the link she was dragged across stays unclicked.
+  Engine.prototype.swallowClick = function (held) {
+    var done = false;
+    function block(ev) { ev.preventDefault(); }
+    function off() {
+      if (done) return;
+      done = true;
+      root.removeEventListener('click', eat, true);
+      root.removeEventListener('mouseup', up, true);
+      root.removeEventListener('mousedown', off, true);
+      root.removeEventListener('selectstart', block, true);
+      root.removeEventListener('dragstart', block, true);
+    }
+    function eat(ev) { ev.preventDefault(); ev.stopImmediatePropagation(); off(); }
+    function up() { setTimeout(off, 60); }
+    root.addEventListener('click', eat, true);
+    if (held) {
+      root.addEventListener('mouseup', up, true);
+      root.addEventListener('mousedown', off, true);   // a new press: that release went missing
+      // the button is still down: the rest of the gesture must not select the page
+      root.addEventListener('selectstart', block, true);
+      root.addEventListener('dragstart', block, true);
+    } else {
+      setTimeout(off, 60);
+    }
+  };
+
+  // ── Hide with Esc ─────────────────────────────────────────────
+  // Esc means something on many pages. Fullscreen, a focused field, an open
+  // dialog: then the key belongs to the page and she stays out of it.
+  Engine.prototype.escBlocked = function (ev) {
+    try {
+      if (document.fullscreenElement || document.webkitFullscreenElement) return true;
+      if (document.designMode === 'on') return true;
+      if (isFieldEl(deepActive())) return true;
+      if (ev && isFieldEl(ev.composedPath ? ev.composedPath()[0] : ev.target)) return true;
+      if (document.querySelector('dialog[open]')) return true;
+      // a dialog that holds the page. A cookie banner or chat bubble marked up as
+      // role=dialog doesn't, and it must not switch her off until it's dismissed.
+      var active = deepActive();
+      var open = document.querySelectorAll('[aria-modal="true"], [role="dialog"], [role="alertdialog"]');
+      for (var i = 0; i < open.length; i++) {
+        var dlg = open[i];
+        if (dlg.getAttribute('aria-hidden') === 'true' || !dlg.getClientRects().length) continue;
+        var css = root.getComputedStyle(dlg);
+        if (css.visibility === 'hidden' || css.opacity === '0') continue;
+        if (dlg.getAttribute('aria-modal') === 'true' || dlg.getAttribute('role') === 'alertdialog' ||
+            (active && active !== document.body && dlg.contains(active))) return true;
+      }
+      try { if (document.querySelector('[popover]:popover-open')) return true; } catch (e2) { /* older browser */ }
+    } catch (e) { return true; }   // when in doubt the page keeps its key
+    return false;
+  };
+
+  Engine.prototype.pressEsc = function () {
+    if (!this.cfg.escHide || !this.running) return;
+    if (this.submerged) { this.surface(); return; }
+    var d = this.duck;
+    // near the cursor: a duck on the far side of the page isn't what you meant
+    if (Math.hypot(this.px - d.x, this.py - d.y) > Math.max(d.radius() * 8, 260)) return;
+    this.hide();
+  };
+
+  Engine.prototype.hide = function () {
+    if (this.submerged) return;
+    var d = this.duck, i;
+    if (this.drag) this.endDrag(true);
+    d.resetActionFlags();
+    d.dragHome = null;
+    // today's gift is already in the collection: if it hasn't been shown yet, it
+    // waits in the queue (tickGift holds it) and she brings it when she's back
+    if (d.giftRun && !d.giftRun.placed) {
+      this.giftQ = { id: d.giftRun.id, isNew: d.giftRun.isNew };
+      d.giftRun = null;
+      d.carry = null;
+    }
+    d.setState('hide', 99);
+    this.submerged = true;
+    this.subT = 0;
+    this.giftObj = null;
+    this.leaf = null;
+    this.fish = null;
+    this.crumbs.length = 0;
+    if (this.visitor) {
+      this.fx.splash(this.visitor.x, this.visitor.y, 0.8);
+      this.visitor = null;
+    }
+    d.actionTick = 0;
+    this.fx.splash(d.x, d.y, 1.2);
+    this.sound.splash(1);
+    for (i = 0; i < this.babies.length; i++) {
+      this.babies[i].hideAt = 0.08 + i * 0.07;
+      this.babies[i].holdT = 0;
+      this.babies[i].nesting = false;
+    }
+    this.stats.hides = (this.stats.hides || 0) + 1;
+    this.saveStats();
+    this.wake();
+  };
+
+  // Under water: props sink and ripples fade, then the scene is empty and
+  // nothing has to be drawn at all until she comes back.
+  Engine.prototype.tickSubmerged = function (dt) {
+    this.subT += dt;
+    var d = this.duck;
+    if (this.subT > 3) {
+      this.fx.clear();
+      this.nest = this.hoard = this.laptop = this.buddy = this.disco = null;
+    }
+    if (!d.vanish || this.fx.parts.length || this.nest || this.hoard || this.laptop ||
+        this.buddy || this.disco) return;
+    for (var i = 0; i < this.babies.length; i++) if (!this.babies[i].vanish) return;
+    this._wantPark = true;
+  };
+
+  Engine.prototype.park = function () {
+    this._wantPark = false;
+    this._parked = true;
+    this._busy = false;
+    if (this._calmTimer) { clearTimeout(this._calmTimer); this._calmTimer = 0; }
+    if (this.ctx && this.canvas) {
+      this.ctx.setTransform(1, 0, 0, 1, 0, 0);
+      this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+    }
+    if (this.host) this.host.style.setProperty('display', 'none', 'important');
+  };
+
+  // Back up: beside the cursor when she follows it, roaming where she went
+  // down. `quiet` skips the entrance (she was switched off in the meantime).
+  Engine.prototype.surface = function (quiet) {
+    if (!this.submerged) return;
+    var d = this.duck, r = d.radius(), i, b;
+    this.submerged = false;
+    this._wantPark = false;
+    this._parked = false;
+    this.subT = 0;
+    d.vx = 0; d.vy = 0;
+    d.vanish = 0;
+    d.resetActionFlags();
+    if (this.cfg.follow) {
+      var keep = r * 1.9 * clamp(this.cfg.distance || 1, 1, 3) * 1.1;
+      var side = this.px > this.w - keep - r * 2 ? -1 : (this.px < keep + r * 2 ? 1 : (d.x <= this.px ? -1 : 1));
+      d.x = clamp(this.px + side * keep, r * 1.2, Math.max(r * 1.2, this.w - r * 1.2));
+      d.y = clamp(this.py + r * 0.5, r * 2, Math.max(r * 2, this.h - r));
+    }
+    d.trail.length = 0;
+    this.ppx = this.px; this.ppy = this.py; this.pointerSpeed = 0;
+    for (i = 0; i < this.babies.length; i++) {
+      b = this.babies[i];
+      b.x = d.x - (d.face >= 0 ? 1 : -1) * (i + 1) * r * 1.1;
+      b.y = d.y + r * 0.2;
+      b.vx = 0; b.vy = 0;
+      b.hideAt = 0;
+      b.holdT = quiet ? 0 : 0.25 + i * 0.1;
+      b.diving = !quiet;
+      b.vanish = quiet ? 0 : 1;
+      b.a.submerge = quiet ? 0 : 1;
+    }
+    if (quiet) {
+      d.a.submerge = 0;
+      d.setState('idle', 1);
+    } else {
+      d.a.submerge = 1;
+      d.setState('surface', 0.9);
+    }
+    if (this.host && this.running) this.host.style.setProperty('display', 'block', 'important');
+    this.wake();
+  };
+
+  // ── Daily gift ────────────────────────────────────────────────
+  // The host decides that today's gift is due (the extension claims it once
+  // per day in the background page); here it is only brought and shown.
+  Engine.prototype.giveGift = function (id, opts) {
+    this.giftQ = { id: id, isNew: !!(opts && opts.isNew) };
+    this.wake();
+  };
+
+  Engine.prototype.giftLabel = function (id) {
+    var n = this.giftName ? this.giftName(id) : '';
+    if (n) return n;
+    var g = DuckModels.giftById[id];
+    return g ? g.name : '';
+  };
+
+  Engine.prototype.startGiftRun = function (q) {
+    var d = this.duck;
+    if (d.state === 'gift') this.finishGiftRun();
+    d.resetActionFlags();
+    d.setState('gift', 99);
+    d.stTime = 0;
+    d.giftRun = { id: q.id, isNew: q.isNew, t: 0, phase: this.cfg.reduceMotion ? 'show' : 'down', splashed: false };
+    d.carry = this.cfg.reduceMotion ? q.id : null;
+    this.wake();
+  };
+
+  Engine.prototype.tickGift = function (dt) {
+    var q = this.giftQ, g = this.giftObj;
+    if (q && !this.submerged && !this.drag && AT_LEISURE[this.duck.state]) {
+      this.giftQ = null;
+      this.startGiftRun(q);
+    }
+    if (!g) return;
+    g.t += dt;
+    g.life -= dt;
+    var tier = g.tier;
+    if (this.cfg.effects && tier !== 'common' && tier !== 'uncommon' && Math.random() < dt * (tier === 'rare' ? 2 : 5)) {
+      this.fx.sparkle(g.x + rand(-g.s, g.s) * 1.3, g.y - rand(0, g.s * 2), tier === 'rare' ? '#bfe8ff' : '#ffe9a8', rand(3, 6));
+    }
+    if (g.life <= 0) {
+      if (this.cfg.effects) {
+        for (var i = 0; i < 6; i++) this.fx.sparkle(g.x + rand(-g.s, g.s), g.y - rand(0, g.s * 1.6), '#fff3b0', rand(3, 5));
+        this.fx.ripple(g.x, g.y, 2, g.s * 2.2, 0.8, 'rgba(255,255,255,0.45)', 1.5);
+      }
+      this.giftObj = null;
+    }
+  };
+
+  // Out of her beak and onto the water, between her and the cursor.
+  Engine.prototype.placeGift = function () {
+    var d = this.duck, r = d.radius(), id = d.carry;
+    if (!id) return;
+    var run = d.giftRun || {};
+    var cat = DuckModels.giftById[id] || {};
+    d.carry = null;
+    run.placed = true;
+    var dir = d.dirF >= 0 ? 1 : -1;
+    var s = 11 * clamp(this.cfg.size, 0.8, 1.7);
+    this.giftObj = {
+      id: id, tier: cat.tier || 'common', s: s, t: 0, life: 4.6, phase: Math.random() * TAU,
+      x: clamp(d.x + dir * r * 1.75, s * 2, Math.max(s * 2, this.w - s * 2)),
+      y: clamp(d.y + r * 0.2, s * 3, Math.max(s * 3, this.h - s * 2))
+    };
+    var g = this.giftObj;
+    if (this.cfg.effects) {
+      this.fx.ripple(g.x, g.y + s * 0.5, 3, s * 2.4, 0.9, 'rgba(255,255,255,0.6)', 1.8);
+      for (var i = 0; i < 5; i++) this.fx.sparkle(g.x + rand(-s, s) * 1.3, g.y - rand(0, s * 1.6), '#fff3b0', rand(3, 6));
+      if (cat.tier === 'legendary' || cat.tier === 'epic') this.fx.confetti(g.x, g.y - s);
+    }
+    this.sound.quack(d.model.quackPitch * 1.15, true);
+    this.sound.peck();
+    var label = this.giftLabel(id);
+    if (label) {
+      var tag = this.fx.exclaim(g.x, g.y - s * 2.4, (run.isNew ? '✨ ' : '🎁 ') + label, '#c98a2e');
+      tag.life = 2.6;
+      tag.vy = -12;
+    }
+  };
+
+  // She was interrupted on the way: whatever she fetched still arrives.
+  Engine.prototype.finishGiftRun = function () {
+    var d = this.duck, run = d.giftRun;
+    if (!run) return;
+    if (!run.placed) {
+      d.carry = run.id;
+      this.placeGift();
+    }
+    d.giftRun = null;
+  };
+
+  Engine.prototype.drawCarry = function (ctx) {
+    var d = this.duck;
+    if (d.vanish || d.a.submerge > 0.55) return;
+    var h = d.headWorld();
+    var dir = d.dirF >= 0 ? 1 : -1;
+    var s = 7.5 * clamp(this.cfg.size, 0.8, 1.7);
+    ctx.save();
+    ctx.globalAlpha *= this.cfg.opacity;
+    DuckRender.gift(ctx, d.carry, h.x + dir * h.r * 1.5, h.y + h.r * 0.28, s, this.time);
+    ctx.restore();
+  };
+
+  Engine.prototype.drawGiftObj = function (ctx) {
+    var g = this.giftObj;
+    var ap = clamp(g.t / 0.28, 0, 1) * clamp(g.life / 0.4, 0, 1);
+    var bob = Math.sin(this.time * 2.3 + g.phase) * 1.6;
+    ctx.save();
+    ctx.globalAlpha *= ap * this.cfg.opacity;
+    ctx.strokeStyle = 'rgba(255,255,255,0.45)';
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.ellipse(g.x, g.y + g.s * 0.72, g.s * 1.5, g.s * 0.42, 0, 0, TAU);
+    ctx.stroke();
+    DuckRender.gift(ctx, g.id, g.x, g.y + bob, g.s * (0.75 + 0.25 * ap), this.time);
+    ctx.restore();
+  };
+
+  // ── Drifting leaves ───────────────────────────────────────────
+  // Lands a short way from her so the stage stays small: a leaf at the far
+  // edge of the page would stretch the canvas across it for half a minute.
+  Engine.prototype.spawnLeaf = function () {
+    var d = this.duck, r = d.radius();
+    var side = d.x > this.w - r * 8 ? -1 : (d.x < r * 8 ? 1 : (Math.random() < 0.5 ? -1 : 1));
+    var calm = this.cfg.reduceMotion;
+    var cols = DuckRender.LEAF_COLS;
+    var dist = r * rand(3.6, 5.6);
+    this.leaf = {
+      x: clamp(d.x + side * dist, 24, Math.max(24, this.w - 24)),
+      y: clamp(d.y + rand(-r * 0.7, r * 0.9), 40, Math.max(40, this.h - 24)),
+      z: calm ? 0 : rand(90, 130),          // height above the water while it falls
+      vx: -side * rand(9, 15), vy: rand(-2, 2),
+      rot: Math.random() * TAU, spin: calm ? 0 : rand(-0.35, 0.35),
+      s: rand(10, 13) * clamp(this.cfg.size, 0.8, 1.6), col: pick(cols),
+      phase: Math.random() * TAU, life: rand(20, 28), alpha: 0, cd: 0, on: false
+    };
+    return this.leaf;
+  };
+
+  Engine.prototype.updateLeaf = function (dt) {
+    var lf = this.leaf, d = this.duck, i;
+    if (!lf) {
+      // On her own only in autumn, never under reduced motion or with effects
+      // off. Clock checked at spawn time, not per frame.
+      if (this.cfg.effects && !this.cfg.reduceMotion && this.cfg.playfulness > 0.25 &&
+          (AT_LEISURE[d.state] || d.state === 'sleep') && !this.submerged && !this.fish) {
+        this.leafCd -= dt * this.cfg.playfulness;
+        if (this.leafCd <= 0) {
+          this.leafCd = rand(70, 170);
+          if (DuckModels.leavesInSeason()) this.spawnLeaf();
+        }
+      }
+      return;
+    }
+    var calm = this.cfg.reduceMotion;
+    var head, r = d.radius();
+    lf.alpha = Math.min(1, lf.alpha + dt * 2.5);
+    lf.cd = Math.max(0, lf.cd - dt);
+    if (lf.on) {
+      // on her head as long as she sleeps; any wake-up shakes it off
+      if (d.state !== 'sleep') {
+        lf.on = false;
+        lf.vx = rand(-14, 14); lf.vy = rand(-3, 3); lf.z = Math.max(0, d.y - lf.y);
+        lf.y = d.y + rand(0, r * 0.4); lf.spin = calm ? 0 : rand(-1, 1);
+        lf.life = Math.min(lf.life, 7);
+        lf.cd = 8;
+        return;
+      }
+      head = d.headWorld();
+      lf.x = head.x - d.dirF * head.r * 0.1;
+      lf.y = head.y - head.r * 0.92;
+      lf.rot = approach(lf.rot, -0.6 * (d.dirF >= 0 ? 1 : -1), 4, dt);
+      return;
+    }
+    if (lf.z > 0) {
+      // fluttering down, swaying as it goes
+      lf.z = Math.max(0, lf.z - dt * 62);
+      lf.x += Math.sin(this.time * 2.2 + lf.phase) * dt * 26;
+      lf.rot += dt * Math.sin(this.time * 2.2 + lf.phase) * 1.5;
+      if (lf.z === 0) this.fx.ripple(lf.x, lf.y + 2, 2, lf.s * 1.9, 0.9, 'rgba(255,255,255,0.5)', 1.4);
+      return;
+    }
+    lf.life -= dt;
+    // She swam off: one leaf must not stretch the stage across the page
+    if (lf.life > 1.6 && Math.hypot(lf.x - d.x, lf.y - d.y) > 420) lf.life = 1.6;
+    // She sleeps nearby: the current carries it over and it comes to rest on her
+    if (d.state === 'sleep' && !d.hoardNap && !d.codeNap && d.vanish !== 1) {
+      head = d.headWorld();
+      var tox = head.x - lf.x, toy = d.y - lf.y, far = Math.hypot(tox, toy);
+      lf.vx = approach(lf.vx, clamp(tox * 0.55, -34, 34), 1.5, dt);
+      lf.vy = approach(lf.vy, clamp(toy * 0.55, -22, 22), 1.5, dt);
+      if (far < r * 1.1) {
+        lf.on = true;
+        lf.z = 0;
+        this.stats.leaves = (this.stats.leaves || 0) + 1;
+        this.saveStats();
+        if (this.cfg.effects) this.fx.ripple(d.x, d.y, 3, r, 0.8, 'rgba(255,255,255,0.35)', 1.2);
+        return;
+      }
+    } else {
+      lf.vx = approach(lf.vx, lf.vx >= 0 ? 12 : -12, 0.5, dt);
+      lf.vy = approach(lf.vy, Math.sin(this.time * 0.7 + lf.phase) * 3, 0.9, dt);
+    }
+    lf.x += lf.vx * dt;
+    lf.y += lf.vy * dt;
+    lf.y = clamp(lf.y, 20, Math.max(20, this.h - 16));
+    if (!calm) {
+      lf.rot += lf.spin * dt;
+      lf.spin = approach(lf.spin, lf.spin >= 0 ? 0.25 : -0.25, 0.8, dt);
+    }
+    if (this.cfg.effects && !calm && Math.random() < dt * 0.5) {
+      this.fx.ripple(lf.x, lf.y + 2, 2, lf.s * 1.4, 0.8, 'rgba(255,255,255,0.28)', 1.1);
+    }
+    if (lf.life <= 0 || lf.x < -40 || lf.x > this.w + 40) {
+      for (i = 0; i < 2; i++) this.fx.bubble(lf.x + rand(-5, 5), lf.y);
+      this.leaf = null;
+    }
+  };
+
+  Engine.prototype.drawLeafObj = function (ctx) {
+    var lf = this.leaf;
+    var fade = lf.on ? 1 : clamp(lf.life / 1.6, 0, 1);
+    var bob = lf.z > 0 || lf.on ? 0 : Math.sin(this.time * 1.9 + lf.phase) * 1;
+    ctx.save();
+    ctx.globalAlpha *= lf.alpha * fade * this.cfg.opacity;
+    if (!lf.on && lf.z <= 0) {
+      ctx.strokeStyle = 'rgba(255,255,255,0.34)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.ellipse(lf.x, lf.y + lf.s * 0.55, lf.s * 1.25, lf.s * 0.36, 0, 0, TAU);
+      ctx.stroke();
+    }
+    // lying on the water it is seen at a flat angle; in the air or on her, whole
+    if (!lf.on && lf.z <= 0) {
+      ctx.translate(lf.x, lf.y + bob);
+      ctx.scale(1, 0.62);
+      DuckRender.leaf(ctx, 0, 0, lf.s, lf.rot, lf.col);
+    } else {
+      DuckRender.leaf(ctx, lf.x, lf.y - lf.z, lf.s, lf.rot, lf.col);
+    }
+    ctx.restore();
+  };
+
   // ── Debug/Steuer-API ──────────────────────────────────────────
   // Deterministisch weiterrechnen (für Tests/Screenshots, unabhängig von rAF)
   Engine.prototype.simulate = function (seconds, dt) {
@@ -4232,6 +5071,22 @@
 
   Engine.prototype.trigger = function (action, dur) {
     this.wake();
+    if (this.drag) this.endDrag(true);
+    if (action === 'hide') {
+      if (this.submerged) this.surface(); else this.hide();
+      return action;
+    }
+    // a popup button pressed while she is hidden: she can't do it from down there
+    if (this.submerged) this.surface();
+    if (action === 'gift') {
+      // the button shows what a gift looks like; collecting is the host's business
+      this.startGiftRun({ id: DuckModels.rollGift(), isNew: false });
+      return action;
+    }
+    if (action === 'leaf') {
+      if (!this.leaf) this.spawnLeaf();
+      return action;
+    }
     if (action === 'fish') {
       if (!this.fish) this.spawnFish();
       this.fish.alpha = 1;

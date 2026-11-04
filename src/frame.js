@@ -34,6 +34,44 @@
     } catch (e) { /* cross-origin */ }
   }, { passive: true, capture: true });
 
+  // Esc with the focus in this frame never reaches the top frame on its own.
+  // Same rules as engine.escBlocked(): judged in the capture phase, before the
+  // frame's own handlers can close the dialog it belongs to; sent in the bubble
+  // phase, so a key they used stays theirs. Never prevented, never stopped.
+  function escBelongsToFrame() {
+    try {
+      var el = document.activeElement;
+      while (el && el.shadowRoot && el.shadowRoot.activeElement) el = el.shadowRoot.activeElement;
+      var tag = el && el.tagName ? el.tagName.toUpperCase() : '';
+      var role = el && el.getAttribute ? el.getAttribute('role') : null;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || (el && el.isContentEditable) ||
+          role === 'textbox' || role === 'searchbox' || role === 'combobox') return true;
+      if (document.designMode === 'on' || document.fullscreenElement) return true;
+      if (document.querySelector('dialog[open]')) return true;
+      var open = document.querySelectorAll('[aria-modal="true"], [role="dialog"], [role="alertdialog"]');
+      for (var i = 0; i < open.length; i++) {
+        var dlg = open[i];
+        if (dlg.getAttribute('aria-hidden') === 'true' || !dlg.getClientRects().length) continue;
+        var css = window.getComputedStyle(dlg);
+        if (css.visibility === 'hidden' || css.opacity === '0') continue;
+        if (dlg.getAttribute('aria-modal') === 'true' || dlg.getAttribute('role') === 'alertdialog' ||
+            (el && el !== document.body && dlg.contains(el))) return true;
+      }
+      try { if (document.querySelector('[popover]:popover-open')) return true; } catch (e2) { /* older browser */ }
+    } catch (e) { return true; }
+    return false;
+  }
+  var escTaken = false;
+  window.addEventListener('keydown', function (ev) {
+    if (ev.key === 'Escape' || ev.key === 'Esc') escTaken = escBelongsToFrame();
+  }, { passive: true, capture: true });
+  window.addEventListener('keydown', function (ev) {
+    if (ev.key !== 'Escape' && ev.key !== 'Esc') return;
+    if (escTaken || ev.repeat || ev.isComposing || ev.defaultPrevented) return;
+    if (ev.ctrlKey || ev.shiftKey || ev.metaKey || ev.altKey) return;
+    try { window.top.postMessage({ __cursorDuck: 1, esc: true }, '*'); } catch (e) { /* cross-origin */ }
+  }, { passive: true });
+
   // Embedded players (YouTube and the like) live in iframes. Idle frames
   // — ads, trackers — must not keep a timer. A heartbeat starts only once
   // something audible is playing, and stops with one final "off".

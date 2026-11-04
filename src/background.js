@@ -33,6 +33,7 @@ const DEFAULTS = {
   hat: '',                // Garderobe: '' = wie das Modell, 'none' = ohne, sonst Hut-Art
   glasses: '',
   follow: true,           // aus = Freilauf: sie lebt auf der Seite statt dem Cursor zu folgen
+  escHide: true,          // Esc near her: the family dives, Esc again brings them back
   disabledHosts: []
 };
 
@@ -44,25 +45,31 @@ const MODEL_IDS = [
   'devil', 'cowboy', 'visionary', 'tycoon', 'techie', 'rainbow', 'galaxy', 'golden'
 ];
 
+// Callback style wrapped by hand: in Firefox's MV2 background chrome.* returns
+// undefined instead of a promise, so awaiting it threw there and took the
+// defaults, the welcome and update pages and the shortcuts down with it.
+const syncGet = (keys) => new Promise((resolve) => chrome.storage.sync.get(keys, resolve));
+const syncSet = (patch) => new Promise((resolve) => chrome.storage.sync.set(patch, resolve));
+
 // Browserstart: Wer das Zufalls-Abo hat, bekommt eine frische Ente.
 // randomId() gewichtet Raritäten und filtert Saison-Enten automatisch.
 chrome.runtime.onStartup.addListener(async () => {
-  const { randomOnStart, model } = await chrome.storage.sync.get({ randomOnStart: false, model: 'mallard' });
+  const { randomOnStart, model } = await syncGet({ randomOnStart: false, model: 'mallard' });
   if (!randomOnStart || typeof DuckModels === 'undefined') return;
   let next = DuckModels.randomId();
   // kleine Extrafreude: möglichst nicht dieselbe Ente wie zuletzt
   for (let tries = 0; next === model && tries < 4; tries++) next = DuckModels.randomId();
-  await chrome.storage.sync.set({ model: next });
+  await syncSet({ model: next });
 });
 
 chrome.runtime.onInstalled.addListener(async (details) => {
   // Nur wirklich FEHLENDE Keys mit Defaults auffüllen. Ein blindes
   // Read-Modify-Write über alles würde beim Update-Neustart mit dem
   // parallel laufenden onStartup-Zufallsmodell kollidieren.
-  const cur = await chrome.storage.sync.get(null);
+  const cur = await syncGet(null);
   const missing = {};
   for (const k in DEFAULTS) if (!(k in cur)) missing[k] = DEFAULTS[k];
-  if (Object.keys(missing).length) await chrome.storage.sync.set(missing);
+  if (Object.keys(missing).length) await syncSet(missing);
   if (details.reason === 'install') {
     chrome.tabs.create({ url: chrome.runtime.getURL('welcome/welcome.html') });
   } else if (details.reason === 'update') {
@@ -75,13 +82,44 @@ chrome.runtime.onInstalled.addListener(async (details) => {
   }
 });
 
+// One gift per calendar day, however many tabs ask at once. Claims run one
+// after the other, so two tabs restored together can't both find yesterday's
+// date. Callback-style storage on purpose: chrome.* in Firefox's MV2 background
+// has no promises. Local only, like the counters.
+let giftQueue = Promise.resolve();
+
+function claimGift(day) {
+  const run = giftQueue.then(() => new Promise((resolve) => {
+    chrome.storage.local.get({ gifts: { last: '', total: 0, counts: {} } }, (o) => {
+      const gifts = o.gifts;
+      gifts.counts = gifts.counts || {};
+      if (gifts.last === day) { resolve({ gift: null }); return; }
+      const id = DuckModels.rollGift(Math.random, gifts.counts);
+      const isNew = !gifts.counts[id];
+      gifts.counts[id] = (gifts.counts[id] || 0) + 1;
+      gifts.total = (gifts.total || 0) + 1;
+      gifts.last = day;
+      gifts.lastKind = id;
+      chrome.storage.local.set({ gifts }, () => resolve({ gift: id, isNew }));
+    });
+  }));
+  giftQueue = run.catch(() => {});
+  return run;
+}
+
+chrome.runtime.onMessage.addListener((msg, sender, respond) => {
+  if (!msg || msg.type !== 'duck:gift') return undefined;
+  claimGift(String(msg.day)).then(respond, () => respond({ gift: null }));
+  return true;   // answers asynchronously
+});
+
 chrome.commands.onCommand.addListener(async (cmd) => {
   if (cmd === 'toggle-duck') {
-    const { enabled } = await chrome.storage.sync.get({ enabled: true });
-    await chrome.storage.sync.set({ enabled: !enabled });
+    const { enabled } = await syncGet({ enabled: true });
+    await syncSet({ enabled: !enabled });
   } else if (cmd === 'next-duck') {
-    const { model } = await chrome.storage.sync.get({ model: 'mallard' });
+    const { model } = await syncGet({ model: 'mallard' });
     const i = MODEL_IDS.indexOf(model);
-    await chrome.storage.sync.set({ model: MODEL_IDS[(i + 1) % MODEL_IDS.length] });
+    await syncSet({ model: MODEL_IDS[(i + 1) % MODEL_IDS.length] });
   }
 });

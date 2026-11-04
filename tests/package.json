@@ -1,0 +1,14 @@
+{
+  "name": "cursor-duck-tests",
+  "private": true,
+  "type": "module",
+  "description": "Browser tests for the packaged extension. Not part of the extension itself.",
+  "scripts": {
+    "unit": "node unit.mjs",
+    "e2e": "node e2e.mjs",
+    "perf": "node perf.mjs"
+  },
+  "devDependencies": {
+    "puppeteer": "^25.16.0"
+  }
+}

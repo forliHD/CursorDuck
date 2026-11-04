@@ -40,7 +40,25 @@ audio file must be CC0/public domain and documented in `audio/SOURCES.md`.
   and calm scenes repaint at ~30 fps — call `engine.wake()` when something must show at
   once.
 - `src/content.js` boots the engine in the top frame only; `src/frame.js` is the only
-  script injected into sub-frames (cursor relay and media heartbeat).
+  script injected into sub-frames (cursor relay, media heartbeat, Esc relay).
+- She never takes input from the page unless the press is on her: drag listeners exist
+  only between press and release, a press that doesn't travel stays an ordinary click on
+  links and buttons (text selection can't start on her, but a double-click selects the
+  word), and Esc is never prevented or stopped (fields, dialogs and fullscreen keep it).
+- The daily gift is claimed in `src/background.js`, one at a time, so several tabs can't
+  each get one. The collection has its own `storage.local` key (`gifts`); its badges are
+  derived with `DuckModels.giftStats()`, nothing writes them into `stats`.
+
+## Tests
+
+`tests/` is not part of the package. `cd tests && npm install` once, then:
+
+- `node tests/unit.mjs`: catalog, season logic, locale parity, numbers in the copy
+- `node tests/e2e.mjs chrome|firefox [filter]`: the zip from `dist/` plus `tests/bridge.js`
+  in real browsers (build first). Firefox: `npx @puppeteer/browsers install firefox@stable
+  --path ~/.cache/puppeteer` or `FIREFOX_BIN`.
+- `node tests/perf.mjs`: idle CPU and frame rate of two packaged versions side by side
+  (edit `VERSIONS`); a release must not idle heavier than the one before it
 
 ## Releases
 

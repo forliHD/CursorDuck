@@ -32,30 +32,24 @@
     engine.mount(document.body);
     engine.start();
     window.__duck = engine;
-    // A quick hello, then the new duck shows off her laptop nap
-    setTimeout(function () { engine.trigger('quack'); }, 2200);
-    setTimeout(function () { engine.trigger('sleep'); }, 4500);
-    // The "try it" card toggles free roam for this page's duck only
-    var btn = document.getElementById('roamBtn');
-    if (btn) {
-      btn.onclick = function () {
-        var roam = !!engine.cfg.follow;   // about to switch
-        engine.apply({ follow: !roam });
-        btn.textContent = MSG(roam ? 'uTryFollow' : 'uTryRoam') ||
-          (roam ? 'Wieder dem Cursor folgen' : 'Freilauf ausprobieren');
-      };
-    }
+    engine.giftName = function (id) { return MSG('gift_' + id); };
+    // A quick hello, then today's new trick: she fetches something (preview only,
+    // nothing lands in the collection from this page)
+    setTimeout(function () { engine.trigger('quack'); }, 1800);
+    setTimeout(function () { engine.trigger('gift'); }, 3800);
+    var giftBtn = document.getElementById('giftBtn');
+    if (giftBtn) giftBtn.onclick = function () { engine.trigger('gift'); };
+    var leafBtn = document.getElementById('leafBtn');
+    if (leafBtn) leafBtn.onclick = function () { engine.trigger('leaf'); };
   }
 
-  // This page's duck is the new IT duck, whatever the popup says — the
-  // user's own settings are only read, never written here
+  // The user's own duck in the user's own settings, only read, never written here
   if (isExt) {
     chrome.storage.sync.get(window.CursorDuckDefaults, function (loaded) {
-      loaded.model = 'techie';
       loaded.follow = true;
       start(loaded);
     });
   } else {
-    start({ model: 'techie', size: 1.1, sound: false });
+    start({ size: 1.1, sound: false });
   }
 })();
