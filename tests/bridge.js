@@ -34,7 +34,9 @@
       state: d.state, x: d.x, y: d.y, r: d.radius(), vanish: d.vanish, submerge: d.a.submerge,
       carry: d.carry || null, giftRun: d.giftRun ? d.giftRun.id : null, home: d.dragHome || null,
       px: e.px, py: e.py, w: e.w, h: e.h, time: e.time, running: e.running, halted: !!e.halted,
-      submerged: e.submerged, parked: e._parked, drag: e.drag ? { active: e.drag.active, touch: e.drag.touch } : null,
+      submerged: e.submerged, parked: e._parked,
+      drag: e.drag ? { active: e.drag.active, touch: e.drag.touch, offX: e.drag.offX, offY: e.drag.offY } : null,
+      speed: Math.hypot(d.vx, d.vy), walk: d.a.walk,
       hostDisplay: e.host.style.getPropertyValue('display'),
       stage: e.stage ? { w: e.stage.w, h: e.stage.h } : null,
       canvas: { w: e.canvas.width, h: e.canvas.height },
@@ -160,10 +162,17 @@
       if (e.submerged) e.surface();
       e.setPointer(e.w / 2, e.h / 2);
       e.apply({ follow: true, reduceMotion: false, playfulness: 0, peck: false, sleepAfter: 1e6 });
-      for (var q = 0; q < 900; q++) { e.step(dt); if (q % 8 === 0) e.render(); }
+      // lowest water level of the last 10 s: a cursor resting on her rightly starts
+      // peekaboo, so one moment says little, but a stuck duck never comes up at all
+      var lowest = 1;
+      for (var q = 0; q < 900; q++) {
+        e.step(dt);
+        if (q % 8 === 0) e.render();
+        if (q >= 600) lowest = Math.min(lowest, e.duck.a.submerge);
+      }
       d = e.duck;
       var end = {
-        state: d.state, vanish: d.vanish || 0, submerge: d.a.submerge, carry: d.carry || null, giftRun: !!d.giftRun,
+        state: d.state, vanish: d.vanish || 0, submerge: lowest, carry: d.carry || null, giftRun: !!d.giftRun,
         babiesHidden: e.babies.filter(function (b) { return b.vanish || b.a.submerge > 0.2; }).length,
         submerged: e.submerged, drag: !!e.drag, hoard: !!e.hoard, laptop: !!e.laptop, buddy: !!e.buddy, disco: !!e.disco
       };

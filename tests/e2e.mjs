@@ -132,6 +132,9 @@ async function open(opts = {}) {
   await until(() => state(page), 'engine');
   await duck(page, 'storageSet', 'sync', { ...CALM, ...(opts.cfg || {}) });
   await duck(page, 'storageSet', 'local', { stats: { pets: 0, pecks: 0 } });
+  // today's gift stays out of every test that doesn't ask for it: a real claim
+  // arrives after 3 s and would walk through whatever the test is looking at
+  if (!opts.claims) await noGiftToday(page);
   await until(async () => { const s = await state(page); return s.cfg.playfulness === (opts.cfg?.playfulness ?? 0); }, 'settings to arrive');
   await page.bringToFront().catch(() => {});
   return page;
@@ -143,7 +146,8 @@ async function settle(page, x = 700, y = 450) {
   await page.mouse.move(x, y);
   await until(async () => {
     const s = await state(page);
-    return (s.state === 'idle' || s.state === 'look' || s.state === 'bob') &&
+    // stopped, not just near: a glide carries her off between reading her position and the press
+    return (s.state === 'idle' || s.state === 'look' || s.state === 'bob') && s.speed < 25 &&
       Math.hypot(s.x - x, s.y - y) < s.r * 3.2 ? s : null;
   }, 'her to catch up', 9000);
   return state(page);
@@ -235,9 +239,11 @@ async function run() {
     await sleep(350);
     const held = await state(page);
     assert.equal(held.state, 'dragged');
-    // the grabbed spot stays under the cursor
-    assert.ok(Math.hypot(held.x - (at.x - 240), held.y - (at.y - 120 + held.r * 0.75)) < held.r * 1.3,
-      `follows the cursor: ${held.x},${held.y}`);
+    // the spot she was grabbed by stays under the cursor (the legs lift the body by walk * 0.9 r)
+    const wantX = at.x - 240 + held.drag.offX, wantY = at.y - 120 + held.drag.offY + held.walk * held.r * 0.9;
+    assert.ok(Math.hypot(held.x - wantX, held.y - wantY) < held.r * 0.5,
+      `follows the cursor: at ${held.x},${held.y}, want ${wantX},${wantY}`);
+    assert.ok(Math.hypot(held.drag.offX, held.drag.offY) < held.r * 2.2, 'and she was grabbed where the press was');
     const during = await page.evaluate(() => ({ ...window.__log, sel: String(getSelection()) }));
     assert.equal(during.sel, '', 'no text got selected');
     assert.ok(during.mousemove - before.mousemove <= 2, `page saw ${during.mousemove - before.mousemove} mouse moves`);
@@ -796,7 +802,7 @@ async function run() {
     let page = await open();
     await freshGifts(page);
     await close(page);
-    page = await open({ hash: '#clock=2026-11-05T10:00:00' });
+    page = await open({ hash: '#clock=2026-11-05T10:00:00', claims: true });
     await page.mouse.move(600, 400);
     const run = await until(async () => { const c = await state(page); return c.giftRun ? c : null; }, 'the gift run', 9000);
     assert.equal(run.state, 'gift');
@@ -818,7 +824,7 @@ async function run() {
     let page = await open({ hash: '#clock=2026-11-05T10:00:00' });
     await duck(page, 'storageSet', 'local', { gifts: { last: '2026-11-5', total: 1, counts: { pebble: 1 } } });
     await close(page);
-    page = await open({ hash: '#clock=2026-11-05T23:50:00' });
+    page = await open({ hash: '#clock=2026-11-05T23:50:00', claims: true });
     await page.mouse.move(600, 400);
     await sleep(5500);
     let c = await state(page);
@@ -826,14 +832,14 @@ async function run() {
     assert.equal(c.giftObj, null);
     assert.equal((await gifts(page)).total, 1, 'same day');
     await close(page);
-    page = await open({ hash: '#clock=2026-11-06T00:01:00' });
+    page = await open({ hash: '#clock=2026-11-06T00:01:00', claims: true });
     await page.mouse.move(600, 400);
     await until(async () => (await gifts(page)).total === 2, 'next day', 8000);
     assert.equal((await gifts(page)).last, '2026-11-6');
   });
 
   await test('gift: a tab left open past midnight waits for its owner', async () => {
-    const page = await open({ hash: '#clock=2026-11-07T23:59:30' });
+    const page = await open({ hash: '#clock=2026-11-07T23:59:30', claims: true });
     await duck(page, 'storageSet', 'local', { gifts: { last: '2026-11-7', total: 5, counts: { pebble: 5 } } });
     await sleep(1200);
     await duck(page, 'setClock', '2026-11-08T00:00:10');
@@ -849,7 +855,7 @@ async function run() {
     const first = await open();
     await duck(first, 'storageSet', 'local', { gifts: { last: '2026-11-8', total: 3, counts: { shell: 3 } } });
     await close(first);
-    const pages = await Promise.all([1, 2, 3].map(() => open({ hash: '#clock=2026-11-09T09:00:00' })));
+    const pages = await Promise.all([1, 2, 3].map(() => open({ hash: '#clock=2026-11-09T09:00:00', claims: true })));
     // straight at the background page, all in the same moment
     const replies = await Promise.all(pages.map((p) => duck(p, 'claim', '2026-11-9')));
     const given = replies.filter((r) => r && r.gift);
@@ -865,7 +871,7 @@ async function run() {
     await duck(page, 'storageSet', 'local', { gifts: { last: '2026-11-10', total: 2, counts: { pebble: 2 } } });
     await duck(page, 'storageSet', 'sync', { disabledHosts: ['127.0.0.1'] });
     await close(page);
-    page = await open({ hash: '#clock=2026-11-11T09:00:00', cfg: { disabledHosts: ['127.0.0.1'] } });
+    page = await open({ hash: '#clock=2026-11-11T09:00:00', claims: true, cfg: { disabledHosts: ['127.0.0.1'] } });
     await sleep(4500);
     assert.equal((await gifts(page)).total, 2, 'paused site');
     await duck(page, 'storageSet', 'sync', { disabledHosts: [], enabled: false });
@@ -1239,8 +1245,7 @@ async function run() {
       for (const st in r.seen) soakSeen[st] = (soakSeen[st] || 0) + r.seen[st];
       const e = r.end;
       assert.equal(e.vanish, 0, JSON.stringify(e));
-      // (a cursor resting on her rightly starts peekaboo, which spends its time under water)
-      if (e.state !== 'peekaboo') assert.ok(e.submerge < 0.1, JSON.stringify(e));
+      assert.ok(e.submerge < 0.1, 'stuck under water: ' + JSON.stringify(e));
       assert.equal(e.babiesHidden, 0, JSON.stringify(e));
       assert.deepEqual([e.carry, e.giftRun, e.submerged, e.drag, e.hoard, e.laptop, e.buddy, e.disco],
         [null, false, false, false, false, false, false, false], JSON.stringify(e));
