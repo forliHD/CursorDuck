@@ -8,7 +8,7 @@
     playfulness: 1.0, sound: false, volume: 0.35, effects: true,
     reflection: true, opacity: 1.0,
     peck: true, feed: true, sleepAfter: 15, duckName: '',
-    hat: '', glasses: '', follow: true, randomOnStart: false, disabledHosts: []
+    hat: '', glasses: '', follow: true, escHide: true, randomOnStart: false, disabledHosts: []
   };
 
   var cfg = null;
@@ -154,7 +154,7 @@
   // nicht zwischen Geräten wandern). Ohne gespeicherten Zustand sind nur
   // Modell, Einstellungen und Seiten offen — der Rest wartet hinter dem Pfeil.
   var UI_KEY = 'cursorduck-ui';
-  var DEFAULT_COLLAPSED = { wardrobe: 1, behaviour: 1, tricks: 1, achievements: 1 };
+  var DEFAULT_COLLAPSED = { wardrobe: 1, gifts: 1, behaviour: 1, tricks: 1, achievements: 1 };
   function loadUi() {
     try { return JSON.parse(localStorage.getItem(UI_KEY)) || {}; } catch (e) { return {}; }
   }
@@ -201,14 +201,15 @@
     ['volume', function (v) { return Math.round(v * 100) + ' %'; }],
     ['sleepAfter', function (v) { return Math.round(v) + ' s'; }]
   ];
-  var CHECKS = ['follow', 'peck', 'feed', 'effects', 'reflection', 'sound', 'randomOnStart'];
+  var CHECKS = ['follow', 'peck', 'feed', 'escHide', 'effects', 'reflection', 'sound', 'randomOnStart'];
   var TRICKS = [
     ['quack', 'Quaken', '📣'], ['flap', 'Flattern', '🪶'], ['preen', 'Putzen', '🧼'],
     ['dabble', 'Gründeln', '🙃'], ['dive', 'Tauchen', '🤿'], ['spin', 'Pirouette', '🌀'],
     ['bathe', 'Baden', '🛁'], ['shake', 'Schütteln', '💦'], ['sleep', 'Nickerchen', '😴'],
     ['crumbs', 'Füttern', '🍞'], ['fish', 'Fisch-Jagd', '🐟'], ['dizzy', 'Schwindel', '😵'],
     ['dance', 'Tänzchen', '💃'], ['peekaboo', 'Kuckuck', '🫣'], ['waddle', 'Landgang', '🚶'],
-    ['visitor', 'Besuch', '💕'], ['disco', 'Disco', '🪩'], ['debug', 'Debuggen', '🐤']
+    ['visitor', 'Besuch', '💕'], ['disco', 'Disco', '🪩'], ['debug', 'Debuggen', '🐤'],
+    ['gift', 'Geschenk', '🎁'], ['leaf', 'Blatt', '🍂']
   ];
 
   // [Stat-Schlüssel, Ziel, Emoji, i18n-Key, Name (Fallback), Erklärung (Fallback), Stufe]
@@ -276,6 +277,15 @@
     ['waddles', 5, '🚶', 'achWaddle', 'Landratte', 'Sieh ihr 5-mal beim Landgang zu — oder stups ihn im Popup an.', 'bronze'],
     ['waddles', 25, '🥾', 'achWaddle2', 'Wanderverein', '25 Landgänge. Die Watschelrunde ist jetzt ein eingetragener Verein.', 'silver'],
     ['waddles', 100, '🏃', 'achWaddle3', 'Watschel-Marathon', '100 Landgänge. 42,195 Kilometer — in Entenschritten.', 'gold'],
+    ['giftsTotal', 1, '🎁', 'achGift1', 'Erste Gabe', 'Ihr erstes Mitbringsel. Es ist nur ein Kiesel? Es ist DER Kiesel.', 'bronze'],
+    ['giftKinds', 7, '🧺', 'achGift2', 'Kuriositätenkabinett', '7 verschiedene Geschenke in der Sammlung. Schaltet den Laubkranz frei.', 'silver'],
+    ['giftRares', 1, '💎', 'achGift3', 'Seltener Fund', 'Ein seltenes Geschenk: Kleeblatt, Seestern, alte Münze oder noch Besseres.', 'gold'],
+    ['giftsTotal', 30, '📦', 'achGift4', 'Monatsvorrat', '30 Tage, 30 Geschenke. Dein Schreibtisch wird langsam zum Strandgut-Museum.', 'silver'],
+    ['giftKinds', DuckModels.gifts.length, '🏛️', 'achGift5', 'Komplette Sammlung', 'Jedes einzelne Geschenk gefunden, bis hin zum goldenen Ei. Das Museum öffnet.', 'diamond'],
+    ['drags', 5, '🤏', 'achDrag1', 'Entenentführung', 'Zieh sie 5-mal mit gedrückter Maustaste durch die Gegend. Sie führt Buch darüber.', 'bronze'],
+    ['drags', 50, '🚁', 'achDrag2', 'Wiederholungstäter', '50-mal am Schlafittchen gepackt. Sie hat inzwischen einen Anwalt — auch eine Ente.', 'silver'],
+    ['hides', 10, '🤫', 'achHide', 'Nichts zu sehen', '10-mal per Esc abgetaucht. Der Chef kam gerade rein, oder?', 'bronze'],
+    ['leaves', 5, '🍂', 'achLeaf', 'Herbstgefühl', '5 Herbstblätter angestupst oder darunter gedöst. Saison: September bis November.', 'bronze'],
     ['streakDays', 30, '🔥', 'achStreak', 'Stammgast', '30 Tage in Folge besucht. Sie hat dir längst einen Stammplatz freigehalten.', 'diamond']
   ];
 
@@ -315,6 +325,57 @@
     });
     var cnt = document.getElementById('achCount');
     if (cnt) cnt.textContent = earned + '/' + ACHIEVEMENTS.length;
+  }
+
+  // ── Collection: what she brings each day ────────────────────
+  // Found gifts are drawn in full, the others only as an outline. Drawn once;
+  // the shelf doesn't animate.
+  function giftName(g) { return MSG('gift_' + g.id) || g.name; }
+  function renderGifts(gifts) {
+    var wrap = document.getElementById('gifts');
+    if (!wrap) return;
+    wrap.textContent = '';
+    var counts = (gifts && gifts.counts) || {};
+    var desc = document.getElementById('giftDesc');
+    var found = 0;
+    DuckModels.gifts.forEach(function (g) {
+      var n = counts[g.id] || 0;
+      if (n) found++;
+      var d = document.createElement('div');
+      d.className = 'g tier-' + g.tier + (n ? '' : ' locked') +
+        (gifts && gifts.lastKind === g.id ? ' on' : '');
+      var c = document.createElement('canvas');
+      var W = 52, H = 40, dpr = Math.min(2, devicePixelRatio || 1);
+      c.width = W * dpr; c.height = H * dpr;
+      var x = c.getContext('2d');
+      x.setTransform(dpr, 0, 0, dpr, 0, 0);
+      DuckRender.gift(x, g.id, W / 2, H / 2, 14, 1);
+      var sp = document.createElement('span');
+      sp.textContent = n ? giftName(g) : '???';
+      d.appendChild(c); d.appendChild(sp);
+      if (n) {
+        if (n > 1) {
+          var cnt = document.createElement('span');
+          cnt.className = 'n'; cnt.textContent = '×' + n;
+          d.appendChild(cnt);
+        }
+        d.title = giftName(g);
+        d.onclick = function () {
+          if (desc) desc.textContent = giftName(g) + ': ' + (MSG('giftD_' + g.id) || '');
+        };
+      }
+      wrap.appendChild(d);
+    });
+    var cnt2 = document.getElementById('giftCount');
+    if (cnt2) cnt2.textContent = found + '/' + DuckModels.gifts.length;
+    var today = document.getElementById('giftToday');
+    if (today) {
+      var last = gifts && gifts.lastKind ? DuckModels.giftById[gifts.lastKind] : null;
+      var isToday = last && gifts.last === DuckModels.dayKey(new Date());
+      today.textContent = isToday
+        ? (MSG('giftToday') || 'Heute: ') + giftName(last)
+        : (MSG('giftNone') || 'Einmal am Tag bringt sie dir etwas mit, sobald ihr euch auf einer Seite begegnet.');
+    }
   }
 
   // ── Pausierte Seiten ──────────────────────────────────────
@@ -592,7 +653,11 @@
     renderWardrobe();
   });
 
-  chrome.storage.local.get({ stats: { pets: 0, pecks: 0, fish: 0, crumbs: 0, dances: 0, visits: 0 } }, function (o) {
+  chrome.storage.local.get({ stats: { pets: 0, pecks: 0, fish: 0, crumbs: 0, dances: 0, visits: 0 }, gifts: null }, function (o) {
+    // the gift badges count from the collection, which has its own storage key
+    var fromGifts = DuckModels.giftStats(o.gifts);
+    for (var gk in fromGifts) o.stats[gk] = fromGifts[gk];
+    renderGifts(o.gifts);
     document.getElementById('pets').textContent = o.stats.pets || 0;
     document.getElementById('pecks').textContent = o.stats.pecks || 0;
     document.getElementById('fishN').textContent = o.stats.fish || 0;

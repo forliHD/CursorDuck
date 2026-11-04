@@ -466,8 +466,66 @@
     { id: 'eyepatch', kind: 'glasses', name: 'Augenklappe',     stat: 'fish',          goal: 25,  ach: 'achFish2' },
     { id: 'monocle',  kind: 'glasses', name: 'Monokel',         stat: 'goldNaps',      goal: 10,  ach: 'achGold2' },
     { id: 'visor',    kind: 'glasses', name: 'Visor',           stat: 'surfs',         goal: 100, ach: 'achSurf2' },
-    { id: 'nerd',     kind: 'glasses', name: 'Nerdbrille',      stat: 'codeNaps',      goal: 10,  ach: 'achCode2' }
+    { id: 'nerd',     kind: 'glasses', name: 'Nerdbrille',      stat: 'codeNaps',      goal: 10,  ach: 'achCode2' },
+    { id: 'wreath',   kind: 'hat',     name: 'Laubkranz',       stat: 'giftKinds',     goal: 7,   ach: 'achGift2' }
   ];
+
+  // ── Daily gifts ───────────────────────────────────────────────
+  // What she brings on the first visit of the day (drawn by render.js).
+  // `w` is the weight in the draw, `name` the German fallback; the popup and
+  // the toast use the localized `gift_<id>` / `giftD_<id>` strings.
+  var GIFTS = [
+    { id: 'pebble',   name: 'Kiesel',       tier: 'common',    w: 12 },
+    { id: 'shell',    name: 'Muschel',      tier: 'common',    w: 12 },
+    { id: 'snail',    name: 'Schnecke',     tier: 'common',    w: 12 },
+    { id: 'feather',  name: 'Feder',        tier: 'common',    w: 12 },
+    { id: 'acorn',    name: 'Eichel',       tier: 'common',    w: 12 },
+    { id: 'marble',   name: 'Murmel',       tier: 'uncommon',  w: 5 },
+    { id: 'button',   name: 'Knopf',        tier: 'uncommon',  w: 5 },
+    { id: 'cork',     name: 'Korken',       tier: 'uncommon',  w: 5 },
+    { id: 'clover',   name: 'Kleeblatt',    tier: 'rare',      w: 2.5 },
+    { id: 'starfish', name: 'Seestern',     tier: 'rare',      w: 2.5 },
+    { id: 'coin',     name: 'Alte Münze',   tier: 'rare',      w: 2.5 },
+    { id: 'pearl',    name: 'Perle',        tier: 'epic',      w: 1.2 },
+    { id: 'bottle',   name: 'Flaschenpost', tier: 'epic',      w: 1.2 },
+    { id: 'goldegg',  name: 'Goldenes Ei',  tier: 'legendary', w: 0.6 }
+  ];
+  var GIFT_BY_ID = {};
+  for (var gi = 0; gi < GIFTS.length; gi++) GIFT_BY_ID[GIFTS[gi].id] = GIFTS[gi];
+
+  // One draw from the catalog. Anything not collected yet counts double, so
+  // the shelf fills up without a long run of duplicates at the start.
+  function rollGift(rnd, counts) {
+    var c = counts || {}, total = 0, i;
+    for (i = 0; i < GIFTS.length; i++) total += GIFTS[i].w * (c[GIFTS[i].id] ? 1 : 2);
+    var r = (rnd || Math.random)() * total;
+    for (i = 0; i < GIFTS.length; i++) {
+      r -= GIFTS[i].w * (c[GIFTS[i].id] ? 1 : 2);
+      if (r <= 0) return GIFTS[i].id;
+    }
+    return GIFTS[0].id;
+  }
+
+  // The counters behind the gift achievements and the wardrobe lock, derived
+  // from the stored collection ({ total, counts }).
+  function giftStats(gifts) {
+    var c = (gifts && gifts.counts) || {}, kinds = 0, rares = 0;
+    for (var i = 0; i < GIFTS.length; i++) {
+      var n = c[GIFTS[i].id] || 0;
+      if (!n) continue;
+      kinds++;
+      if (GIFTS[i].tier !== 'common' && GIFTS[i].tier !== 'uncommon') rares += n;
+    }
+    return { giftsTotal: (gifts && gifts.total) || 0, giftKinds: kinds, giftRares: rares };
+  }
+
+  // Local calendar day, the same format the daily streak uses.
+  function dayKey(d) {
+    return d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate();
+  }
+
+  // Autumn leaves drift by from September through November.
+  var LEAF_SEASON = { season: { months: [9, 10, 11] } };
 
   var BY_ID = {};
   for (var i = 0; i < MODELS.length; i++) BY_ID[MODELS[i].id] = MODELS[i];
@@ -521,6 +579,8 @@
   root.DuckModels = {
     list: MODELS, get: get, byId: BY_ID, randomId: randomId,
     isAvailable: isAvailable, easterSunday: easterSunday, BASE: BASE,
-    wardrobe: WARDROBE
+    wardrobe: WARDROBE,
+    gifts: GIFTS, giftById: GIFT_BY_ID, rollGift: rollGift, giftStats: giftStats, dayKey: dayKey,
+    leavesInSeason: function (when) { return isAvailable(LEAF_SEASON, when); }
   };
 })(typeof window !== 'undefined' ? window : this);

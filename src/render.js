@@ -715,6 +715,14 @@
         ctx.strokeStyle = 'rgba(255,255,255,0.55)'; ctx.lineWidth = r * 0.06; ctx.stroke();
         ctx.restore();
         break;
+      case 'wreath':
+        // a ring of autumn leaves around the crown, front leaves drawn last
+        for (var wl = 0; wl < 9; wl++) {
+          var wa = Math.PI + wl / 8 * Math.PI;
+          drawLeaf(ctx, Math.cos(wa) * hr * 0.86, hr * 0.12 + Math.sin(wa) * hr * 0.34, hr * 0.3,
+            wa + Math.PI / 2, LEAF_COLS[wl % LEAF_COLS.length]);
+        }
+        break;
       case 'halo':
         ctx.save();
         ctx.translate(0, -hr * 0.55);
@@ -834,6 +842,212 @@
         fillEll(ctx, -hr * 1.15, -hr * 0.62 + sway2, hr * 0.2, hr * 0.2, 0, '#ffffff');
         break;
       }
+    }
+    ctx.restore();
+  }
+
+  // ── Autumn leaf ───────────────────────────────────────────────
+  // A little maple-ish leaf around (x, y), pointing along `rot`.
+  var LEAF_COLS = ['#d9822b', '#c8502a', '#e3b23c', '#a8501f', '#b5662a'];
+  function drawLeaf(ctx, x, y, s, rot, color) {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(rot || 0);
+    ctx.fillStyle = color || LEAF_COLS[0];
+    ctx.beginPath();
+    ctx.moveTo(0, s);
+    ctx.quadraticCurveTo(-s * 0.2, s * 0.62, -s * 0.72, s * 0.62);
+    ctx.quadraticCurveTo(-s * 0.56, s * 0.28, -s * 0.92, -s * 0.02);
+    ctx.quadraticCurveTo(-s * 0.56, -s * 0.06, -s * 0.5, -s * 0.34);
+    ctx.quadraticCurveTo(-s * 0.26, -s * 0.28, -s * 0.2, -s * 0.46);
+    ctx.lineTo(0, -s);
+    ctx.lineTo(s * 0.2, -s * 0.46);
+    ctx.quadraticCurveTo(s * 0.26, -s * 0.28, s * 0.5, -s * 0.34);
+    ctx.quadraticCurveTo(s * 0.56, -s * 0.06, s * 0.92, -s * 0.02);
+    ctx.quadraticCurveTo(s * 0.56, s * 0.28, s * 0.72, s * 0.62);
+    ctx.quadraticCurveTo(s * 0.2, s * 0.62, 0, s);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(80,40,10,0.45)';
+    ctx.lineWidth = Math.max(0.6, s * 0.07);
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(0, s * 1.22); ctx.lineTo(0, -s * 0.72);
+    ctx.moveTo(0, s * 0.28); ctx.lineTo(-s * 0.48, s * 0.04);
+    ctx.moveTo(0, s * 0.28); ctx.lineTo(s * 0.48, s * 0.04);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  // ── Daily gifts ───────────────────────────────────────────────
+  // One small object per catalog entry in models.js, roughly s wide around
+  // (x, y). Used on the water, in her beak and on the popup's shelf.
+  function drawGift(ctx, id, x, y, s, t) {
+    var i, a;
+    t = t || 0;
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    switch (id) {
+      case 'shell':
+        for (i = 0; i < 5; i++) {
+          a = -Math.PI / 2 + (i - 2) * 0.5;
+          fillEll(ctx, Math.cos(a) * s * 0.42, s * 0.28 + Math.sin(a) * s * 0.62, s * 0.34, s * 0.5, a + Math.PI / 2,
+            i % 2 ? '#f6c9b2' : '#f9dcc8');
+        }
+        ctx.strokeStyle = 'rgba(150,84,60,0.5)';
+        ctx.lineWidth = Math.max(0.6, s * 0.06);
+        ctx.beginPath();
+        for (i = 0; i < 5; i++) {
+          a = -Math.PI / 2 + (i - 2) * 0.46;
+          ctx.moveTo(0, s * 0.62);
+          ctx.lineTo(Math.cos(a) * s * 0.92, s * 0.5 + Math.sin(a) * s * 0.98);
+        }
+        ctx.stroke();
+        fillEll(ctx, 0, s * 0.68, s * 0.26, s * 0.14, 0, '#e8a98c');
+        break;
+      case 'snail':
+        fillEll(ctx, s * 0.08, s * 0.56, s * 0.9, s * 0.2, 0, '#c9b48d');
+        ctx.strokeStyle = '#c9b48d';
+        ctx.lineWidth = Math.max(1, s * 0.16);
+        ctx.beginPath();
+        ctx.moveTo(s * 0.76, s * 0.46); ctx.quadraticCurveTo(s * 0.92, s * 0.1, s * 0.82, -s * 0.24);
+        ctx.stroke();
+        fillEll(ctx, s * 0.82, -s * 0.3, s * 0.08, s * 0.08, 0, '#3d2c18');
+        fillEll(ctx, -s * 0.12, s * 0.08, s * 0.58, s * 0.56, 0, '#b4713a');
+        fillEll(ctx, -s * 0.12, s * 0.08, s * 0.4, s * 0.38, 0, '#d39455');
+        fillEll(ctx, -s * 0.12, s * 0.08, s * 0.22, s * 0.21, 0, '#b4713a');
+        fillEll(ctx, -s * 0.12, s * 0.08, s * 0.08, s * 0.08, 0, '#8a5226');
+        break;
+      case 'feather':
+        ctx.rotate(0.55);
+        fillEll(ctx, 0, -s * 0.12, s * 0.32, s * 0.86, 0, '#f4f7fb');
+        ctx.strokeStyle = 'rgba(120,140,170,0.55)';
+        ctx.lineWidth = Math.max(0.6, s * 0.05);
+        ctx.beginPath();
+        for (i = 0; i < 4; i++) {
+          ctx.moveTo(0, -s * 0.5 + i * s * 0.28); ctx.lineTo(-s * 0.24, -s * 0.66 + i * s * 0.28);
+          ctx.moveTo(0, -s * 0.5 + i * s * 0.28); ctx.lineTo(s * 0.24, -s * 0.66 + i * s * 0.28);
+        }
+        ctx.stroke();
+        ctx.strokeStyle = '#8795a8';
+        ctx.lineWidth = Math.max(0.8, s * 0.08);
+        ctx.beginPath();
+        ctx.moveTo(0, s); ctx.lineTo(0, -s * 0.8);
+        ctx.stroke();
+        break;
+      case 'acorn':
+        fillEll(ctx, 0, s * 0.2, s * 0.56, s * 0.7, 0, '#bb7a3a');
+        fillEll(ctx, -s * 0.18, s * 0.12, s * 0.12, s * 0.28, 0, 'rgba(255,225,180,0.55)');
+        fillEll(ctx, 0, -s * 0.3, s * 0.66, s * 0.36, 0, '#7a5230');
+        ctx.strokeStyle = 'rgba(60,36,16,0.45)';
+        ctx.lineWidth = Math.max(0.5, s * 0.05);
+        ctx.beginPath();
+        for (i = -2; i <= 2; i++) { ctx.moveTo(i * s * 0.22, -s * 0.56); ctx.lineTo(i * s * 0.26, -s * 0.06); }
+        ctx.stroke();
+        ctx.strokeStyle = '#7a5230';
+        ctx.lineWidth = Math.max(1, s * 0.12);
+        ctx.beginPath();
+        ctx.moveTo(0, -s * 0.62); ctx.lineTo(s * 0.08, -s * 0.9);
+        ctx.stroke();
+        break;
+      case 'marble':
+        fillEll(ctx, 0, 0, s * 0.72, s * 0.72, 0, '#5db5e8');
+        ctx.strokeStyle = '#f2734f';
+        ctx.lineWidth = Math.max(1, s * 0.2);
+        ctx.beginPath();
+        ctx.arc(-s * 0.1, s * 0.1, s * 0.34, -0.6, 2.2);
+        ctx.stroke();
+        fillEll(ctx, -s * 0.26, -s * 0.28, s * 0.17, s * 0.11, -0.6, 'rgba(255,255,255,0.85)');
+        break;
+      case 'button':
+        fillEll(ctx, 0, 0, s * 0.8, s * 0.8, 0, '#d64f6d');
+        fillEll(ctx, 0, 0, s * 0.58, s * 0.58, 0, '#ee7a92');
+        for (i = 0; i < 4; i++) {
+          a = Math.PI / 4 + i * Math.PI / 2;
+          fillEll(ctx, Math.cos(a) * s * 0.24, Math.sin(a) * s * 0.24, s * 0.1, s * 0.1, 0, '#7c2238');
+        }
+        break;
+      case 'cork':
+        ctx.rotate(-0.4);
+        ctx.fillStyle = '#c99a63';
+        ctx.fillRect(-s * 0.72, -s * 0.36, s * 1.44, s * 0.72);
+        fillEll(ctx, s * 0.72, 0, s * 0.2, s * 0.36, 0, '#deb987');
+        fillEll(ctx, -s * 0.72, 0, s * 0.2, s * 0.36, 0, '#c99a63');
+        ctx.fillStyle = 'rgba(90,58,24,0.5)';
+        for (i = 0; i < 6; i++) ctx.fillRect(-s * 0.56 + i * s * 0.22, -s * 0.2 + (i % 3) * s * 0.17, s * 0.09, s * 0.06);
+        break;
+      case 'clover':
+        ctx.strokeStyle = '#3c8f4b';
+        ctx.lineWidth = Math.max(1, s * 0.12);
+        ctx.beginPath();
+        ctx.moveTo(0, 0); ctx.quadraticCurveTo(s * 0.1, s * 0.5, s * 0.34, s * 0.92);
+        ctx.stroke();
+        for (i = 0; i < 4; i++) {
+          a = Math.PI / 4 + i * Math.PI / 2;
+          fillEll(ctx, Math.cos(a) * s * 0.4, -s * 0.1 + Math.sin(a) * s * 0.4, s * 0.34, s * 0.3, a, '#4fb765');
+          fillEll(ctx, Math.cos(a) * s * 0.26, -s * 0.1 + Math.sin(a) * s * 0.26, s * 0.13, s * 0.06, a, '#8bdc98');
+        }
+        break;
+      case 'starfish':
+        ctx.fillStyle = '#ef8450';
+        star(ctx, 0, s * 0.04, s);
+        ctx.fillStyle = '#ffc39e';
+        for (i = 0; i < 5; i++) {
+          a = -Math.PI / 2 + i * TAU / 5;
+          fillEll(ctx, Math.cos(a) * s * 0.42, s * 0.04 + Math.sin(a) * s * 0.42, s * 0.07, s * 0.07, 0, '#ffc39e');
+          fillEll(ctx, Math.cos(a) * s * 0.18, s * 0.04 + Math.sin(a) * s * 0.18, s * 0.06, s * 0.06, 0, '#ffc39e');
+        }
+        break;
+      case 'coin':
+        fillEll(ctx, 0, 0, s * 0.8, s * 0.76, 0, '#b08a3e');
+        fillEll(ctx, -s * 0.03, -s * 0.03, s * 0.74, s * 0.7, 0, '#e4c060');
+        ctx.strokeStyle = 'rgba(120,86,20,0.6)';
+        ctx.lineWidth = Math.max(0.6, s * 0.07);
+        ctx.beginPath(); ctx.ellipse(-s * 0.03, -s * 0.03, s * 0.56, s * 0.52, 0, 0, TAU); ctx.stroke();
+        // a worn little duck on the face of it
+        fillEll(ctx, -s * 0.08, s * 0.1, s * 0.3, s * 0.17, 0, '#9c7526');
+        fillEll(ctx, s * 0.16, -s * 0.12, s * 0.14, s * 0.14, 0, '#9c7526');
+        break;
+      case 'pearl':
+        fillEll(ctx, 0, s * 0.28, s * 0.96, s * 0.46, 0, '#7f6a8e');
+        fillEll(ctx, 0, s * 0.22, s * 0.84, s * 0.36, 0, '#d9c8e4');
+        fillEll(ctx, 0, -s * 0.1, s * 0.52, s * 0.52, 0, '#f6f1fa');
+        fillEll(ctx, s * 0.08, s * 0.02, s * 0.36, s * 0.34, 0, '#e4d8ef');
+        fillEll(ctx, -s * 0.16, -s * 0.28, s * 0.14, s * 0.1, -0.5, '#ffffff');
+        break;
+      case 'bottle':
+        ctx.rotate(0.5);
+        ctx.fillStyle = 'rgba(120,200,190,0.75)';
+        ctx.fillRect(-s * 0.36, -s * 0.38, s * 0.72, s * 1.24);
+        ctx.fillRect(-s * 0.16, -s * 0.84, s * 0.32, s * 0.48);
+        fillEll(ctx, 0, -s * 0.38, s * 0.36, s * 0.14, 0, 'rgba(120,200,190,0.75)');
+        ctx.fillStyle = '#c99a63';
+        ctx.fillRect(-s * 0.18, -s * 1.02, s * 0.36, s * 0.24);
+        ctx.fillStyle = '#f6edd2';
+        ctx.fillRect(-s * 0.2, -s * 0.2, s * 0.4, s * 0.74);
+        ctx.strokeStyle = 'rgba(120,90,50,0.55)';
+        ctx.lineWidth = Math.max(0.5, s * 0.05);
+        ctx.beginPath();
+        for (i = 0; i < 3; i++) { ctx.moveTo(-s * 0.12, -s * 0.06 + i * s * 0.2); ctx.lineTo(s * 0.12, -s * 0.06 + i * s * 0.2); }
+        ctx.stroke();
+        break;
+      case 'goldegg':
+        fillEll(ctx, 0, s * 0.08, s * 0.66, s * 0.86, 0, '#d9a316');
+        fillEll(ctx, -s * 0.06, 0, s * 0.54, s * 0.74, 0, '#f6cf52');
+        fillEll(ctx, -s * 0.2, -s * 0.3, s * 0.14, s * 0.24, 0.3, 'rgba(255,250,214,0.9)');
+        ctx.fillStyle = 'rgba(255,250,214,' + (0.55 + 0.45 * Math.sin(t * 4)).toFixed(2) + ')';
+        star(ctx, s * 0.42, -s * 0.62, s * 0.26);
+        break;
+      case 'pebble':
+      default:
+        fillEll(ctx, 0, s * 0.1, s * 0.94, s * 0.66, -0.12, '#868e97');
+        fillEll(ctx, -s * 0.1, -s * 0.06, s * 0.68, s * 0.42, -0.14, '#adb5bd');
+        fillEll(ctx, -s * 0.34, -s * 0.2, s * 0.17, s * 0.08, -0.3, 'rgba(255,255,255,0.7)');
+        fillEll(ctx, s * 0.3, s * 0.22, s * 0.06, s * 0.05, 0, 'rgba(60,66,74,0.55)');
+        fillEll(ctx, s * 0.05, s * 0.32, s * 0.04, s * 0.04, 0, 'rgba(60,66,74,0.55)');
+        break;
     }
     ctx.restore();
   }
@@ -1202,6 +1416,7 @@
 
   root.DuckRender = {
     draw: draw, bounds: bounds, geom: geom, headWorld: headWorld,
-    babyOf: babyOf, star: star, mix: mix, rgba: rgba
+    babyOf: babyOf, star: star, mix: mix, rgba: rgba,
+    gift: drawGift, leaf: drawLeaf, LEAF_COLS: LEAF_COLS
   };
 })(typeof window !== 'undefined' ? window : this);

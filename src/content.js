@@ -47,8 +47,8 @@
     for (var k in DEFAULTS) keys[k] = DEFAULTS[k];
     keys.disabledHosts = [];
     chrome.storage.sync.get(keys, function (cfg) {
-      chrome.storage.local.get({ stats: { pets: 0, pecks: 0 } }, function (loc) {
-        cb(cfg, loc.stats);
+      chrome.storage.local.get({ stats: { pets: 0, pecks: 0 }, gifts: null }, function (loc) {
+        cb(cfg, loc.stats, loc.gifts);
       });
     });
   }
@@ -90,7 +90,7 @@
     if (hold === focusHold) return;
     focusHold = hold;
     sync();
-    if (!hold && engine && engine.duck && engine.cfg.enabled && !blocked) {
+    if (!hold && engine && engine.duck && engine.cfg.enabled && !blocked && !engine.submerged) {
       try { engine.duck.say('!', '#4a90d9'); } catch (e) { /* Deko */ }
     }
   }
@@ -116,7 +116,8 @@
   }
 
   function boot() {
-    readAll(function (cfg, stats) {
+    readAll(function (cfg, stats, gifts) {
+      if (gifts && gifts.last) giftAskedDay = gifts.last;   // today's is out already: no need to ask
       // Tages-Serie: einmal pro Kalendertag zählen (lokale Zeit, keine
       // Netzwerk-Uhr). Idempotent pro Tag — mehrere Tabs zählen nicht doppelt.
       try {
@@ -142,19 +143,47 @@
         engine.sound.preload();
       } catch (e) { /* keeps the synth fallback */ }
       engine.stats = stats || { pets: 0, pecks: 0 };
-      engine.onStats = throttle(function (s) {
+      // engine.stats, not the argument: a delayed write has to carry what other
+      // tabs reported in the meantime, not the object from when it was scheduled
+      engine.onStats = throttle(function () {
         try {
-          var snap = {};
+          var s = engine.stats, snap = {};
           for (var k in s) snap[k] = s[k] || 0;
           chrome.storage.local.set({ stats: snap });
         } catch (e) {}
       }, 2000);
+      engine.giftName = function (id) {
+        try { return chrome.i18n.getMessage('gift_' + id) || ''; } catch (e) { return ''; }
+      };
       engine.mount(document.documentElement);
       window.__cursorDuck = engine;   // Debug-Handle
       blocked = !siteAllowed(cfg);
       focusHold = focusHoldNow();     // login page with an autofocused password field
       sync();
     });
+  }
+
+  // ── Daily gift ──────────────────────────────────────────────
+  // The first page she is actually on each day: a few seconds in view, with
+  // somebody at the mouse (a tab left open overnight waits for its owner).
+  // The background page hands out the gift, so several tabs can't each get one.
+  var giftAskedDay = '';
+  var giftSeenFor = 0;
+  function giftTick() {
+    if (!engine.running || engine.halted || engine.submerged || blocked || focusHold) {
+      giftSeenFor = 0;
+      return;
+    }
+    if (++giftSeenFor < 3 || engine.pointerIdle > 30) return;
+    var day = window.DuckModels.dayKey(new Date());
+    if (day === giftAskedDay) return;
+    giftAskedDay = day;
+    try {
+      chrome.runtime.sendMessage({ type: 'duck:gift', day: day }, function (res) {
+        if (chrome.runtime.lastError) { giftAskedDay = ''; return; }
+        if (res && res.gift && engine) engine.giveGift(res.gift, { isNew: res.isNew });
+      });
+    } catch (e) { /* extension was reloaded: this tab keeps its duck, the next page asks again */ }
   }
 
   // ── Media watch: own document + sub-frame heartbeats → engine.setMedia ──
@@ -175,6 +204,7 @@
       else any = true;
     }
     engine.setMedia(any);
+    giftTick();
   }, 1000);
 
   // Follow OS reduced-motion changes live (Settings → Accessibility
@@ -190,12 +220,22 @@
     }
   } catch (e) { /* old browser: stays on the boot value */ }
 
+  // Trailing write included: the last count before she goes quiet (a dive
+  // parks the engine, nothing saves after that) used to be lost.
   function throttle(fn, ms) {
-    var t = 0, pending = null;
-    return function (arg) {
-      pending = arg;
+    var t = 0, timer = 0;
+    return function () {
       var now = Date.now();
-      if (now - t >= ms) { t = now; fn(pending); }
+      if (now - t >= ms) {
+        t = now;
+        fn();
+      } else if (!timer) {
+        timer = setTimeout(function () {
+          timer = 0;
+          t = Date.now();
+          fn();
+        }, ms - (now - t));
+      }
     };
   }
 
@@ -209,6 +249,11 @@
         continue;
       }
       if (k === 'stats') { engine.stats = changes[k].newValue || engine.stats; continue; }
+      if (k === 'gifts') {           // the popup's shelf; another tab may have claimed today's
+        var gv = changes[k].newValue;
+        if (gv && gv.last) giftAskedDay = gv.last;
+        continue;
+      }
       if (k === 'reduceMotion') continue;   // comes from the OS, never from storage
       patch[k] = changes[k].newValue;
     }
