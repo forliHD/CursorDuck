@@ -2,7 +2,7 @@
 
 # Privacy Policy — Cursor Duck
 
-*Last updated: 21 September 2026*
+*Last updated: 4 November 2026*
 
 **English** · [Deutsch ↓](#deutsch)
 
@@ -19,12 +19,14 @@ you are visiting. To do so it observes a few things about how you use the page �
 all of it in memory only, never stored and never transmitted:
 
 - the position of your mouse pointer or finger within the browser window,
-- whether a key was pressed (never which one) and where on the screen the text
-  field you are typing into is,
+- whether a key was pressed (never which one, with one exception: the Esc key,
+  which sends the duck under water) and where on the screen the text field you
+  are typing into is,
 - where on the screen a text selection is (never its text),
 - whether a video or audio element on the page is playing with sound,
 - whether a password field has focus or a video is in fullscreen — in both
-  cases the duck hides itself,
+  cases the duck hides itself — and, when Esc is pressed, whether a text field
+  has focus or a dialog is open, in which case the key stays with the page,
 - your system's “reduce motion” setting.
 
 ## What data is stored
@@ -37,7 +39,9 @@ Only your settings and harmless play counters, locally in your browser profile
 - the list of sites on which you have paused the duck,
 - the duck's name, if you gave her one,
 - counters such as pettings or caught fish, plus the date of your last visit for
-  the daily-streak badge.
+  the daily-streak badge,
+- the little gifts the duck brought you: which ones, how many, and the date of
+  the last one.
 
 This data never leaves your browser. If you have browser sync enabled, your
 browser vendor (Google, Mozilla or Microsoft) synchronizes it between your own
@@ -74,7 +78,7 @@ noted in the store listing.
 
 # Datenschutzerklärung — Cursor Duck
 
-*Stand: 21. September 2026*
+*Stand: 4. November 2026*
 
 [↑ English](#english) · **Deutsch**
 
@@ -92,12 +96,14 @@ Seite benutzen — alles ausschließlich im Arbeitsspeicher, nie gespeichert und
 übertragen:
 
 - die Position des Mauszeigers bzw. Fingers innerhalb des Browserfensters,
-- ob eine Taste gedrückt wurde (nie welche) und wo auf dem Bildschirm das
-  Textfeld liegt, in das Sie gerade tippen,
+- ob eine Taste gedrückt wurde (nie welche, mit einer Ausnahme: die Esc-Taste,
+  die die Ente abtauchen lässt) und wo auf dem Bildschirm das Textfeld liegt, in
+  das Sie gerade tippen,
 - wo auf dem Bildschirm eine Textmarkierung liegt (nie ihren Text),
 - ob ein Video- oder Audio-Element der Seite mit Ton abgespielt wird,
 - ob ein Passwortfeld den Fokus hat oder ein Video im Vollbild läuft — in beiden
-  Fällen blendet sich die Ente aus,
+  Fällen blendet sich die Ente aus — und, wenn Esc gedrückt wird, ob ein Textfeld
+  den Fokus hat oder ein Dialog offen ist; dann bleibt die Taste bei der Seite,
 - die Systemeinstellung „Bewegung reduzieren“.
 
 ## Welche Daten gespeichert werden
@@ -110,7 +116,9 @@ Browserprofil (`storage.sync` / `storage.local`):
 - die Liste der Seiten, auf denen Sie die Ente pausiert haben,
 - der Name der Ente, falls Sie ihr einen gegeben haben,
 - Zähler wie Streicheleinheiten oder gefangene Fische sowie das Datum des letzten
-  Besuchs für das Abzeichen „Stammgast“.
+  Besuchs für das Abzeichen „Stammgast“,
+- die kleinen Geschenke, die die Ente Ihnen gebracht hat: welche, wie viele und
+  das Datum des letzten.
 
 Diese Daten verlassen Ihren Browser nicht. Bei aktivierter Browser-Synchronisation
 synchronisiert Ihr Browser-Anbieter (Google, Mozilla oder Microsoft) sie wie alle

@@ -63,6 +63,11 @@ def names_from(locale):
     return out
 
 
+def gifts_from(locale):
+    msgs = json.loads(read('_locales', locale, 'messages.json'))
+    return {key[5:]: val['message'] for key, val in msgs.items() if key.startswith('gift_')}
+
+
 TAG = re.compile(r'<([a-zA-Z][a-zA-Z0-9]*)(\s[^>]*)?>')
 LD = re.compile(r'<script type="application/ld\+json">(.*?)</script>', re.S)
 
@@ -230,6 +235,7 @@ def main():
             'turnstileSiteKey': turnstile_key
         },
         'names': names,
+        'gifts': {'en': gifts_from('en'), 'de': gifts_from('de')},
         'en': {'dom': en_dom},
         'de': de
     }

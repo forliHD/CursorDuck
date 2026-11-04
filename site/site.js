@@ -38,6 +38,8 @@
     trick_waddle: 'Shore leave',
     trick_disco: 'Disco',
     trick_debug: 'Debug',
+    trick_gift: 'Gift',
+    trick_leaf: 'Leaf',
     another: 'Another duck',
     soundOn: 'Sound on',
     soundOff: 'Sound off',
@@ -222,6 +224,10 @@
     engine.mount(doc.body);
     engine.start();
     window.__duck = engine;
+    engine.giftName = function (id) {
+      var names = DATA.gifts && DATA.gifts[lang];
+      return (names && names[id]) || '';
+    };
     try {
       var q = window.matchMedia('(prefers-reduced-motion: reduce)');
       var onChange = function () { engine.apply({ reduceMotion: !!q.matches }); };
@@ -246,7 +252,8 @@
 
   var TRICKS = [
     ['quack', '📣'], ['flap', '🪶'], ['crumbs', '🍞'], ['fish', '🐟'],
-    ['visitor', '💕'], ['waddle', '🚶'], ['disco', '🪩'], ['debug', '🐤']
+    ['visitor', '💕'], ['waddle', '🚶'], ['disco', '🪩'], ['debug', '🐤'],
+    ['gift', '🎁'], ['leaf', '🍂']
   ];
   function renderTricks() {
     var box = $('#tricks');
