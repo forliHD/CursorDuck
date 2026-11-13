@@ -1990,6 +1990,11 @@ async function run() {
     openPages.add(page);
     await page.setViewport(opts.viewport || { width: 1100, height: 720 }).catch(() => {});
     if (opts.calm) await page.emulateMediaFeatures([{ name: 'prefers-reduced-motion', value: 'reduce' }]);
+    if (opts.block) {
+      // a file that never arrives (a flaky connection, a blocker)
+      await page.setRequestInterception(true);
+      page.on('request', (r) => (opts.block.test(r.url()) ? r.abort() : r.continue()).catch(() => {}));
+    }
     page.errors = [];
     page.on('pageerror', (e) => page.errors.push(String(e)));
     // the console stays clean too, and every file is there (the pond's API is not part of this server)
@@ -2001,7 +2006,7 @@ async function run() {
       document.addEventListener('securitypolicyviolation', (e) => window.__csp.push(e.violatedDirective + ' ' + e.blockedURI));
     });
     await page.goto(siteBase + pathname, { waitUntil: 'load' });
-    await until(() => page.evaluate(() => !!window.__duck), 'the page duck');
+    if (!opts.block) await until(() => page.evaluate(() => !!window.__duck), 'the page duck');
     return page;
   }
   // No script error, nothing refused by the policy.
@@ -2079,7 +2084,7 @@ async function run() {
     const page = await sitePage('/de/');
     assert.deepEqual([await text(page, '#roamBtn'), await text(page, '#diveBtn'), await text(page, '#birdsBtn'), await text(page, '[data-day="1"]'), await text(page, '[data-day="2"]')],
       ['🧭 Frei schwimmen lassen', '🤫 Abtauchen', '🕊️ Vögel schicken', '☀️ Ein Tag weiter', '💤 Einen Tag verpassen']);
-    assert.equal(await text(page, '#streak'), '🔥 1Tag in FolgeRekord: 1 · 1 Tag zusammen');
+    assert.equal(await text(page, '#streak'), '🔥 1 Tag in Folge Rekord: 1 · 1 Tag zusammen');
     assert.deepEqual(await page.evaluate(() => [...document.querySelectorAll('#family .kid')].map((k) => k.textContent)),
       ['🐣 Flaumkükennoch 1 Tag', '🪶 Fast flüggenoch 2 Tage']);
     // the popup's own names for the tricks, from the German locale file
@@ -2094,7 +2099,7 @@ async function run() {
     assert.equal(await page.evaluate(() => document.documentElement.lang), 'en');
     assert.deepEqual([await text(page, '#diveBtn'), await text(page, '#roamBtn'), await text(page, '#wearing'), await text(page, '#leafBtn')],
       ['🫧 Come back up', '🏊 Follow me again', 'Wearing: Cap', '🍂 Send a leaf']);
-    assert.equal(await text(page, '#streak'), '🔥 1day in a rowBest: 1 · 1 day together');
+    assert.equal(await text(page, '#streak'), '🔥 1 day in a row Best: 1 · 1 day together');
     await clean(page);
   });
 
@@ -2111,7 +2116,9 @@ async function run() {
     assert.equal(l.length, 21 + 3, JSON.stringify(l));
     assert.equal(l.length - 3, Number(await text(page, '#statTricks')), 'as many as the page says the popup has');
     assert.ok(l.every((t) => /^\S+ \S/.test(t)), 'every one has a name: ' + JSON.stringify(l));
-    assert.ok(l.includes('🌀 Pirouette') && l.includes('😴 Nap') && l.includes('🫣 Peekaboo') && l.includes('− Fewer tricks'), JSON.stringify(l));
+    assert.ok(l.includes('🌀 Pirouette') && l.includes('😴 Nap') && l.includes('🫣 Peekaboo'), JSON.stringify(l));
+    // the ten open right after their switch, so Tab walks into them
+    assert.deepEqual([l[11], l[12], l[21]], ['− Fewer tricks', '🧼 Preen', '🫣 Peekaboo'], JSON.stringify(l));
     assert.equal(await page.evaluate(() => document.activeElement && document.activeElement.id), 'moreTricks', 'the keyboard keeps its place');
     assert.equal(await page.evaluate(() => document.getElementById('moreTricks').getAttribute('aria-expanded')), 'true');
     // they are the engine's own tricks
@@ -2219,23 +2226,67 @@ async function run() {
     await until(() => page.evaluate(() => window.__duck.babies[1].egg == null && window.__duck.babies[1].stage === 0), 'the hatchling', 8000, 40);
     assert.equal(await page.evaluate(() => window.__duck.broodQ.length), 0);
     // the two cards share the calendar: three days in a row by now
-    assert.equal(await text(page, '#streak'), '🔥 3days in a rowBest: 3 · 3 days together');
+    assert.equal(await text(page, '#streak'), '🔥 3 days in a row Best: 3 · 3 days together');
     assert.equal(await stored(page), before, 'nothing of it is stored');
     await clean(page);
   });
+
+  await test('site: asleep in the nest, "One day later" wakes the family for it, in free roam too', async () => {
+    const page = await sitePage('/?lang=en');
+    await quiet(page);
+    await page.mouse.move(560, 330);
+    await sleep(500);
+    const asleep = async () => {
+      await page.evaluate(() => { window.__duck.pointerIdle = 5; window.__duck.trigger('sleep', 8); });
+      await until(() => page.evaluate(() => window.__duck.duck.state === 'sleep' && !!window.__duck.nest && window.__duck.pointerIdle > 1), 'the family asleep in the nest', 20000);
+    };
+    await asleep();
+    // a click that moves no mouse, the way Enter on the focused button arrives
+    await press(page, '#family + .row [data-day="1"]');
+    await until(() => page.evaluate(() => window.__duck.babies[0].stage === 1), 'the fluffball as a duckling', 12000);
+    await press(page, '#roamBtn');
+    await sleep(400);
+    await asleep();
+    await press(page, '#family + .row [data-day="1"]');
+    await until(() => page.evaluate(() => !!window.__duck.fledge), 'her farewell, from a nap in free roam', 14000, 40);
+    await clean(page);
+  });
+
+  await test('site: a file that never arrives: no engine greys the buttons out, no data keeps eleven tricks', async () => {
+    let page = await sitePage('/?lang=en', { block: /\/src\/engine\.js/ });
+    await sleep(400);
+    assert.equal(await page.evaluate(() => typeof window.__duck), 'undefined');
+    const dead = await page.evaluate(() => [...document.querySelectorAll('.feat .row button')].map((b) => [b.id || b.textContent.trim(), b.disabled]));
+    assert.equal(dead.length, 11);
+    assert.deepEqual(dead.filter((b) => b[1] !== (b[0] !== 'beatBtn')), [], 'all greyed out but the beat');
+    assert.deepEqual([await text(page, '#streak'), await page.evaluate(() => document.querySelectorAll('#family .kid').length)], ['', 0], 'no counter without her');
+    assert.deepEqual(page.errors, []);
+    await close(page);
+    page = await sitePage('/?lang=en', { block: /\/data\.js/ });
+    await until(() => page.evaluate(() => !!window.__duck), 'the page duck');
+    const l = await page.evaluate(() => [...document.querySelectorAll('#tricks button')].map((b) => b.textContent));
+    assert.deepEqual(l.slice(0, 3).concat(l.length), ['Quack', 'Flap', 'Crumbs', 11 + 2], JSON.stringify(l));
+    await page.evaluate(() => [...document.querySelectorAll('#tricks button')].find((b) => b.textContent === 'Flap').click());
+    assert.equal(await page.evaluate(() => window.__duck.duck.state), 'flap');
+    // the cards still work, they only keep quiet where their words are missing
+    await press(page, '[data-day="1"]');
+    assert.deepEqual([await text(page, '#streak'), await page.evaluate(() => document.querySelectorAll('#family .kid').length)], ['', 0]);
+    assert.deepEqual(await page.evaluate(() => window.__duck.broodAges.slice(0, 2)), [3, 17]);
+    assert.deepEqual(page.errors, []);
+  }, { chromeOnly: true, why: 'requests are only intercepted in Chromium here' });
 
   await test('site: the pretend calendar counts like the real one: a missed day ends the run, never the record', async () => {
     const page = await sitePage('/?lang=en');
     await quiet(page);
     const before = await stored(page);
-    assert.equal(await text(page, '#streak'), '🔥 1day in a rowBest: 1 · 1 day together');
+    assert.equal(await text(page, '#streak'), '🔥 1 day in a row Best: 1 · 1 day together');
     await press(page, '#streak + .row [data-day="1"]');
     await press(page, '#streak + .row [data-day="1"]');
-    assert.equal(await text(page, '#streak'), '🔥 3days in a rowBest: 3 · 3 days together');
+    assert.equal(await text(page, '#streak'), '🔥 3 days in a row Best: 3 · 3 days together');
     await press(page, '#streak + .row [data-day="2"]');
-    assert.equal(await text(page, '#streak'), '🔥 1day in a rowBest: 3 · 4 days together');
+    assert.equal(await text(page, '#streak'), '🔥 1 day in a row Best: 3 · 4 days together');
     await press(page, '#streak + .row [data-day="1"]');
-    assert.equal(await text(page, '#streak'), '🔥 2days in a rowBest: 3 · 5 days together');
+    assert.equal(await text(page, '#streak'), '🔥 2 days in a row Best: 3 · 5 days together');
     // the ducklings lived through the same days
     assert.deepEqual(await page.evaluate(() => window.__duck.broodAges.slice(0, 2)), [6, 2]);
     assert.equal(await stored(page), before, 'nothing of it is stored');
@@ -2271,7 +2322,16 @@ async function run() {
     const mallard = await look();
     assert.equal(mallard.length, 2);
     await press(page, '#diveBtn');
-    await page.evaluate(() => [...document.querySelectorAll('#gallery .tile')].find((t) => t.__tile.m.id === 'rubber').click());
+    // the box is a live region: a new mama repaints the pictures and leaves the words alone
+    const rewritten = (act) => page.evaluate((a) => new Promise((resolve) => {
+      let n = 0;
+      const mo = new MutationObserver((m) => { n += m.length; });
+      mo.observe(document.getElementById('family'), { childList: true, subtree: true, characterData: true });
+      if (a === 'rubber') [...document.querySelectorAll('#gallery .tile')].find((t) => t.__tile.m.id === 'rubber').click();
+      else document.querySelector(a).click();
+      setTimeout(() => { mo.disconnect(); resolve(n); }, 120);
+    }), act);
+    assert.equal(await rewritten('rubber'), 0, 'nothing for a screen reader to read out again');
     assert.equal(await page.evaluate(() => window.__duck.modelId), 'rubber');
     const rubber = await look();
     assert.equal(rubber.length, 2);
@@ -2279,6 +2339,7 @@ async function run() {
     assert.deepEqual([await page.evaluate(() => window.__duck.submerged), await text(page, '#diveBtn')], [false, '🤫 Dive']);
     // the stages are the ducklings' own, whoever mama is
     assert.deepEqual(await page.evaluate(() => window.__duck.babies.map((b) => b.stage)), [0, 3]);
+    assert.ok(await rewritten('#family + .row [data-day="1"]') > 0, 'a day later there is news');
     await clean(page);
   });
 
@@ -2318,7 +2379,7 @@ async function run() {
     assert.deepEqual([r.queue, r.fledge, r.eggs, r.flock, r.sky, r.hidden, r.submerged], [0, false, 0, false, 0, 0, false], JSON.stringify(r));
     assert.equal(r.shown, r.ages, 'every duckling looks her age: ' + JSON.stringify(r));
     assert.equal(r.kids, r.babies);
-    assert.match(r.streak, /^🔥 \d+days? in a rowBest: \d+ · \d+ days together$/);
+    assert.match(r.streak, /^🔥 \d+ days? in a row Best: \d+ · \d+ days together$/);
     assert.equal(await sideways(page), 0);
     assert.equal(await stored(page), before, 'and nothing was stored');
     await clean(page);

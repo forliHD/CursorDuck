@@ -54,8 +54,9 @@ audio file must be CC0/public domain and documented in `audio/SOURCES.md`.
   `growBrood`, …) on local calendar days in `dayKey()` form. Distances come from the
   calendar, never from elapsed hours; change them there and in `tests/unit.mjs`.
 - The engine only shows the ducklings' ages: the host hands them over with
-  `engine.setBrood(ages, news)`. Pages without storage (website, update page) get the
-  default family.
+  `engine.setBrood(ages, news)`. Pages without storage get the default family unless
+  they hand over one of their own, as the website and the update page do for their
+  previews.
 - Anything that crosses the page stays off her stage: the autumn birds fly on a second
   small layer (`engine.sky`) that exists for one crossing and is moved by its transform.
 

@@ -279,11 +279,12 @@
   // The popup's trick buttons, every one of them: the build reads the list
   // from popup.js and the names from the locale files. The ones named here
   // show at once, the rest wait behind "More tricks".
-  var TRICKS = DATA.tricks || [];
   var FEATURED = ['quack', 'flap', 'crumbs', 'fish', 'visitor', 'waddle', 'disco', 'debug', 'gift', 'leaf', 'birds'];
+  var TRICKS = DATA.tricks || FEATURED.map(function (id) { return [id, '']; });   // data.js missing: these, by their ids
   var allTricks = false;
   function trickButton(tr) {
-    var b = el('button', 'btn btn-ghost btn-mini', tr[1] + ' ' + (X('trick_' + tr[0]) || tr[0]));
+    var name = X('trick_' + tr[0]) || tr[0].charAt(0).toUpperCase() + tr[0].slice(1);
+    var b = el('button', 'btn btn-ghost btn-mini', (tr[1] ? tr[1] + ' ' : '') + name);
     b.type = 'button';
     b.onclick = function () {
       engine.trigger(tr[0], tr[0] === 'sleep' ? 8 : 2.4);   // the popup's durations
@@ -301,7 +302,6 @@
       if (FEATURED.indexOf(tr[0]) < 0) rest.push(tr);
     });
     FEATURED.forEach(function (id) { if (byId[id]) box.appendChild(trickButton(byId[id])); });
-    if (allTricks) rest.forEach(function (tr) { box.appendChild(trickButton(tr)); });
     if (rest.length) {
       var more = el('button', 'btn btn-ghost btn-mini', (allTricks ? '− ' : '+ ') + T(allTricks ? 'fewerTricks' : 'moreTricks'));
       more.type = 'button';
@@ -315,6 +315,8 @@
       };
       box.appendChild(more);
     }
+    // the rest opens right after its switch: that is where Tab goes next
+    if (allTricks) rest.forEach(function (tr) { box.appendChild(trickButton(tr)); });
     var rnd = el('button', 'btn btn-ghost btn-mini', '🎲 ' + T('another'));
     rnd.type = 'button';
     rnd.onclick = function () {
@@ -353,6 +355,11 @@
   function passDay(gap) {
     if (!engine) return;
     if (engine.submerged) engine.surface();
+    // Somebody is here. A visitor at the keyboard never moves the mouse, and the
+    // little ceremony waits for as long as the family is asleep in the nest.
+    // (In free roam only a cursor close by wakes her.)
+    if (engine.cfg.follow) engine.setPointer(engine.px, engine.py);
+    else engine.setPointer(engine.duck.x, engine.duck.y);
     pv.date = new Date(pv.date.getFullYear(), pv.date.getMonth(), pv.date.getDate() + gap);
     pv.days = DuckModels.countDay(pv.days, DuckModels.dayKey(pv.date), 0) || pv.days;
     var grown = DuckModels.growBrood(pv.brood, engine.babies.length);
@@ -362,38 +369,53 @@
     renderStreak();
     renderDive();
   }
-  // The ducklings that are out, each at her stage, the way the popup shows them
+  // The ducklings that are out, each at her stage, the way the popup shows them.
+  // Only what changed is rewritten: the box is a live region, and a screen
+  // reader should hear a day pass, not every new mama from the gallery.
+  function setText(e, text) { if (e.textContent !== text) e.textContent = text; }
   function renderFamily() {
     var box = $('#family');
-    if (!box || !engine || !window.DuckRender) return;
-    box.textContent = '';
+    if (!box || !engine || !window.DuckRender || !DATA.ext) return;
     var stages = DuckModels.broodStages, mama = DuckModels.get(engine.modelId);
-    for (var i = 0; i < engine.babies.length; i++) {
+    var kids = $$('.kid', box), gone = $('.gone', box), n = engine.babies.length;
+    var W = 76, H = 50, dpr = Math.min(2, window.devicePixelRatio || 1);
+    while (kids.length > n) box.removeChild(kids.pop());
+    for (var i = 0; i < n; i++) {
       var age = pv.brood.ages[i], st = DuckModels.stageOf(age), S = stages[st];
       var left = (st + 1 < stages.length ? stages[st + 1].from : DuckModels.grownAt) - age;
-      var kid = el('div', 'kid');
-      var c = el('canvas');
-      var W = 76, H = 50, dpr = Math.min(2, window.devicePixelRatio || 1);
-      c.width = W * dpr; c.height = H * dpr;
-      c.style.width = W + 'px'; c.style.height = H + 'px';
-      var x = c.getContext('2d');
+      var kid = kids[i];
+      if (!kid) {
+        kid = el('div', 'kid');
+        var c = el('canvas');
+        c.width = W * dpr; c.height = H * dpr;
+        c.style.width = W + 'px'; c.style.height = H + 'px';
+        kid.appendChild(c);
+        kid.appendChild(el('b'));
+        kid.appendChild(el('span'));
+        box.insertBefore(kid, gone);
+      }
+      var x = kid.firstChild.getContext('2d');
       x.setTransform(dpr, 0, 0, dpr, 0, 0);
+      x.clearRect(0, 0, W, H);
       DuckRender.draw(x, DuckRender.babyOf(mama, S.grow), { x: W / 2, y: H - 10, r: 20 * S.size, t: 1.4, dir: 1, reflection: false });
-      kid.appendChild(c);
-      kid.appendChild(el('b', '', S.emoji + ' ' + engine.stageLabel(S.id)));
-      kid.appendChild(el('span', '', left === 1 ? X('broodNextOne') : X('broodNextMany').replace('{n}', left)));
-      box.appendChild(kid);
+      setText(kid.childNodes[1], S.emoji + ' ' + engine.stageLabel(S.id));
+      setText(kid.childNodes[2], left === 1 ? X('broodNextOne') : X('broodNextMany').replace('{n}', left));
     }
-    if (pv.brood.fledged) box.appendChild(el('p', 'gone', X('broodFledged') + pv.brood.fledged));
+    if (pv.brood.fledged) {
+      if (!gone) gone = box.appendChild(el('p', 'gone'));
+      setText(gone, X('broodFledged') + pv.brood.fledged);
+    }
   }
   function renderStreak() {
     var box = $('#streak');
-    if (!box || !window.DuckModels) return;
+    if (!box || !engine || !DATA.ext) return;
     if (!pv.days) pv.days = DuckModels.countDay(null, DuckModels.dayKey(pv.date), 0);   // today counts: she is here
     var d = pv.days;
     box.textContent = '';
     box.appendChild(el('b', '', '🔥 ' + d.streak));
+    box.appendChild(doc.createTextNode(' '));
     box.appendChild(el('span', '', X(d.streak === 1 ? 'daysRowOne' : 'daysRowMany')));
+    box.appendChild(doc.createTextNode(' '));
     box.appendChild(el('small', '', X('daysBest') + d.best + ' · ' + d.total + ' ' + X(d.total === 1 ? 'daysTotalOne' : 'daysTotalMany')));
   }
   function renderRoam() {
@@ -434,7 +456,11 @@
     renderStreak();
   }
   function setupTry() {
-    if (!engine) return;
+    if (!engine) {
+      // the engine did not load: a button that does nothing is worse than a grey one
+      $$('.feat .row button').forEach(function (b) { if (b.id !== 'beatBtn') b.disabled = true; });
+      return;
+    }
     function on(id, fn) { var b = doc.getElementById(id); if (b) b.onclick = fn; }
     on('roamBtn', function () { engine.apply({ follow: !engine.cfg.follow }); renderRoam(); });
     on('diveBtn', function () { engine.trigger('hide'); renderDive(); });

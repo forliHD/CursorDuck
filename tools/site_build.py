@@ -77,8 +77,9 @@ def stages_from(locale):
 # Strings the site shows exactly as the popup does: the trick buttons, the
 # wardrobe, the day counter and the family. They come from the extension's
 # locale files, so the two never drift apart.
-SHARED = re.compile(r'^(?:trick_|wear_)[a-z]+$|^(?:wearDefault|daysRowOne|daysRowMany|daysBest|daysTotalOne|'
-                    r'daysTotalMany|broodNextOne|broodNextMany|broodFledged)$')
+SHARED_KEYS = ['daysRowOne', 'daysRowMany', 'daysBest', 'daysTotalOne', 'daysTotalMany',
+               'broodNextOne', 'broodNextMany', 'broodFledged']
+SHARED = re.compile(r'^(?:trick_|wear_)[a-z]+$|^(?:%s)$' % '|'.join(SHARED_KEYS))
 
 
 def shared_from(locale):
@@ -225,7 +226,16 @@ def main():
     glasses = len(re.findall(r"kind: 'glasses'", models_js))
     achievements = len(re.findall(r"^\s+\['", block(popup_js, 'var ACHIEVEMENTS = ['), re.M))
     # the popup's trick buttons, in its order: [id, emoji]
-    tricks = re.findall(r"\['([a-z]+)', '[^']*', '([^']*)'\]", block(popup_js, 'var TRICKS = ['))
+    trick_block = block(popup_js, 'var TRICKS = [')
+    tricks = re.findall(r"\['([a-z]+)', '[^']*', '([^']*)'\]", trick_block)
+    # the hero's buttons hang on this list: an entry written another way must
+    # stop the build instead of quietly dropping a button
+    if not tricks or len(tricks) != len(re.findall(r"\[\s*['\"]", trick_block)):
+        problems.append('popup.js: could not read every entry of TRICKS (expected [\'id\', \'name\', \'emoji\'])')
+    featured = re.findall(r"'([a-z]+)'", block(read('site', 'site.js'), 'var FEATURED = [', '];'))
+    for tid in featured:
+        if tid not in [t[0] for t in tricks]:
+            problems.append('site.js: FEATURED names the trick %s, which the popup does not have' % tid)
 
     names = {'en': names_from('en'), 'de': names_from('de')}
     for mid in models:
@@ -237,6 +247,12 @@ def main():
         for loc in ('en', 'de'):
             if 'trick_' + tid not in shared[loc]:
                 problems.append('trick %s has no name in _locales/%s' % (tid, loc))
+    # the labels the cards read from the popup's strings: a renamed key must not ship as a blank
+    wear = re.findall(r"\{ id: '([a-z]+)',\s+kind: '(?:hat|glasses)'", models_js)
+    for key in ['wear_' + w for w in wear] + SHARED_KEYS:
+        for loc in ('en', 'de'):
+            if key not in shared[loc]:
+                problems.append('%s is missing in _locales/%s (the site shows it)' % (key, loc))
 
     # The wishing pond needs a Turnstile site key. On Cloudflare it comes from the
     # build environment (TURNSTILE_SITE_KEY); without one the pond section stays
