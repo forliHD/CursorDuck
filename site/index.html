@@ -138,10 +138,14 @@
           <p class="sub" data-i18n="featSub">Everything below happens on this page too, with the real engine. The dashed cards are for trying out.</p>
         </div>
         <div class="features">
-          <article class="feat">
+          <article class="feat try">
+            <span class="tag" data-i18n="tryTag">Try it</span>
             <div class="ico" aria-hidden="true">🏊</div>
             <h3 data-i18n="f1h">Following</h3>
             <p data-i18n="f1p">The farther away your cursor, the faster she paddles, wake and bow wave included. She turns into her swimming direction and sprints when she falls behind. Or switch off “Follows the cursor” in the popup and she roams the page on her own.</p>
+            <div class="row">
+              <button class="btn btn-ghost btn-mini" id="roamBtn" type="button" data-i18n="tryRoam">🧭 Let her roam</button>
+            </div>
           </article>
           <article class="feat">
             <div class="ico" aria-hidden="true">🫶</div>
@@ -189,32 +193,61 @@
             <div class="ico" aria-hidden="true">🤫</div>
             <h3 data-i18n="f16h">Dive with Esc</h3>
             <p data-i18n="f16p">Press Esc while she's near your cursor and the whole family dives out of sight. Esc again brings them back. Dialogs, fullscreen and text fields keep their Esc key, and the popup can switch this off.</p>
+            <div class="row">
+              <button class="btn btn-ghost btn-mini" id="diveBtn" type="button" data-i18n="tryDive">🤫 Dive</button>
+              <span class="hint" data-i18n="f16note">No Esc key on a touchscreen? This button does the same.</span>
+            </div>
           </article>
-          <article class="feat">
+          <article class="feat try">
+            <span class="tag" data-i18n="tryTag">Try it</span>
             <div class="ico" aria-hidden="true">🎁</div>
             <h3 data-i18n="f17h">A daily gift</h3>
             <p data-i18n="f17p">On your first page of the day she dives and comes up with a little present: a pebble, a shell, a snail, and very rarely a pearl or a golden egg. The popup keeps your collection, on your device only.</p>
+            <div class="row">
+              <button class="btn btn-ghost btn-mini" id="giftBtn" type="button" data-i18n="tryGift">🎁 Bring me one</button>
+              <span class="hint" data-i18n="f17note">Just to look at: this page keeps no collection.</span>
+            </div>
           </article>
-          <article class="feat">
+          <article class="feat try">
+            <span class="tag" data-i18n="tryTag">Try it</span>
             <div class="ico" aria-hidden="true">🍂</div>
             <h3 data-i18n="f18h">Drifting leaves</h3>
             <p data-i18n="f18p">From September to November an autumn leaf drifts across the water now and then. She gives it a nudge, or dozes off with it on her head.</p>
+            <div class="row">
+              <button class="btn btn-ghost btn-mini" id="leafBtn" type="button" data-i18n="tryLeaf">🍂 Send a leaf</button>
+            </div>
           </article>
           <article class="feat try">
             <span class="tag" data-i18n="tryTag">Try it</span>
             <div class="ico" aria-hidden="true">🕊️</div>
             <h3 data-i18n="f19h">Autumn migration</h3>
-            <p data-i18n="f19p">From September to November a small V of birds crosses the top of the page now and then. She looks up and calls after them, and the ducklings look up with her. Rare by design, and never under “reduce motion”.</p>
+            <p data-i18n="f19p">From September to November a small V of birds crosses the top of the page now and then. She looks up and calls after them, and the ducklings look up with her. Rare by design, and never on their own under “reduce motion”.</p>
+            <div class="row">
+              <button class="btn btn-ghost btn-mini" id="birdsBtn" type="button" data-i18n="tryBirds">🕊️ Send the birds</button>
+            </div>
           </article>
-          <article class="feat">
+          <article class="feat try">
+            <span class="tag" data-i18n="tryTag">Try it</span>
             <div class="ico" aria-hidden="true">🐣</div>
             <h3 data-i18n="f20h">Ducklings that grow up</h3>
             <p data-i18n="f20p">The ducklings grow with the days you spend together: fluffball, duckling, half-grown, nearly fledged. After 18 days one of them is grown up and flies off into the world, and a new fluffball hatches from an egg in her place.</p>
+            <div class="family" id="family" role="status"></div>
+            <div class="row">
+              <button class="btn btn-ghost btn-mini" data-day="1" type="button" data-i18n="tryDay">☀️ One day later</button>
+              <span class="hint" data-i18n="f20note">Every press is one more day together, for the ducklings on this page.</span>
+            </div>
           </article>
-          <article class="feat">
+          <article class="feat try">
+            <span class="tag" data-i18n="tryTag">Try it</span>
             <div class="ico" aria-hidden="true">🔥</div>
             <h3 data-i18n="f21h">Days together</h3>
             <p data-i18n="f21p">The popup counts how many days in a row you have spent with the ducks, with your record and the total beside it. A missed day ends the run, never the record. Counted on your device only.</p>
+            <p class="streak" id="streak" role="status"></p>
+            <div class="row">
+              <button class="btn btn-ghost btn-mini" data-day="1" type="button" data-i18n="tryDay">☀️ One day later</button>
+              <button class="btn btn-ghost btn-mini" data-day="2" type="button" data-i18n="trySkip">💤 Miss a day</button>
+            </div>
+            <p class="hint" data-i18n="f21note">A pretend calendar for trying out: nothing is stored, and a reload starts it over.</p>
           </article>
           <article class="feat">
             <div class="ico" aria-hidden="true">😴</div>
@@ -236,10 +269,16 @@
             <h3 data-i18n="f10h">Ducklings</h3>
             <p data-i18n="f10p">Up to six ducklings paddle in a row behind her, with their own little animations. When mama gets sleepy she tucks them into a nest first.</p>
           </article>
-          <article class="feat">
+          <article class="feat try">
+            <span class="tag" data-i18n="tryTag">Try it</span>
             <div class="ico" aria-hidden="true">🎩</div>
             <h3 data-i18n="f11h">Wardrobe</h3>
             <p data-i18n="f11p">16 hats and 6 pairs of glasses for any model, each unlocked by an achievement: top hat, crown, halo, leaf wreath, headphones, sunglasses, monocle and more.</p>
+            <div class="row">
+              <button class="btn btn-ghost btn-mini" id="hatBtn" type="button" data-i18n="tryHat">🎩 Next hat</button>
+              <button class="btn btn-ghost btn-mini" id="glassesBtn" type="button" data-i18n="tryGlasses">🕶️ Next glasses</button>
+              <span class="hint" id="wearing" role="status"></span>
+            </div>
           </article>
           <article class="feat">
             <div class="ico" aria-hidden="true">🏆</div>

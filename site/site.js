@@ -1,8 +1,9 @@
 /* Cursor Duck website — (c) 2026 Lucas Reiser (forliHD). All rights reserved. See LICENSE. */
 /* The page runs the real extension engine: the duck that follows the visitor is
  * the shipped code, not a video. Everything else here is glue: language toggle,
- * store detection, the trick bar, the model gallery, the changelog and a tiny
- * procedural beat that the media-dance feature can react to. */
+ * store detection, the trick bar, the try-it buttons on the feature cards, the
+ * model gallery, the changelog and a tiny procedural beat that the media-dance
+ * feature can react to. */
 (function () {
   'use strict';
 
@@ -30,17 +31,12 @@
     safariNote: 'Safari isn’t supported yet. Chrome, Firefox and Edge are.',
     otherNote: 'Chromium browsers like Brave, Opera and Vivaldi use the Chrome Web Store.',
     nowSwimming: 'Swimming right now:',
-    trick_quack: 'Quack',
-    trick_flap: 'Flap',
-    trick_crumbs: 'Feed',
-    trick_fish: 'Fish hunt',
-    trick_visitor: 'Visitor',
-    trick_waddle: 'Shore leave',
-    trick_disco: 'Disco',
-    trick_debug: 'Debug',
-    trick_gift: 'Gift',
-    trick_leaf: 'Leaf',
-    trick_birds: 'Birds',
+    moreTricks: 'More tricks',
+    fewerTricks: 'Fewer tricks',
+    heroHintTouch: 'Psst, she’s already here. Tap anywhere and she comes over.',
+    roamStop: '🏊 Follow me again',
+    diveBack: '🫧 Come back up',
+    wearing: 'Wearing: {what}',
     another: 'Another duck',
     soundOn: 'Sound on',
     soundOff: 'Sound off',
@@ -96,6 +92,12 @@
     if (lang === 'de' && DE.dom && DE.dom[key] !== undefined) return DE.dom[key];
     return EN[(prefix || '') + key];
   }
+  // What the site says exactly as the popup does (trick names, wardrobe, day
+  // counter, family): the extension's own strings, handed over by the build
+  function X(key) {
+    var ext = DATA.ext || {};
+    return (ext[lang] && ext[lang][key]) || (ext.en && ext.en[key]) || '';
+  }
   function detectLang() {
     var q = /[?&]lang=(de|en)(?:&|$)/.exec(location.search);
     if (q) return q[1];
@@ -125,7 +127,9 @@
       b.setAttribute('aria-label', T('langSwitch'));
     });
     renderInstall();
+    renderHeroHint();
     renderTricks();
+    renderTry();
     renderGallery();
     renderTimeline();
     renderBeatBtn();
@@ -198,6 +202,13 @@
     var note = $('#browserNote');
     if (note) note.textContent = kind === 'safari' ? T('safariNote') : (kind === 'other' ? T('otherNote') : '');
   }
+  // "Move your mouse" means nothing on a phone
+  function renderHeroHint() {
+    var h = $('[data-i18n="heroHint"]');
+    var touch = false;
+    try { touch = window.matchMedia('(hover: none)').matches; } catch (e) { /* the mouse text stays */ }
+    if (h && touch) h.textContent = T('heroHintTouch');
+  }
 
   // ── The duck herself ──────────────────────────────────────────
   var engine = null;
@@ -233,13 +244,17 @@
       var names = DATA.stages && DATA.stages[lang];
       return (names && names[id]) || '';
     };
+    engine.setBrood(pv.brood.ages);
     try {
       var q = window.matchMedia('(prefers-reduced-motion: reduce)');
       var onChange = function () { engine.apply({ reduceMotion: !!q.matches }); };
       if (q.addEventListener) q.addEventListener('change', onChange);
       else if (q.addListener) q.addListener(onChange);
     } catch (e) { /* stays on the boot value */ }
-    setInterval(function () { engine.setMedia(beat.playing || mediaPlaying()); }, 1000);
+    setInterval(function () {
+      engine.setMedia(beat.playing || mediaPlaying());
+      renderDive();   // Esc may have sent her under, or brought her back
+    }, 1000);
   }
   function modelName(id) {
     var n = NAMES[lang] && NAMES[lang][id];
@@ -254,29 +269,60 @@
     c.appendChild(doc.createTextNode(T('nowSwimming') + ' '));
     c.appendChild(el('b', '', modelName(engine.modelId)));
   }
+  function pickModel(id) {
+    engine.apply({ model: id });
+    renderCurrent();
+    renderFamily();   // the ducklings take after her
+    renderDive();     // and a new duck comes up if the old one was under
+  }
 
-  var TRICKS = [
-    ['quack', '📣'], ['flap', '🪶'], ['crumbs', '🍞'], ['fish', '🐟'],
-    ['visitor', '💕'], ['waddle', '🚶'], ['disco', '🪩'], ['debug', '🐤'],
-    ['gift', '🎁'], ['leaf', '🍂'], ['birds', '🕊️']
-  ];
+  // The popup's trick buttons, every one of them: the build reads the list
+  // from popup.js and the names from the locale files. The ones named here
+  // show at once, the rest wait behind "More tricks".
+  var FEATURED = ['quack', 'flap', 'crumbs', 'fish', 'visitor', 'waddle', 'disco', 'debug', 'gift', 'leaf', 'birds'];
+  var TRICKS = DATA.tricks || FEATURED.map(function (id) { return [id, '']; });   // data.js missing: these, by their ids
+  var allTricks = false;
+  function trickButton(tr) {
+    var name = X('trick_' + tr[0]) || tr[0].charAt(0).toUpperCase() + tr[0].slice(1);
+    var b = el('button', 'btn btn-ghost btn-mini', (tr[1] ? tr[1] + ' ' : '') + name);
+    b.type = 'button';
+    b.onclick = function () {
+      engine.trigger(tr[0], tr[0] === 'sleep' ? 8 : 2.4);   // the popup's durations
+      renderDive();   // a trick brings her up
+    };
+    return b;
+  }
   function renderTricks() {
     var box = $('#tricks');
     if (!box || !engine) return;
     box.innerHTML = '';
+    var byId = {}, rest = [];
     TRICKS.forEach(function (tr) {
-      var b = el('button', 'btn btn-ghost btn-mini', tr[1] + ' ' + T('trick_' + tr[0]));
-      b.type = 'button';
-      b.onclick = function () { engine.trigger(tr[0], 2.2); };
-      box.appendChild(b);
+      byId[tr[0]] = tr;
+      if (FEATURED.indexOf(tr[0]) < 0) rest.push(tr);
     });
+    FEATURED.forEach(function (id) { if (byId[id]) box.appendChild(trickButton(byId[id])); });
+    if (rest.length) {
+      var more = el('button', 'btn btn-ghost btn-mini', (allTricks ? '− ' : '+ ') + T(allTricks ? 'fewerTricks' : 'moreTricks'));
+      more.type = 'button';
+      more.id = 'moreTricks';
+      more.setAttribute('aria-expanded', allTricks ? 'true' : 'false');
+      more.onclick = function () {
+        allTricks = !allTricks;
+        renderTricks();
+        var again = $('#moreTricks');
+        if (again) again.focus();   // the bar was rebuilt under the keyboard
+      };
+      box.appendChild(more);
+    }
+    // the rest opens right after its switch: that is where Tab goes next
+    if (allTricks) rest.forEach(function (tr) { box.appendChild(trickButton(tr)); });
     var rnd = el('button', 'btn btn-ghost btn-mini', '🎲 ' + T('another'));
     rnd.type = 'button';
     rnd.onclick = function () {
       var id = DuckModels.randomId();
       for (var tries = 0; id === engine.modelId && tries < 5; tries++) id = DuckModels.randomId();
-      engine.apply({ model: id });
-      renderCurrent();
+      pickModel(id);
     };
     box.appendChild(rnd);
     var snd = el('button', 'btn btn-ghost btn-mini' + (soundOn ? ' on' : ''),
@@ -293,6 +339,139 @@
     cur.id = 'curDuck';
     box.appendChild(cur);
     renderCurrent();
+  }
+
+  // ── Try-it buttons on the feature cards ───────────────────────
+  // She is the shipped engine, so a button here only asks her for what the
+  // popup, the Esc key or a day in the extension would. The family and the
+  // calendar belong to this visit: the site stores and counts nothing.
+  var pv = {
+    brood: { ages: [2, 16, 6, 11, 2, 16, 6, 11] },   // each a day or two short of the next step
+    days: null,
+    date: new Date()
+  };
+  // The next day she is met on a page (gap 2: a day was missed in between):
+  // the same rules as in the extension, on a calendar that only exists here.
+  function passDay(gap) {
+    if (!engine) return;
+    if (engine.submerged) engine.surface();
+    // Somebody is here. A visitor at the keyboard never moves the mouse, and the
+    // little ceremony waits for as long as the family is asleep in the nest.
+    // (In free roam only a cursor close by wakes her.)
+    if (engine.cfg.follow) engine.setPointer(engine.px, engine.py);
+    else engine.setPointer(engine.duck.x, engine.duck.y);
+    pv.date = new Date(pv.date.getFullYear(), pv.date.getMonth(), pv.date.getDate() + gap);
+    pv.days = DuckModels.countDay(pv.days, DuckModels.dayKey(pv.date), 0) || pv.days;
+    var grown = DuckModels.growBrood(pv.brood, engine.babies.length);
+    pv.brood = grown.brood;
+    engine.setBrood(pv.brood.ages, grown.news);
+    renderFamily();
+    renderStreak();
+    renderDive();
+  }
+  // The ducklings that are out, each at her stage, the way the popup shows them.
+  // Only what changed is rewritten: the box is a live region, and a screen
+  // reader should hear a day pass, not every new mama from the gallery.
+  function setText(e, text) { if (e.textContent !== text) e.textContent = text; }
+  function renderFamily() {
+    var box = $('#family');
+    if (!box || !engine || !window.DuckRender || !DATA.ext) return;
+    var stages = DuckModels.broodStages, mama = DuckModels.get(engine.modelId);
+    var kids = $$('.kid', box), gone = $('.gone', box), n = engine.babies.length;
+    var W = 76, H = 50, dpr = Math.min(2, window.devicePixelRatio || 1);
+    while (kids.length > n) box.removeChild(kids.pop());
+    for (var i = 0; i < n; i++) {
+      var age = pv.brood.ages[i], st = DuckModels.stageOf(age), S = stages[st];
+      var left = (st + 1 < stages.length ? stages[st + 1].from : DuckModels.grownAt) - age;
+      var kid = kids[i];
+      if (!kid) {
+        kid = el('div', 'kid');
+        var c = el('canvas');
+        c.width = W * dpr; c.height = H * dpr;
+        c.style.width = W + 'px'; c.style.height = H + 'px';
+        kid.appendChild(c);
+        kid.appendChild(el('b'));
+        kid.appendChild(el('span'));
+        box.insertBefore(kid, gone);
+      }
+      var x = kid.firstChild.getContext('2d');
+      x.setTransform(dpr, 0, 0, dpr, 0, 0);
+      x.clearRect(0, 0, W, H);
+      DuckRender.draw(x, DuckRender.babyOf(mama, S.grow), { x: W / 2, y: H - 10, r: 20 * S.size, t: 1.4, dir: 1, reflection: false });
+      setText(kid.childNodes[1], S.emoji + ' ' + engine.stageLabel(S.id));
+      setText(kid.childNodes[2], left === 1 ? X('broodNextOne') : X('broodNextMany').replace('{n}', left));
+    }
+    if (pv.brood.fledged) {
+      if (!gone) gone = box.appendChild(el('p', 'gone'));
+      setText(gone, X('broodFledged') + pv.brood.fledged);
+    }
+  }
+  function renderStreak() {
+    var box = $('#streak');
+    if (!box || !engine || !DATA.ext) return;
+    if (!pv.days) pv.days = DuckModels.countDay(null, DuckModels.dayKey(pv.date), 0);   // today counts: she is here
+    var d = pv.days;
+    box.textContent = '';
+    box.appendChild(el('b', '', '🔥 ' + d.streak));
+    box.appendChild(doc.createTextNode(' '));
+    box.appendChild(el('span', '', X(d.streak === 1 ? 'daysRowOne' : 'daysRowMany')));
+    box.appendChild(doc.createTextNode(' '));
+    box.appendChild(el('small', '', X('daysBest') + d.best + ' · ' + d.total + ' ' + X(d.total === 1 ? 'daysTotalOne' : 'daysTotalMany')));
+  }
+  function renderRoam() {
+    var b = $('#roamBtn');
+    if (!b || !engine) return;
+    var roaming = !engine.cfg.follow;
+    b.textContent = roaming ? T('roamStop') : domText('tryRoam');
+    b.classList.toggle('on', roaming);
+  }
+  function renderDive() {
+    var b = $('#diveBtn');
+    if (!b || !engine) return;
+    var text = engine.submerged ? T('diveBack') : domText('tryDive');
+    if (b.textContent !== text) b.textContent = text;
+    b.classList.toggle('on', !!engine.submerged);
+  }
+  // One piece after the other, then back to what the model wears by itself
+  function nextWear(kind) {
+    var ids = [''];
+    DuckModels.wardrobe.forEach(function (w) { if (w.kind === kind) ids.push(w.id); });
+    var key = kind === 'hat' ? 'hat' : 'glasses', patch = {};
+    patch[key] = ids[(ids.indexOf(engine.cfg[key] || '') + 1) % ids.length];
+    engine.apply(patch);
+    renderWearing();
+    renderDive();   // she comes up to show it
+  }
+  function renderWearing() {
+    var box = $('#wearing');
+    if (!box || !engine) return;
+    var what = [engine.cfg.hat, engine.cfg.glasses].filter(Boolean).map(function (id) { return X('wear_' + id) || id; });
+    box.textContent = what.length ? T('wearing').replace('{what}', what.join(' · ')) : '';
+  }
+  function renderTry() {
+    renderRoam();
+    renderDive();
+    renderWearing();
+    renderFamily();
+    renderStreak();
+  }
+  function setupTry() {
+    if (!engine) {
+      // the engine did not load: a button that does nothing is worse than a grey one
+      $$('.feat .row button').forEach(function (b) { if (b.id !== 'beatBtn') b.disabled = true; });
+      return;
+    }
+    function on(id, fn) { var b = doc.getElementById(id); if (b) b.onclick = fn; }
+    on('roamBtn', function () { engine.apply({ follow: !engine.cfg.follow }); renderRoam(); });
+    on('diveBtn', function () { engine.trigger('hide'); renderDive(); });
+    on('giftBtn', function () { engine.trigger('gift'); renderDive(); });
+    on('leafBtn', function () { engine.trigger('leaf'); renderDive(); });
+    on('birdsBtn', function () { engine.trigger('birds'); renderDive(); });
+    on('hatBtn', function () { nextWear('hat'); });
+    on('glassesBtn', function () { nextWear('glasses'); });
+    $$('[data-day]').forEach(function (b) {
+      b.onclick = function () { passDay(Number(b.getAttribute('data-day')) || 1); };
+    });
   }
 
   // ── The flock: every model, drawn by the real renderer ────────
@@ -350,11 +529,7 @@
       var when = null;
       if (m.season) { when = el('em', '', seasonLabel(m)); d.appendChild(when); }
       d.title = modelName(m.id);
-      var pick = function () {
-        if (!engine) return;
-        engine.apply({ model: m.id });
-        renderCurrent();
-      };
+      var pick = function () { if (engine) pickModel(m.id); };
       d.onclick = pick;
       d.onkeydown = function (ev) { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); pick(); } };
       grid.appendChild(d);
@@ -617,6 +792,7 @@
     lang = detectLang();
     drawLogo();
     bootDuck();
+    setupTry();
     applyLang(lang);
     syncUrl();   // the address names the language on screen, / or /de/
     renderStats();

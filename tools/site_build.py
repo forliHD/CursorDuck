@@ -8,8 +8,9 @@ This script
   1. copies site/ to _site/,
   2. adds src/{models,render,effects,engine}.js, audio/ and icons/,
   3. writes _site/data.js with the version, the model/achievement/trick counts,
-     the model names in both languages (from _locales/) and the site strings
-     (English from the markup, German from site/de.json),
+     the popup's trick buttons, the names and labels the site shares with the
+     extension in both languages (from _locales/) and the site strings (English
+     from the markup, German from site/de.json),
   4. checks that every data-i18n key used in the HTML has a German string and
      that releases.json is well-formed; when the newest release is missing from
      it, the entry is generated from the update page strings (tools/release_log.py),
@@ -71,6 +72,19 @@ def gifts_from(locale):
 def stages_from(locale):
     msgs = json.loads(read('_locales', locale, 'messages.json'))
     return {key[6:]: val['message'] for key, val in msgs.items() if key.startswith('stage_')}
+
+
+# Strings the site shows exactly as the popup does: the trick buttons, the
+# wardrobe, the day counter and the family. They come from the extension's
+# locale files, so the two never drift apart.
+SHARED_KEYS = ['daysRowOne', 'daysRowMany', 'daysBest', 'daysTotalOne', 'daysTotalMany',
+               'broodNextOne', 'broodNextMany', 'broodFledged']
+SHARED = re.compile(r'^(?:trick_|wear_)[a-z]+$|^(?:%s)$' % '|'.join(SHARED_KEYS))
+
+
+def shared_from(locale):
+    msgs = json.loads(read('_locales', locale, 'messages.json'))
+    return {key: val['message'] for key, val in msgs.items() if SHARED.match(key)}
 
 
 TAG = re.compile(r'<([a-zA-Z][a-zA-Z0-9]*)(\s[^>]*)?>')
@@ -211,13 +225,34 @@ def main():
     hats = len(re.findall(r"kind: 'hat'", models_js))
     glasses = len(re.findall(r"kind: 'glasses'", models_js))
     achievements = len(re.findall(r"^\s+\['", block(popup_js, 'var ACHIEVEMENTS = ['), re.M))
-    tricks = len(re.findall(r"\['[a-z]+', '", block(popup_js, 'var TRICKS = [')))
+    # the popup's trick buttons, in its order: [id, emoji]
+    trick_block = block(popup_js, 'var TRICKS = [')
+    tricks = re.findall(r"\['([a-z]+)', '[^']*', '([^']*)'\]", trick_block)
+    # the hero's buttons hang on this list: an entry written another way must
+    # stop the build instead of quietly dropping a button
+    if not tricks or len(tricks) != len(re.findall(r"\[\s*['\"]", trick_block)):
+        problems.append('popup.js: could not read every entry of TRICKS (expected [\'id\', \'name\', \'emoji\'])')
+    featured = re.findall(r"'([a-z]+)'", block(read('site', 'site.js'), 'var FEATURED = [', '];'))
+    for tid in featured:
+        if tid not in [t[0] for t in tricks]:
+            problems.append('site.js: FEATURED names the trick %s, which the popup does not have' % tid)
 
     names = {'en': names_from('en'), 'de': names_from('de')}
     for mid in models:
         for loc in ('en', 'de'):
             if mid not in names[loc]:
                 problems.append('model %s has no name in _locales/%s' % (mid, loc))
+    shared = {'en': shared_from('en'), 'de': shared_from('de')}
+    for tid, _ in tricks:
+        for loc in ('en', 'de'):
+            if 'trick_' + tid not in shared[loc]:
+                problems.append('trick %s has no name in _locales/%s' % (tid, loc))
+    # the labels the cards read from the popup's strings: a renamed key must not ship as a blank
+    wear = re.findall(r"\{ id: '([a-z]+)',\s+kind: '(?:hat|glasses)'", models_js)
+    for key in ['wear_' + w for w in wear] + SHARED_KEYS:
+        for loc in ('en', 'de'):
+            if key not in shared[loc]:
+                problems.append('%s is missing in _locales/%s (the site shows it)' % (key, loc))
 
     # The wishing pond needs a Turnstile site key. On Cloudflare it comes from the
     # build environment (TURNSTILE_SITE_KEY); without one the pond section stays
@@ -234,7 +269,7 @@ def main():
         'meta': {
             'version': manifest['version'],
             'models': len(models), 'seasonal': seasonal,
-            'achievements': achievements, 'tricks': tricks,
+            'achievements': achievements, 'tricks': len(tricks),
             'hats': hats, 'glasses': glasses,
             'built': datetime.date.today().isoformat(),
             'turnstileSiteKey': turnstile_key
@@ -242,6 +277,8 @@ def main():
         'names': names,
         'gifts': {'en': gifts_from('en'), 'de': gifts_from('de')},
         'stages': {'en': stages_from('en'), 'de': stages_from('de')},
+        'tricks': tricks,
+        'ext': shared,
         'en': {'dom': en_dom},
         'de': de
     }
@@ -305,7 +342,7 @@ def main():
     size = sum(os.path.getsize(os.path.join(dp, f)) for dp, _, fs in os.walk(OUT) for f in fs)
     print('cursorduck.com %s: %d models (%d seasonal), %d achievements, %d trick buttons, '
           '%d hats, %d glasses, %d fingerprinted assets -> _site/ (%d KB)'
-          % (manifest['version'], len(models), seasonal, achievements, tricks, hats, glasses,
+          % (manifest['version'], len(models), seasonal, achievements, len(tricks), hats, glasses,
              fingerprinted, size // 1024))
 
 

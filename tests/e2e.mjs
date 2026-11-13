@@ -63,7 +63,14 @@ async function openExtPage(from, rel) {
   return p;
 }
 
-function serve(root = path.join(HERE, 'fixtures')) {
+// The website is served with its own content security policy (site/_headers),
+// so a test page refuses what the real one would refuse.
+function siteHeaders() {
+  const m = /^\s*Content-Security-Policy:\s*(.+)$/m.exec(fs.readFileSync(path.join(ROOT, 'site', '_headers'), 'utf8'));
+  return m ? { 'content-security-policy': m[1].trim() } : {};
+}
+
+function serve(root = path.join(HERE, 'fixtures'), headers = {}) {
   return new Promise((resolve) => {
     const srv = http.createServer((req, res) => {
       const url = new URL(req.url, 'http://x');
@@ -73,7 +80,7 @@ function serve(root = path.join(HERE, 'fixtures')) {
       fs.readFile(file, (err, buf) => {
         if (err) { res.writeHead(404); res.end(); return; }
         const type = { '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.svg': 'image/svg+xml', '.wav': 'audio/wav', '.woff2': 'font/woff2', '.png': 'image/png' }[path.extname(file)] || 'text/html; charset=utf-8';
-        res.writeHead(200, { 'content-type': type, 'cache-control': 'no-store' });
+        res.writeHead(200, { 'content-type': type, 'cache-control': 'no-store', ...headers });
         res.end(buf);
       });
     });
@@ -1973,19 +1980,46 @@ async function run() {
 
   console.log('Website');
 
-  async function sitePage(pathname) {
+  // The page's own duck, on the page as it is deployed. `viewport` for a phone,
+  // `calm` for a visitor who asked the system for reduced motion.
+  async function sitePage(pathname, opts = {}) {
     const ext = await open();
     await duck(ext, 'storageSet', 'sync', { disabledHosts: ['localhost'] });   // only the page's own duck here
     await close(ext);
     const page = await browser.newPage();
     openPages.add(page);
-    await page.setViewport({ width: 1100, height: 720 }).catch(() => {});
+    await page.setViewport(opts.viewport || { width: 1100, height: 720 }).catch(() => {});
+    if (opts.calm) await page.emulateMediaFeatures([{ name: 'prefers-reduced-motion', value: 'reduce' }]);
+    if (opts.block) {
+      // a file that never arrives (a flaky connection, a blocker)
+      await page.setRequestInterception(true);
+      page.on('request', (r) => (opts.block.test(r.url()) ? r.abort() : r.continue()).catch(() => {}));
+    }
     page.errors = [];
     page.on('pageerror', (e) => page.errors.push(String(e)));
+    // the console stays clean too, and every file is there (the pond's API is not part of this server)
+    page.on('console', (m) => { if (m.type() === 'error' && !/Failed to load resource/.test(m.text())) page.errors.push('console: ' + m.text()); });
+    page.on('response', (r) => { if (r.status() >= 400 && !/\/api\//.test(r.url())) page.errors.push(r.status() + ' ' + r.url()); });
+    // what the page's own content security policy refused
+    await page.evaluateOnNewDocument(() => {
+      window.__csp = [];
+      document.addEventListener('securitypolicyviolation', (e) => window.__csp.push(e.violatedDirective + ' ' + e.blockedURI));
+    });
     await page.goto(siteBase + pathname, { waitUntil: 'load' });
-    await until(() => page.evaluate(() => !!window.__duck), 'the page duck');
+    if (!opts.block) await until(() => page.evaluate(() => !!window.__duck), 'the page duck');
     return page;
   }
+  // No script error, nothing refused by the policy.
+  async function clean(page) {
+    assert.deepEqual(page.errors, []);
+    assert.deepEqual(await page.evaluate(() => window.__csp), []);
+  }
+  // A quiet duck that stays awake, so a test sees what it asked for and nothing else.
+  const quiet = (page) => page.evaluate(() => window.__duck.apply({ sleepAfter: 60, playfulness: 0 }));
+  const press = (page, sel) => page.evaluate((q) => document.querySelector(q).click(), sel);
+  const text = (page, sel) => page.evaluate((q) => { const e = document.querySelector(q); return e ? e.textContent.replace(/\s+/g, ' ').trim() : null; }, sel);
+  const sideways = (page) => page.evaluate(() => { const el = document.scrollingElement; return el.scrollWidth - el.clientWidth; });
+  const stored = (page) => page.evaluate(() => JSON.stringify([Object.keys(localStorage).sort(), Object.keys(sessionStorage).sort()]));
 
   await test('site: counts, new cards and the tricks run on the real engine', async () => {
     const page = await sitePage('/');
@@ -2001,13 +2035,13 @@ async function run() {
     assert.ok(info.cards.every(Boolean), JSON.stringify(info.cards));
     assert.ok(info.log, 'the duck log lists 1.10.0');
     assert.ok(await page.evaluate(() => document.getElementById('timeline').textContent.includes('1.9.0')), 'and still 1.9.0');
-    // the hero's two ducklings are a fluffball and an older sister
-    assert.deepEqual(await page.evaluate(() => window.__duck.babies.map((b) => b.stage)), [0, 1]);
+    // the hero's two ducklings: a fluffball, and a big sister who is nearly fledged
+    assert.deepEqual(await page.evaluate(() => window.__duck.babies.map((b) => b.stage)), [0, 3]);
     // (the label follows the browser's language, the bird doesn't)
     assert.equal(await page.evaluate(() => [...document.querySelectorAll('#tricks button')].some((b) => b.textContent.includes('🕊'))), true);
     await page.evaluate(() => window.__duck.trigger('birds'));
     await until(() => page.evaluate(() => document.querySelectorAll('[data-cursor-duck-sky]').length === 1), 'the birds over the site', 2000);
-    assert.ok(await page.evaluate(() => { const el = document.scrollingElement; return el.scrollWidth <= el.clientWidth; }), 'no sideways scroll');
+    assert.equal(await sideways(page), 0, 'no sideways scroll');
     await page.evaluate(() => window.__duck.dropFlock());
     await page.evaluate(() => window.__duck.trigger('leaf'));
     assert.equal(await page.evaluate(() => !!window.__duck.leaf), true);
@@ -2022,7 +2056,7 @@ async function run() {
     await until(() => page.evaluate(() => window.__duck.submerged), 'Esc on the site', 1500);
     await page.keyboard.press('Escape');
     await until(() => page.evaluate(() => !window.__duck.submerged), 'Esc again', 1500);
-    assert.deepEqual(page.errors, []);
+    await clean(page);
   });
 
   await test('site: the German start page carries the new cards and names', async () => {
@@ -2043,8 +2077,404 @@ async function run() {
     assert.deepEqual([info.f19, info.f20, info.f21], ['Vogelzug im Herbst', 'Küken, die heranwachsen', 'Tage zusammen']);
     assert.equal(info.name, 'Muschel');
     assert.deepEqual([info.stage, info.grown], ['Flaumküken', 'Ausgewachsen']);
-    assert.deepEqual(page.errors, []);
+    await clean(page);
   });
+
+  await test('site: the try-it buttons speak German, and keep their state through a language switch', async () => {
+    const page = await sitePage('/de/');
+    assert.deepEqual([await text(page, '#roamBtn'), await text(page, '#diveBtn'), await text(page, '#birdsBtn'), await text(page, '[data-day="1"]'), await text(page, '[data-day="2"]')],
+      ['🧭 Frei schwimmen lassen', '🤫 Abtauchen', '🕊️ Vögel schicken', '☀️ Ein Tag weiter', '💤 Einen Tag verpassen']);
+    assert.equal(await text(page, '#streak'), '🔥 1 Tag in Folge Rekord: 1 · 1 Tag zusammen');
+    assert.deepEqual(await page.evaluate(() => [...document.querySelectorAll('#family .kid')].map((k) => k.textContent)),
+      ['🐣 Flaumkükennoch 1 Tag', '🪶 Fast flüggenoch 2 Tage']);
+    // the popup's own names for the tricks, from the German locale file
+    const tricks = await page.evaluate(() => [...document.querySelectorAll('#tricks button')].map((b) => b.textContent));
+    assert.ok(tricks.includes('🚶 Landgang') && tricks.includes('🕊️ Vogelzug') && tricks.includes('+ Mehr Kunststücke'), JSON.stringify(tricks));
+    await press(page, '#hatBtn');
+    await press(page, '#roamBtn');
+    await press(page, '#diveBtn');
+    assert.deepEqual([await text(page, '#diveBtn'), await text(page, '#roamBtn'), await text(page, '#wearing')],
+      ['🫧 Wieder auftauchen', '🏊 Wieder folgen', 'Sie trägt: Kappe']);
+    await press(page, '#langBtn');
+    assert.equal(await page.evaluate(() => document.documentElement.lang), 'en');
+    assert.deepEqual([await text(page, '#diveBtn'), await text(page, '#roamBtn'), await text(page, '#wearing'), await text(page, '#leafBtn')],
+      ['🫧 Come back up', '🏊 Follow me again', 'Wearing: Cap', '🍂 Send a leaf']);
+    assert.equal(await text(page, '#streak'), '🔥 1 day in a row Best: 1 · 1 day together');
+    await clean(page);
+  });
+
+  await test('site: every trick button of the popup, eleven at once and the rest behind "More tricks"', async () => {
+    const page = await sitePage('/?lang=en');
+    await quiet(page);
+    const labels = () => page.evaluate(() => [...document.querySelectorAll('#tricks button')].map((b) => b.textContent));
+    let l = await labels();
+    assert.equal(l.length, 11 + 3, JSON.stringify(l));
+    assert.deepEqual(l.slice(-3), ['+ More tricks', '🎲 Another duck', '🔇 Sound off']);
+    assert.equal(await page.evaluate(() => document.getElementById('moreTricks').getAttribute('aria-expanded')), 'false');
+    await press(page, '#moreTricks');
+    l = await labels();
+    assert.equal(l.length, 21 + 3, JSON.stringify(l));
+    assert.equal(l.length - 3, Number(await text(page, '#statTricks')), 'as many as the page says the popup has');
+    assert.ok(l.every((t) => /^\S+ \S/.test(t)), 'every one has a name: ' + JSON.stringify(l));
+    assert.ok(l.includes('🌀 Pirouette') && l.includes('😴 Nap') && l.includes('🫣 Peekaboo'), JSON.stringify(l));
+    // the ten open right after their switch, so Tab walks into them
+    assert.deepEqual([l[11], l[12], l[21]], ['− Fewer tricks', '🧼 Preen', '🫣 Peekaboo'], JSON.stringify(l));
+    assert.equal(await page.evaluate(() => document.activeElement && document.activeElement.id), 'moreTricks', 'the keyboard keeps its place');
+    assert.equal(await page.evaluate(() => document.getElementById('moreTricks').getAttribute('aria-expanded')), 'true');
+    // they are the engine's own tricks
+    await page.mouse.move(560, 330);
+    await page.evaluate(() => [...document.querySelectorAll('#tricks button')].find((b) => b.textContent.includes('Pirouette')).click());
+    assert.equal(await page.evaluate(() => window.__duck.duck.state), 'spin');
+    await page.evaluate(() => [...document.querySelectorAll('#tricks button')].find((b) => b.textContent.includes('Nap')).click());
+    assert.equal(await page.evaluate(() => window.__duck.duck.state), 'tuckin', 'with ducklings, a nap starts at the nest');
+    await press(page, '#moreTricks');
+    assert.equal((await labels()).length, 11 + 3);
+    assert.equal(await sideways(page), 0);
+    await clean(page);
+  });
+
+  await test('site: the cards send a leaf, the birds and a gift', async () => {
+    const page = await sitePage('/?lang=en');
+    await quiet(page);
+    await page.mouse.move(560, 330);
+    const before = await stored(page);
+    await press(page, '#leafBtn');
+    assert.equal(await page.evaluate(() => !!window.__duck.leaf), true, 'a leaf');
+    await press(page, '#birdsBtn');
+    await until(() => page.evaluate(() => !!window.__duck.flock && document.querySelectorAll('[data-cursor-duck-sky]').length === 1), 'the birds', 2000);
+    assert.equal(await sideways(page), 0, 'no sideways scroll under the flock');
+    await page.evaluate(() => window.__duck.dropFlock());
+    await press(page, '#giftBtn');
+    assert.equal(await page.evaluate(() => window.__duck.duck.state), 'gift');
+    await until(() => page.evaluate(() => !!window.__duck.giftObj), 'the gift', 6000);
+    assert.equal(await stored(page), before, 'a gift to look at: nothing is kept');
+    // hidden with Esc, a button brings her back up for it
+    await press(page, '#diveBtn');
+    assert.equal(await page.evaluate(() => window.__duck.submerged), true);
+    await press(page, '#birdsBtn');
+    assert.equal(await page.evaluate(() => window.__duck.submerged), false);
+    assert.equal(await text(page, '#diveBtn'), '🤫 Dive', 'and the dive button knows');
+    // so does a new hat: she comes up to show it
+    await press(page, '#diveBtn');
+    await press(page, '#hatBtn');
+    assert.deepEqual([await page.evaluate(() => window.__duck.submerged), await text(page, '#diveBtn')], [false, '🤫 Dive']);
+    await clean(page);
+  });
+
+  await test('site: the dive button does what Esc does, and says which way it goes', async () => {
+    const page = await sitePage('/?lang=en');
+    await quiet(page);
+    await page.mouse.move(560, 330);
+    await sleep(300);
+    assert.equal(await text(page, '#diveBtn'), '🤫 Dive');
+    await press(page, '#diveBtn');
+    assert.equal(await page.evaluate(() => window.__duck.submerged), true);
+    assert.equal(await text(page, '#diveBtn'), '🫧 Come back up');
+    await until(() => page.evaluate(() => window.__duck.babies.every((b) => b.vanish > 0.9)), 'the family under water', 3000);
+    await press(page, '#diveBtn');
+    assert.equal(await page.evaluate(() => window.__duck.submerged), false);
+    assert.equal(await text(page, '#diveBtn'), '🤫 Dive');
+    // the key and the button are one switch: the label follows the key
+    await until(() => page.evaluate(() => window.__duck.duck.grabbable()), 'her back up', 4000);
+    await page.evaluate(() => { window.__duck.px = window.__duck.duck.x + 40; window.__duck.py = window.__duck.duck.y; });
+    await page.keyboard.press('Escape');
+    await until(() => page.evaluate(() => window.__duck.submerged), 'Esc', 1500);
+    await until(async () => (await text(page, '#diveBtn')) === '🫧 Come back up', 'the label after Esc', 2500);
+    await page.keyboard.press('Escape');
+    await until(async () => (await text(page, '#diveBtn')) === '🤫 Dive', 'the label after the second Esc', 2500);
+    await clean(page);
+  });
+
+  await test('site: free roam from the card, and back to the cursor', async () => {
+    const page = await sitePage('/?lang=en');
+    await quiet(page);
+    await page.mouse.move(560, 330);
+    assert.equal(await page.evaluate(() => window.__duck.cfg.follow), true);
+    await press(page, '#roamBtn');
+    assert.equal(await page.evaluate(() => window.__duck.cfg.follow), false);
+    assert.equal(await text(page, '#roamBtn'), '🏊 Follow me again');
+    // she really is on her own now: the cursor leaves, she doesn't come after it
+    await page.mouse.move(1000, 600);
+    await sleep(1500);
+    const far = await page.evaluate(() => Math.hypot(window.__duck.duck.x - 1000, window.__duck.duck.y - 600));
+    assert.ok(far > 150, 'she stayed where she lives: ' + far);
+    await press(page, '#roamBtn');
+    assert.equal(await page.evaluate(() => window.__duck.cfg.follow), true);
+    assert.equal(await text(page, '#roamBtn'), '🧭 Let her roam');
+    await until(() => page.evaluate(() => Math.hypot(window.__duck.duck.x - 1000, window.__duck.duck.y - 600) < 150), 'her back at the cursor', 8000);
+    await clean(page);
+  });
+
+  await test('site: one day later the fluffball has grown; another day and her sister flies off, an egg hatches', async () => {
+    const page = await sitePage('/?lang=en');
+    await quiet(page);
+    await page.mouse.move(560, 330);
+    const before = await stored(page);
+    const kids = () => page.evaluate(() => [...document.querySelectorAll('#family .kid')].map((k) => [k.querySelector('b').textContent, k.querySelector('span').textContent, k.querySelector('canvas').width > 0]));
+    assert.deepEqual(await kids(), [['🐣 Fluffball', '1 more day', true], ['🪶 Nearly fledged', '2 more days', true]]);
+    await sleep(800);
+    await press(page, '#family + .row [data-day="1"]');
+    // the card knows at once, the duckling has her little ceremony first
+    assert.deepEqual(await kids(), [['🐥 Duckling', '4 more days', true], ['🪶 Nearly fledged', '1 more day', true]]);
+    await until(() => page.evaluate(() => window.__duck.babies[0].stage === 1), 'the fluffball as a duckling', 10000);
+    assert.equal(await page.evaluate(() => window.__duck.babies[1].stage), 3);
+    await press(page, '#family + .row [data-day="1"]');
+    assert.deepEqual(await kids(), [['🐥 Duckling', '3 more days', true], ['🐣 Fluffball', '3 more days', true]]);
+    assert.equal(await text(page, '#family .gone'), 'Grown up and gone so far: 1');
+    await until(() => page.evaluate(() => !!window.__duck.fledge), 'her farewell', 12000, 40);
+    await until(() => page.evaluate(() => !window.__duck.fledge && window.__duck.babies[1].egg != null), 'the egg in her place', 8000, 40);
+    await until(() => page.evaluate(() => window.__duck.babies[1].egg == null && window.__duck.babies[1].stage === 0), 'the hatchling', 8000, 40);
+    assert.equal(await page.evaluate(() => window.__duck.broodQ.length), 0);
+    // the two cards share the calendar: three days in a row by now
+    assert.equal(await text(page, '#streak'), '🔥 3 days in a row Best: 3 · 3 days together');
+    assert.equal(await stored(page), before, 'nothing of it is stored');
+    await clean(page);
+  });
+
+  await test('site: asleep in the nest, "One day later" wakes the family for it, in free roam too', async () => {
+    const page = await sitePage('/?lang=en');
+    await quiet(page);
+    await page.mouse.move(560, 330);
+    await sleep(500);
+    const asleep = async () => {
+      await page.evaluate(() => { window.__duck.pointerIdle = 5; window.__duck.trigger('sleep', 8); });
+      await until(() => page.evaluate(() => window.__duck.duck.state === 'sleep' && !!window.__duck.nest && window.__duck.pointerIdle > 1), 'the family asleep in the nest', 20000);
+    };
+    await asleep();
+    // a click that moves no mouse, the way Enter on the focused button arrives
+    await press(page, '#family + .row [data-day="1"]');
+    await until(() => page.evaluate(() => window.__duck.babies[0].stage === 1), 'the fluffball as a duckling', 12000);
+    await press(page, '#roamBtn');
+    await sleep(400);
+    await asleep();
+    await press(page, '#family + .row [data-day="1"]');
+    await until(() => page.evaluate(() => !!window.__duck.fledge), 'her farewell, from a nap in free roam', 14000, 40);
+    await clean(page);
+  });
+
+  await test('site: a file that never arrives: no engine greys the buttons out, no data keeps eleven tricks', async () => {
+    let page = await sitePage('/?lang=en', { block: /\/src\/engine\.js/ });
+    await sleep(400);
+    assert.equal(await page.evaluate(() => typeof window.__duck), 'undefined');
+    const dead = await page.evaluate(() => [...document.querySelectorAll('.feat .row button')].map((b) => [b.id || b.textContent.trim(), b.disabled]));
+    assert.equal(dead.length, 11);
+    assert.deepEqual(dead.filter((b) => b[1] !== (b[0] !== 'beatBtn')), [], 'all greyed out but the beat');
+    assert.deepEqual([await text(page, '#streak'), await page.evaluate(() => document.querySelectorAll('#family .kid').length)], ['', 0], 'no counter without her');
+    assert.deepEqual(page.errors, []);
+    await close(page);
+    page = await sitePage('/?lang=en', { block: /\/data\.js/ });
+    await until(() => page.evaluate(() => !!window.__duck), 'the page duck');
+    const l = await page.evaluate(() => [...document.querySelectorAll('#tricks button')].map((b) => b.textContent));
+    assert.deepEqual(l.slice(0, 3).concat(l.length), ['Quack', 'Flap', 'Crumbs', 11 + 2], JSON.stringify(l));
+    await page.evaluate(() => [...document.querySelectorAll('#tricks button')].find((b) => b.textContent === 'Flap').click());
+    assert.equal(await page.evaluate(() => window.__duck.duck.state), 'flap');
+    // the cards still work, they only keep quiet where their words are missing
+    await press(page, '[data-day="1"]');
+    assert.deepEqual([await text(page, '#streak'), await page.evaluate(() => document.querySelectorAll('#family .kid').length)], ['', 0]);
+    assert.deepEqual(await page.evaluate(() => window.__duck.broodAges.slice(0, 2)), [3, 17]);
+    assert.deepEqual(page.errors, []);
+  }, { chromeOnly: true, why: 'requests are only intercepted in Chromium here' });
+
+  await test('site: the pretend calendar counts like the real one: a missed day ends the run, never the record', async () => {
+    const page = await sitePage('/?lang=en');
+    await quiet(page);
+    const before = await stored(page);
+    assert.equal(await text(page, '#streak'), '🔥 1 day in a row Best: 1 · 1 day together');
+    await press(page, '#streak + .row [data-day="1"]');
+    await press(page, '#streak + .row [data-day="1"]');
+    assert.equal(await text(page, '#streak'), '🔥 3 days in a row Best: 3 · 3 days together');
+    await press(page, '#streak + .row [data-day="2"]');
+    assert.equal(await text(page, '#streak'), '🔥 1 day in a row Best: 3 · 4 days together');
+    await press(page, '#streak + .row [data-day="1"]');
+    assert.equal(await text(page, '#streak'), '🔥 2 days in a row Best: 3 · 5 days together');
+    // the ducklings lived through the same days
+    assert.deepEqual(await page.evaluate(() => window.__duck.broodAges.slice(0, 2)), [6, 2]);
+    assert.equal(await stored(page), before, 'nothing of it is stored');
+    await clean(page);
+  });
+
+  await test('site: the wardrobe goes round, piece by piece, and back to her own', async () => {
+    const page = await sitePage('/?lang=en');
+    await quiet(page);
+    assert.equal(await text(page, '#wearing'), '');
+    await press(page, '#hatBtn');
+    assert.equal(await page.evaluate(() => window.__duck.cfg.hat), 'cap');
+    await press(page, '#glassesBtn');
+    assert.equal(await text(page, '#wearing'), 'Wearing: Cap · Sunglasses');
+    const hats = await page.evaluate(() => DuckModels.wardrobe.filter((w) => w.kind === 'hat').length);
+    assert.equal(hats, 16);
+    const seen = new Set(['cap']);
+    for (let i = 1; i < hats; i++) { await press(page, '#hatBtn'); seen.add(await page.evaluate(() => window.__duck.cfg.hat)); }
+    assert.equal(seen.size, hats, 'every hat once');
+    assert.ok(seen.has('headphones') && seen.has('wreath'), 'the newer ones too');
+    await press(page, '#hatBtn');
+    assert.equal(await page.evaluate(() => window.__duck.cfg.hat), '', 'and her own again');
+    assert.equal(await text(page, '#wearing'), 'Wearing: Sunglasses');
+    for (let i = 0; i < 6; i++) await press(page, '#glassesBtn');
+    assert.deepEqual([await page.evaluate(() => window.__duck.cfg.glasses), await text(page, '#wearing')], ['', '']);
+    await clean(page);
+  });
+
+  await test('site: another duck: the family on the card takes after her, and she comes up if she was under', async () => {
+    const page = await sitePage('/?lang=en');
+    await quiet(page);
+    const look = () => page.evaluate(() => [...document.querySelectorAll('#family .kid canvas')].map((c) => c.toDataURL().length + ':' + c.toDataURL().slice(-40)));
+    const mallard = await look();
+    assert.equal(mallard.length, 2);
+    await press(page, '#diveBtn');
+    // the box is a live region: a new mama repaints the pictures and leaves the words alone
+    const rewritten = (act) => page.evaluate((a) => new Promise((resolve) => {
+      let n = 0;
+      const mo = new MutationObserver((m) => { n += m.length; });
+      mo.observe(document.getElementById('family'), { childList: true, subtree: true, characterData: true });
+      if (a === 'rubber') [...document.querySelectorAll('#gallery .tile')].find((t) => t.__tile.m.id === 'rubber').click();
+      else document.querySelector(a).click();
+      setTimeout(() => { mo.disconnect(); resolve(n); }, 120);
+    }), act);
+    assert.equal(await rewritten('rubber'), 0, 'nothing for a screen reader to read out again');
+    assert.equal(await page.evaluate(() => window.__duck.modelId), 'rubber');
+    const rubber = await look();
+    assert.equal(rubber.length, 2);
+    assert.notDeepEqual(rubber, mallard, 'redrawn in her colours');
+    assert.deepEqual([await page.evaluate(() => window.__duck.submerged), await text(page, '#diveBtn')], [false, '🤫 Dive']);
+    // the stages are the ducklings' own, whoever mama is
+    assert.deepEqual(await page.evaluate(() => window.__duck.babies.map((b) => b.stage)), [0, 3]);
+    assert.ok(await rewritten('#family + .row [data-day="1"]') > 0, 'a day later there is news');
+    await clean(page);
+  });
+
+  await test('site: a visitor who presses everything, again and again, leaves nothing behind', async () => {
+    const page = await sitePage('/?lang=en');
+    await quiet(page);
+    await page.mouse.move(560, 330);
+    const before = await stored(page);
+    const r = await page.evaluate(() => {
+      const e = window.__duck;
+      let seed = 20261113;
+      const rnd = () => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x7fffffff; };
+      const bad = [];
+      for (let i = 0; i < 400; i++) {
+        const buttons = [...document.querySelectorAll('#tricks button, .feat .row button')]
+          .filter((b) => !/Another duck|Sound o/.test(b.textContent) && b.id !== 'beatBtn');
+        buttons[Math.floor(rnd() * buttons.length)].click();
+        e.pointerIdle = 0;
+        try { e.simulate(0.2 + rnd() * 1.2); } catch (err) { bad.push(i + ': ' + err); break; }
+        const ages = e.broodAges.slice(0, e.babies.length);
+        if (ages.some((a) => !(a >= 0 && a < 18))) { bad.push(i + ': ages ' + ages); break; }
+      }
+      // let whatever is still going on finish: up again, following, then a quiet while
+      if (e.submerged) e.surface();
+      e.apply({ follow: true });
+      for (let t = 0; t < 60; t++) { e.pointerIdle = 0; e.simulate(1); }
+      return {
+        bad, queue: e.broodQ.length, fledge: !!e.fledge, eggs: e.babies.filter((b) => b.egg).length,
+        flock: !!e.flock, sky: document.querySelectorAll('[data-cursor-duck-sky]').length,
+        shown: e.babies.map((b) => b.stage).join(), ages: e.broodAges.slice(0, e.babies.length).map((a) => DuckModels.stageOf(a)).join(),
+        hidden: e.babies.filter((b) => b.vanish).length + (e.duck.vanish ? 1 : 0), submerged: e.submerged,
+        kids: document.querySelectorAll('#family .kid').length, babies: e.babies.length,
+        streak: document.getElementById('streak').textContent
+      };
+    });
+    assert.deepEqual(r.bad, []);
+    assert.deepEqual([r.queue, r.fledge, r.eggs, r.flock, r.sky, r.hidden, r.submerged], [0, false, 0, false, 0, 0, false], JSON.stringify(r));
+    assert.equal(r.shown, r.ages, 'every duckling looks her age: ' + JSON.stringify(r));
+    assert.equal(r.kids, r.babies);
+    assert.match(r.streak, /^🔥 \d+ days? in a row Best: \d+ · \d+ days together$/);
+    assert.equal(await sideways(page), 0);
+    assert.equal(await stored(page), before, 'and nothing was stored');
+    await clean(page);
+  });
+
+  await test('site: privacy, legal notice and the 404 page keep their duck, without the cards', async () => {
+    for (const pathname of ['/privacy.html', '/imprint.html', '/404.html']) {
+      const page = await sitePage(pathname);
+      assert.deepEqual(await page.evaluate(() => window.__duck.babies.map((b) => b.stage)), [0, 3], pathname);
+      assert.equal(await page.evaluate(() => document.querySelectorAll('#tricks button, [data-day]').length), 0, pathname);
+      await page.evaluate(() => window.__duck.trigger('birds'));
+      await until(() => page.evaluate(() => document.querySelectorAll('[data-cursor-duck-sky]').length === 1), 'the birds on ' + pathname, 2000);
+      assert.equal(await sideways(page), 0, pathname);
+      await clean(page);
+      await close(page);
+    }
+  });
+
+  await test('site: on a phone nothing sticks out sideways and every new button is within reach', async () => {
+    const page = await sitePage('/?lang=en', { viewport: FIREFOX ? { width: 390, height: 844 } : { width: 390, height: 844, isMobile: true, hasTouch: true } });
+    await quiet(page);
+    assert.equal(await sideways(page), 0);
+    await press(page, '#moreTricks');
+    await press(page, '#hatBtn');
+    await press(page, '#glassesBtn');
+    await press(page, '[data-day="2"]');
+    await press(page, '#birdsBtn');
+    await until(() => page.evaluate(() => document.querySelectorAll('[data-cursor-duck-sky]').length === 1), 'the birds', 2000);
+    assert.equal(await sideways(page), 0, 'with everything open');
+    const out = await page.evaluate(() => [...document.querySelectorAll('#tricks button, .feat .row > *, #family .kid, #streak')]
+      .filter((e) => { const r = e.getBoundingClientRect(); return r.width > 0 && (r.left < 0 || r.right > innerWidth); })
+      .map((e) => e.textContent.trim().slice(0, 24)));
+    assert.deepEqual(out, []);
+    // the birds fit the narrow sky
+    const sky = await page.evaluate(() => { const r = document.querySelector('[data-cursor-duck-sky]').getBoundingClientRect(); return [Math.round(r.width), Math.round(r.height)]; });
+    assert.ok(sky[0] <= 220 && sky[1] <= 150, 'a small layer: ' + sky);
+    await clean(page);
+  });
+
+  await test('site: touch: the hint talks about tapping, a tap presses the buttons, a long press drags her', async () => {
+    const page = await sitePage('/?lang=en', { viewport: { width: 390, height: 844, isMobile: true, hasTouch: true } });
+    await quiet(page);
+    assert.match(await text(page, '[data-i18n="heroHint"]'), /Tap anywhere/);
+    // a tap on a card button, at its place on the page
+    await page.evaluate(() => document.getElementById('diveBtn').scrollIntoView({ block: 'center', behavior: 'instant' }));
+    await sleep(300);
+    const at = await page.evaluate(() => { const r = document.getElementById('diveBtn').getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; });
+    await page.touchscreen.tap(at.x, at.y);
+    await until(() => page.evaluate(() => window.__duck.submerged), 'a tap on Dive', 1500);
+    await page.touchscreen.tap(at.x, at.y);
+    await until(() => page.evaluate(() => !window.__duck.submerged && window.__duck.duck.grabbable()), 'a tap brings her back', 4000);
+    // she came to the finger; hold her and pull
+    const free = await page.evaluate(() => {
+      for (let y = 120; y < innerHeight - 80; y += 16) for (let x = 60; x < innerWidth - 60; x += 16) {
+        const el = document.elementFromPoint(x, y);
+        if (el && !el.closest('a,button,textarea,input,summary')) return { x, y };
+      }
+      return null;
+    });
+    await page.touchscreen.tap(free.x, free.y);
+    const s = await until(() => page.evaluate(() => {
+      const d = window.__duck.duck;
+      return (d.state === 'idle' || d.state === 'look' || d.state === 'bob') && Math.hypot(d.vx || 0, d.vy || 0) < 25 ? { x: d.x, y: d.y, r: d.radius() } : null;
+    }), 'her to settle by the finger', 9000);
+    const y0 = await page.evaluate(() => scrollY);
+    await page.touchscreen.touchStart(s.x, s.y - s.r * 0.75);
+    await sleep(650);
+    assert.equal(await page.evaluate(() => window.__duck.duck.state), 'dragged', 'a long press picks her up');
+    await page.touchscreen.touchMove(s.x + 40, s.y - 90);
+    await page.touchscreen.touchMove(s.x + 70, s.y - 150);
+    await sleep(150);
+    const moved = await page.evaluate(() => ({ y: window.__duck.duck.y, scroll: scrollY }));
+    assert.ok(moved.y < s.y - 60, 'she comes along: ' + JSON.stringify(moved));
+    assert.equal(moved.scroll, y0, 'the page stays put');
+    await page.touchscreen.touchEnd();
+    await until(() => page.evaluate(() => window.__duck.duck.state === 'dragback'), 'the way back', 1500);
+    await clean(page);
+  }, { chromeOnly: true, why: 'touch input is only emulated in Chromium here' });
+
+  await test('site: with reduced motion asked for, the buttons still answer, calmly', async () => {
+    const page = await sitePage('/?lang=en', { calm: true });
+    await quiet(page);
+    await page.mouse.move(560, 330);
+    assert.equal(await page.evaluate(() => window.__duck.cfg.reduceMotion), true, 'the page told her');
+    await sleep(600);
+    await press(page, '#birdsBtn');
+    await until(() => page.evaluate(() => !!window.__duck.flock), 'the birds, asked for', 2000);
+    await page.evaluate(() => window.__duck.dropFlock());
+    await press(page, '[data-day="1"]');
+    await until(() => page.evaluate(() => window.__duck.babies[0].stage === 1), 'the fluffball as a duckling', 10000);
+    assert.equal(await page.evaluate(() => window.__duck.babies[0].hopY || 0), 0, 'without the hop');
+    await press(page, '#diveBtn');
+    assert.equal(await page.evaluate(() => window.__duck.submerged), true);
+    await clean(page);
+  }, { chromeOnly: true, why: 'the reduced-motion media query is only emulated in Chromium here' });
 
   console.log('Soak');
 
@@ -2122,7 +2552,7 @@ function firefoxPath() {
 (async () => {
   const pkg = testPackage();
   const srv = await serve();
-  const siteSrv = await serve(path.join(ROOT, '_site'));
+  const siteSrv = await serve(path.join(ROOT, '_site'), siteHeaders());
   base = `http://127.0.0.1:${srv.address().port}`;
   siteBase = `http://localhost:${siteSrv.address().port}`;
   try {

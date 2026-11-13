@@ -275,6 +275,23 @@ a { color: var(--accent-deep); }
   font-style: italic; cursor: text; color: var(--ink);
 }
 .feat .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 14px; }
+.feat .hint { font-size: 14px; margin: 0; }
+.feat p.hint { margin-top: 10px; }
+/* the ducklings on this page at their stages, and the pretend day counter */
+.family { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+.family:empty, .streak:empty { display: none; }
+.kid { flex: 0 0 104px; padding: 6px 4px 8px; border-radius: 12px; background: var(--bg); text-align: center; }
+.kid canvas { display: block; margin: 0 auto; }
+.kid b { display: block; font-size: 12.5px; line-height: 1.25; color: var(--ink); }
+.kid span { display: block; font-size: 12px; color: var(--muted); }
+.family .gone { flex: 1 0 100%; margin: 2px 0 0; font-size: 14px; }
+.streak {
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px;
+  margin: 14px 0 0; padding: 10px 14px; border-radius: 12px; background: var(--bg);
+}
+.feat .streak b { font: 600 26px/1.1 var(--font-display); color: var(--ink); }
+.feat .streak span { font-weight: 800; color: var(--ink); }
+.feat .streak small { flex: 1 0 100%; font-size: 13px; color: var(--muted); }
 
 /* stats strip */
 .stats { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; }
