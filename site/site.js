@@ -40,6 +40,7 @@
     trick_debug: 'Debug',
     trick_gift: 'Gift',
     trick_leaf: 'Leaf',
+    trick_birds: 'Birds',
     another: 'Another duck',
     soundOn: 'Sound on',
     soundOff: 'Sound off',
@@ -228,6 +229,10 @@
       var names = DATA.gifts && DATA.gifts[lang];
       return (names && names[id]) || '';
     };
+    engine.stageName = function (id) {
+      var names = DATA.stages && DATA.stages[lang];
+      return (names && names[id]) || '';
+    };
     try {
       var q = window.matchMedia('(prefers-reduced-motion: reduce)');
       var onChange = function () { engine.apply({ reduceMotion: !!q.matches }); };
@@ -253,7 +258,7 @@
   var TRICKS = [
     ['quack', '📣'], ['flap', '🪶'], ['crumbs', '🍞'], ['fish', '🐟'],
     ['visitor', '💕'], ['waddle', '🚶'], ['disco', '🪩'], ['debug', '🐤'],
-    ['gift', '🎁'], ['leaf', '🍂']
+    ['gift', '🎁'], ['leaf', '🍂'], ['birds', '🕊️']
   ];
   function renderTricks() {
     var box = $('#tricks');

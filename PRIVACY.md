@@ -2,7 +2,7 @@
 
 # Privacy Policy — Cursor Duck
 
-*Last updated: 4 November 2026*
+*Last updated: 13 November 2026*
 
 **English** · [Deutsch ↓](#deutsch)
 
@@ -38,8 +38,10 @@ Only your settings and harmless play counters, locally in your browser profile
   opacity, effect and sound settings,
 - the list of sites on which you have paused the duck,
 - the duck's name, if you gave her one,
-- counters such as pettings or caught fish, plus the date of your last visit for
-  the daily-streak badge,
+- counters such as pettings or caught fish,
+- the days you have spent with the duck: the date and time the last one was
+  counted, how many in a row, your record and the total,
+- how old each duckling is, counted in those days, and how many have grown up,
 - the little gifts the duck brought you: which ones, how many, and the date of
   the last one.
 
@@ -78,7 +80,7 @@ noted in the store listing.
 
 # Datenschutzerklärung — Cursor Duck
 
-*Stand: 4. November 2026*
+*Stand: 13. November 2026*
 
 [↑ English](#english) · **Deutsch**
 
@@ -115,8 +117,11 @@ Browserprofil (`storage.sync` / `storage.local`):
   Sichtbarkeit, Effekt- und Ton-Einstellungen,
 - die Liste der Seiten, auf denen Sie die Ente pausiert haben,
 - der Name der Ente, falls Sie ihr einen gegeben haben,
-- Zähler wie Streicheleinheiten oder gefangene Fische sowie das Datum des letzten
-  Besuchs für das Abzeichen „Stammgast“,
+- Zähler wie Streicheleinheiten oder gefangene Fische,
+- die Tage, die Sie mit der Ente verbracht haben: Datum und Uhrzeit, zu der der
+  letzte gezählt wurde, wie viele in Folge, Ihr Rekord und die Summe,
+- wie alt jedes Küken ist, gezählt in diesen Tagen, und wie viele schon
+  ausgewachsen sind,
 - die kleinen Geschenke, die die Ente Ihnen gebracht hat: welche, wie viele und
   das Datum des letzten.
 

@@ -1,5 +1,28 @@
 [
   {
+    "version": "1.10.0",
+    "date": "2026-11-13",
+    "github": true,
+    "title": {
+      "en": "Migrating birds, growing ducklings & days together",
+      "de": "Vogelzug, wachsende Küken & gemeinsame Tage"
+    },
+    "items": {
+      "en": [
+        "🕊️ Autumn migration: From September to November a small V of birds crosses the top of the page now and then. She looks up and calls after them, and the ducklings look up with her. It is rare, and it doesn't happen at all under “reduce motion” or with the water effects switched off.",
+        "🐣 Ducklings that grow up: The ducklings grow with the days you spend together: fluffball, duckling, half-grown, nearly fledged. After 18 days one of them is grown up and flies off into the world, and a new fluffball hatches from an egg in her place. The popup shows how far each of them is.",
+        "🔥 Days together: The popup now counts how many days in a row you have spent with the ducks, with your record and the total beside it. A day counts as soon as you meet her on a page. A missed day ends the run, never the record.",
+        "🏆 Achievements: 4 new badges, 76 in total: for a week in a row, for 100 days together, for the first duckling that leaves home and for calling after the birds."
+      ],
+      "de": [
+        "🕊️ Vogelzug im Herbst: Von September bis November zieht ab und zu ein kleines V aus Vögeln oben über die Seite. Sie schaut hoch und quakt ihnen nach, und die Küken gucken mit. Das kommt selten vor, und gar nicht bei „Bewegung reduzieren“ oder ausgeschalteten Wasser-Effekten.",
+        "🐣 Küken, die heranwachsen: Die Küken wachsen mit den Tagen, die ihr zusammen verbringt: Flaumküken, Küken, halbstark, fast flügge. Nach 18 Tagen ist eines ausgewachsen und zieht in die Welt, und an seiner Stelle schlüpft ein neues Flaumküken aus dem Ei. Im Popup siehst du, wie weit jedes ist.",
+        "🔥 Tage zusammen: Das Popup zählt jetzt, wie viele Tage in Folge du mit den Enten verbracht hast, daneben stehen dein Rekord und die Summe. Ein Tag zählt, sobald ihr euch auf einer Seite begegnet. Ein verpasster Tag beendet die Serie, nie den Rekord.",
+        "🏆 Erfolge: 4 neue Abzeichen, 76 insgesamt: für eine Woche in Folge, für 100 gemeinsame Tage, für das erste Küken, das auszieht, und fürs Nachquaken beim Vogelzug."
+      ]
+    }
+  },
+  {
     "version": "1.9.0",
     "date": "2026-11-04",
     "github": true,

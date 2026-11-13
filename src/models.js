@@ -524,8 +524,173 @@
     return d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate();
   }
 
-  // Autumn leaves drift by from September through November.
-  var LEAF_SEASON = { season: { months: [9, 10, 11] } };
+  // ── Days together ─────────────────────────────────────────────
+  // One calendar for the day counter, the ducklings' growth and the daily
+  // gift: local calendar days in dayKey() form. The distance between two days
+  // comes from the calendar alone, never from elapsed hours, so the 23- and
+  // 25-hour days around a clock change still count as one day each.
+  function dayNum(key) {
+    var p = String(key || '').split('-');
+    if (p.length !== 3) return NaN;
+    var y = +p[0], m = +p[1], d = +p[2];
+    if (!(y >= 1970 && m >= 1 && m <= 12 && d >= 1 && d <= 31)) return NaN;
+    return Math.round(Date.UTC(y, m - 1, d) / 86400000);
+  }
+
+  function daysBetween(from, to) {
+    return dayNum(to) - dayNum(from);
+  }
+
+  // Is `today` a day after `last`? A date up to two days back is a trip
+  // across time zones and must not count a day twice; further back the clock
+  // was wrong, and today starts afresh. Nothing stored yet: a new day.
+  function isNewDay(last, today) {
+    if (dayNum(today) !== dayNum(today)) return false;   // not a date: nobody's new day
+    var d = daysBetween(last, today);
+    return !(d >= -2 && d <= 0);
+  }
+
+  function count(v) {
+    return typeof v === 'number' && v >= 0 && v < 1e7 ? Math.floor(v) : 0;
+  }
+
+  // { last, at, streak, best, total }: the last day together and the moment it
+  // was counted, days in a row up to it, the longest run so far and all days
+  // together. Anything broken in storage reads as zero instead of NaN.
+  function normDays(days) {
+    var o = days || {}, streak = count(o.streak);
+    return {
+      v: 1,
+      last: typeof o.last === 'string' ? o.last : '',
+      at: typeof o.at === 'number' && o.at > 0 && o.at < 1e14 ? o.at : 0,
+      streak: streak,
+      best: Math.max(count(o.best), streak),
+      total: Math.max(count(o.total), streak)
+    };
+  }
+
+  // Calendar days from the last day together to `today`. A long flight east
+  // can skip a date nobody lived through, so the last meeting also counts as
+  // the day it was in today's time zone.
+  function daysSince(o, today) {
+    var d = daysBetween(o.last, today);
+    if (d > 1 && o.at) {
+      var seen = daysBetween(dayKey(new Date(o.at)), today);
+      if (seen >= 1 && seen < d) d = seen;
+    }
+    return d;
+  }
+
+  // Up to 1.9.0 the streak lived in the play counters (streakDays /
+  // streakLast) and counted every page load. The first record starts there;
+  // gifts came one per day, so they are days together as well.
+  function legacyDays(stats, gifts) {
+    var s = stats || {}, streak = count(s.streakDays);
+    return normDays({
+      last: s.streakLast, streak: streak, best: streak,
+      total: Math.max(streak, count(gifts && gifts.total))
+    });
+  }
+
+  function daysOf(days, stats, gifts) {
+    return days ? normDays(days) : legacyDays(stats, gifts);
+  }
+
+  // One more day together, or null when `today` is counted already (see
+  // isNewDay). `at` is the moment of the visit. A gap ends the streak, never
+  // the record or the total. `force` adds a day without moving the date (the
+  // popup's test switch), so the real next day still counts.
+  function countDay(days, today, at, force) {
+    var o = normDays(days);
+    if (dayNum(today) !== dayNum(today)) return null;   // not a date
+    var d = daysSince(o, today);
+    if (!force && d >= -2 && d <= 0) return null;
+    o.streak = force || d === 1 ? o.streak + 1 : 1;
+    o.best = Math.max(o.best, o.streak);
+    o.total += 1;
+    if (!force) {
+      o.last = today;
+      o.at = typeof at === 'number' && at > 0 && at < 1e14 ? at : 0;
+    }
+    return o;
+  }
+
+  // Where the streak stands on `today`: { streak, today }. Yesterday's run
+  // can still grow today; a whole missed day has ended it. `today` says
+  // whether this day is counted already.
+  function streakNow(days, today) {
+    var o = normDays(days), d = daysSince(o, today);
+    return { streak: d >= -2 && d <= 1 ? o.streak : 0, today: d >= -2 && d <= 0 };
+  }
+
+  // The counters behind the day badges. The record, not the running streak:
+  // a badge once earned doesn't go away with a missed day.
+  function dayStats(days) {
+    var o = normDays(days);
+    return { streakDays: o.best, daysTotal: o.total };
+  }
+
+  // ── Ducklings that grow up ────────────────────────────────────
+  // Every duckling slot has an age in days together, and her look follows
+  // her stage: `grow` is how far render.js takes her from fluffball to
+  // mama's looks, `size` her radius against mama's. At GROWN_AT she is grown
+  // up: she flies off into the world and a new one hatches in her place.
+  // `name` is the German fallback; the popup and the label over her head use
+  // the localized `stage_<id>` strings.
+  var BROOD_STAGES = [
+    { id: 'fluff', from: 0,  grow: 0,    size: 0.55, emoji: '🐣', name: 'Flaumküken' },
+    { id: 'chick', from: 3,  grow: 0.3,  size: 0.62, emoji: '🐥', name: 'Küken' },
+    { id: 'half',  from: 7,  grow: 0.6,  size: 0.7,  emoji: '🐤', name: 'Halbstark' },
+    { id: 'teen',  from: 12, grow: 0.85, size: 0.8,  emoji: '🪶', name: 'Fast flügge' }
+  ];
+  var GROWN = { id: 'grown', emoji: '🦆', name: 'Ausgewachsen' };
+  var GROWN_AT = 18;
+  var BROOD_MAX = 8;
+  // A family that started on the same day would grow up in lockstep, so the
+  // slots start at different ages, the one right behind her the youngest.
+  var BROOD_START = [0, 5, 10, 15, 3, 8, 13, 1];
+
+  function stageOf(age) {
+    var s = 0;
+    for (var i = 1; i < BROOD_STAGES.length; i++) if (age >= BROOD_STAGES[i].from) s = i;
+    return s;
+  }
+
+  // { ages: [days together per slot], fledged }. Missing or broken slots get
+  // their starting age, so a brood from before 1.10.0 (none stored) or a
+  // damaged one never shows up as NaN.
+  function normBrood(brood) {
+    var ages = brood && brood.ages && typeof brood.ages.length === 'number' ? brood.ages : [];
+    var out = { v: 1, ages: [], fledged: count(brood && brood.fledged) };
+    for (var i = 0; i < BROOD_MAX; i++) {
+      var a = ages[i];
+      out.ages.push(typeof a === 'number' && a >= 0 && a < 1e7 ? Math.min(Math.floor(a), GROWN_AT - 1) : BROOD_START[i]);
+    }
+    return out;
+  }
+
+  // One more day together for the ducklings that are out, the first `n`
+  // slots. Returns the new state and the news, slot by slot: a new stage, or
+  // grown up and gone (the slot starts over with a hatchling).
+  function growBrood(brood, n) {
+    var o = normBrood(brood), news = [];
+    var out = Math.max(0, Math.min(BROOD_MAX, n | 0));
+    for (var i = 0; i < out; i++) {
+      var before = stageOf(o.ages[i]);
+      o.ages[i] += 1;
+      if (o.ages[i] >= GROWN_AT) {
+        o.ages[i] = 0;
+        o.fledged += 1;
+        news.push({ slot: i, kind: 'fledge' });
+      } else if (stageOf(o.ages[i]) !== before) {
+        news.push({ slot: i, kind: 'grow', stage: stageOf(o.ages[i]) });
+      }
+    }
+    return { brood: o, news: news };
+  }
+
+  // Autumn: leaves drift by and birds fly south from September through November.
+  var AUTUMN = { season: { months: [9, 10, 11] } };
 
   var BY_ID = {};
   for (var i = 0; i < MODELS.length; i++) BY_ID[MODELS[i].id] = MODELS[i];
@@ -581,6 +746,11 @@
     isAvailable: isAvailable, easterSunday: easterSunday, BASE: BASE,
     wardrobe: WARDROBE,
     gifts: GIFTS, giftById: GIFT_BY_ID, rollGift: rollGift, giftStats: giftStats, dayKey: dayKey,
-    leavesInSeason: function (when) { return isAvailable(LEAF_SEASON, when); }
+    dayNum: dayNum, daysBetween: daysBetween, isNewDay: isNewDay, countDay: countDay,
+    daysOf: daysOf, streakNow: streakNow, dayStats: dayStats,
+    broodStages: BROOD_STAGES, grown: GROWN, grownAt: GROWN_AT,
+    stageOf: stageOf, normBrood: normBrood, growBrood: growBrood,
+    leavesInSeason: function (when) { return isAvailable(AUTUMN, when); },
+    birdsInSeason: function (when) { return isAvailable(AUTUMN, when); }
   };
 })(typeof window !== 'undefined' ? window : this);

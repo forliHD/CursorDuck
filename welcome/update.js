@@ -32,24 +32,36 @@
     engine.mount(document.body);
     engine.start();
     window.__duck = engine;
-    engine.giftName = function (id) { return MSG('gift_' + id); };
-    // A quick hello, then today's new trick: she fetches something (preview only,
-    // nothing lands in the collection from this page)
+    engine.stageName = function (id) { return MSG('stage_' + id); };
+    // A family for this page only, a day or two short of the next stage each:
+    // the button lets them grow the way a day together does, and the second
+    // press sees the eldest off. Nothing here is stored or counted.
+    var brood = { ages: [16, 11, 6, 2, 16, 11, 6, 2] };
+    engine.setBrood(brood.ages);
+    var dayBtn = document.getElementById('dayBtn');
+    if (dayBtn) {
+      dayBtn.onclick = function () {
+        var grown = DuckModels.growBrood(brood, engine.babies.length);
+        brood = grown.brood;
+        engine.setBrood(brood.ages, grown.news);
+      };
+    }
+    var birdsBtn = document.getElementById('birdsBtn');
+    if (birdsBtn) birdsBtn.onclick = function () { engine.trigger('birds'); };
+    // A quick hello, then this update's sight: the birds come over
     setTimeout(function () { engine.trigger('quack'); }, 1800);
-    setTimeout(function () { engine.trigger('gift'); }, 3800);
-    var giftBtn = document.getElementById('giftBtn');
-    if (giftBtn) giftBtn.onclick = function () { engine.trigger('gift'); };
-    var leafBtn = document.getElementById('leafBtn');
-    if (leafBtn) leafBtn.onclick = function () { engine.trigger('leaf'); };
+    setTimeout(function () { engine.trigger('birds'); }, 3800);
   }
 
-  // The user's own duck in the user's own settings, only read, never written here
+  // The user's own duck in the user's own settings, only read, never written
+  // here. A few ducklings come along, so there is something to grow.
   if (isExt) {
     chrome.storage.sync.get(window.CursorDuckDefaults, function (loaded) {
       loaded.follow = true;
+      loaded.ducklings = Math.max(3, loaded.ducklings | 0);
       start(loaded);
     });
   } else {
-    start({ size: 1.1, sound: false });
+    start({ size: 1.1, sound: false, ducklings: 3 });
   }
 })();

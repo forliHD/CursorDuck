@@ -82,34 +82,64 @@ chrome.runtime.onInstalled.addListener(async (details) => {
   }
 });
 
-// One gift per calendar day, however many tabs ask at once. Claims run one
+// The first real visit of a day, however many tabs ask at once: the day
+// counter, the ducklings' growth and the gift share this queue and the
+// calendar day the tab reports (DuckModels.countDay / isNewDay). Claims run one
 // after the other, so two tabs restored together can't both find yesterday's
 // date. Callback-style storage on purpose: chrome.* in Firefox's MV2 background
 // has no promises. Local only, like the counters.
-let giftQueue = Promise.resolve();
+let dayQueue = Promise.resolve();
 
-function claimGift(day) {
-  const run = giftQueue.then(() => new Promise((resolve) => {
-    chrome.storage.local.get({ gifts: { last: '', total: 0, counts: {} } }, (o) => {
-      const gifts = o.gifts;
-      gifts.counts = gifts.counts || {};
-      if (gifts.last === day) { resolve({ gift: null }); return; }
-      const id = DuckModels.rollGift(Math.random, gifts.counts);
-      const isNew = !gifts.counts[id];
-      gifts.counts[id] = (gifts.counts[id] || 0) + 1;
-      gifts.total = (gifts.total || 0) + 1;
-      gifts.last = day;
-      gifts.lastKind = id;
-      chrome.storage.local.set({ gifts }, () => resolve({ gift: id, isNew }));
+function claimDay(day, at, force) {
+  const run = dayQueue.then(() => new Promise((resolve) => {
+    const out = { gift: null, news: [] };
+    // not a date: nothing to count (and a read that failed must not hold up the queue)
+    if (DuckModels.dayNum(day) !== DuckModels.dayNum(day)) { resolve(out); return; }
+    chrome.storage.sync.get({ ducklings: 0 }, (cfg) => {
+      const stored = { gifts: { last: '', total: 0, counts: {} }, days: null, brood: null, stats: null };
+      chrome.storage.local.get(stored, (o) => {
+        if (chrome.runtime.lastError || !cfg || !o) { resolve(out); return; }
+        const patch = {};
+        // 1.9.0 kept the streak in the play counters and had no brood yet:
+        // the first claim after the update writes both records
+        const days = DuckModels.daysOf(o.days, o.stats, o.gifts);
+        const brood = DuckModels.normBrood(o.brood);
+        if (!o.days) patch.days = days;
+        if (!o.brood) patch.brood = brood;
+        // a new day together: the counter goes up and the ducklings that are out grow
+        const next = DuckModels.countDay(days, day, at, force);
+        if (next) {
+          const grown = DuckModels.growBrood(brood, cfg.ducklings);
+          patch.days = next;
+          patch.brood = grown.brood;
+          out.news = grown.news;
+          out.ages = grown.brood.ages;
+        }
+        const gifts = o.gifts || stored.gifts;
+        gifts.counts = gifts.counts || {};
+        if (!force && DuckModels.isNewDay(gifts.last, day)) {
+          const id = DuckModels.rollGift(Math.random, gifts.counts);
+          out.isNew = !gifts.counts[id];
+          out.gift = id;
+          gifts.counts[id] = (gifts.counts[id] || 0) + 1;
+          gifts.total = (gifts.total || 0) + 1;
+          gifts.last = day;
+          gifts.lastKind = id;
+          patch.gifts = gifts;
+        }
+        if (!Object.keys(patch).length) { resolve(out); return; }
+        chrome.storage.local.set(patch, () => resolve(out));
+      });
     });
   }));
-  giftQueue = run.catch(() => {});
+  dayQueue = run.catch(() => {});
   return run;
 }
 
 chrome.runtime.onMessage.addListener((msg, sender, respond) => {
-  if (!msg || msg.type !== 'duck:gift') return undefined;
-  claimGift(String(msg.day)).then(respond, () => respond({ gift: null }));
+  if (!msg || msg.type !== 'duck:day') return undefined;
+  claimDay(String(msg.day), Number(msg.at) || 0, msg.force === true)
+    .then(respond, () => respond({ gift: null, news: [] }));
   return true;   // answers asynchronously
 });
 

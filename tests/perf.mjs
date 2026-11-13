@@ -15,9 +15,10 @@ const ROOT = path.dirname(HERE);
 const SECONDS = Number(process.argv[2] || 15);
 const ROUNDS = Number(process.argv[3] || 2);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+// The release before, then the one being built. Scenes only the new one has are marked `fresh`.
 const VERSIONS = [
-  { label: '1.8.1', zip: 'dist/cursor-duck-chrome-1.8.1.zip' },
-  { label: '1.9.0', zip: 'dist/cursor-duck-chrome-1.9.0.zip' }
+  { label: '1.9.0', zip: 'dist/cursor-duck-chrome-1.9.0.zip' },
+  { label: '1.10.0', zip: 'dist/cursor-duck-chrome-1.10.0.zip', fresh: true }
 ];
 
 function unpack(zip) {
@@ -88,7 +89,8 @@ async function runVersion(v, srv) {
     await sleep(800);
     await duck(page, 'storageSet', 'sync', CALM);
     const day = await page.evaluate(() => { const d = new Date(); return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`; });
-    await duck(page, 'storageSet', 'local', { gifts: { last: day, total: 0, counts: {} } });
+    // today is settled: no gift, no day to count, nobody grows while the meter runs
+    await duck(page, 'storageSet', 'local', { gifts: { last: day, total: 0, counts: {} }, days: { last: day, streak: 1, best: 1, total: 1 } });
     await duck(page, 'setEngine', 'leafCd', 1e9);
     // beside her: a cursor resting on her starts peekaboo at full frame rate
     await page.mouse.move(700, 450);
@@ -109,23 +111,49 @@ async function runVersion(v, srv) {
         await sleep(16);
       }
     });
-    if (v.label !== '1.8.1') {
+    await page.mouse.move(700, 450);
+    await duck(page, 'place', 620, 470);
+    await sleep(3500);
+    const s = await duck(page, 'state');
+    // a leaf out the whole time at its usual distance, on the side away from her path
+    await duck(page, 'spawnLeafAt', -s.r * 4.5, 0);
+    await duck(page, 'setEngine', 'leafCd', 1e9);
+    await page.evaluate(() => {});
+    out.leaf = await measure(page, cdp);
+    await duck(page, 'setEngine', 'leaf', null);
+    // three ducklings resting behind her: fluffballs before, since 1.10.0 at their ages
+    await duck(page, 'storageSet', 'sync', { ducklings: 3 });
+    await page.mouse.move(700, 450);
+    await duck(page, 'place', 620, 470);
+    await sleep(4500);
+    out.family = await measure(page, cdp);
+    await duck(page, 'storageSet', 'sync', { ducklings: 0 });
+    await sleep(600);
+    if (v.fresh) {
+      // birds in the air the whole time, one flock after the other: far more than a page ever sees
       await page.mouse.move(700, 450);
       await duck(page, 'place', 620, 470);
-      await sleep(3500);
-      const s = await duck(page, 'state');
-      // a leaf out the whole time at its usual distance, on the side away from her path
-      await duck(page, 'spawnLeafAt', -s.r * 4.5, 0);
-      await duck(page, 'setEngine', 'leafCd', 1e9);
-      await page.evaluate(() => {});
-      out.leaf = await measure(page, cdp);
-      await duck(page, 'setEngine', 'leaf', null);
-      await page.keyboard.press('Escape');
-      await sleep(3500);
-      const hidden = await duck(page, 'state');
-      out.hidden = await measure(page, cdp);
-      out.hidden.note = hidden.parked ? 'parked' : 'NOT parked';
+      await sleep(3000);
+      let flocks = 0;
+      out.birds = await measure(page, cdp, async () => {
+        const end = Date.now() + SECONDS * 1000;
+        while (Date.now() < end) {
+          const now = await duck(page, 'state');
+          if (!now.flock) { await duck(page, 'trigger', 'birds'); flocks++; }
+          await sleep(250);
+        }
+      });
+      out.birds.note = flocks + ' flocks';
+      await duck(page, 'setEngine', 'flock', null);
+      await sleep(1500);
+      // …and at rest again once they have gone
+      out.after = await measure(page, cdp);
     }
+    await page.keyboard.press('Escape');
+    await sleep(3500);
+    const hidden = await duck(page, 'state');
+    out.hidden = await measure(page, cdp);
+    out.hidden.note = hidden.parked ? 'parked' : 'NOT parked';
   } finally {
     await browser.close().catch(() => {});
     fs.rmSync(pkg, { recursive: true, force: true });

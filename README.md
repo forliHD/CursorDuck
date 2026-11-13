@@ -51,6 +51,9 @@ her tricks.
 | **Dive with Esc** | Press Esc while she's near your cursor → the whole family dives out of sight and the overlay stops drawing altogether. Esc again brings them back. Text fields, open dialogs and fullscreen keep their Esc key; a switch in the popup turns this off. |
 | **A daily gift** | On your first page of the day she dives and comes up with a little present: pebble, shell, snail, feather, acorn, marble, button, cork, clover, starfish, old coin, pearl, message in a bottle or, very rarely, a golden egg. The popup keeps the collection, on your device only. |
 | **Drifting leaves** | From September to November an autumn leaf drifts across the water now and then. She gives it a nudge, or dozes off with it on her head. Not under “reduce motion”. |
+| **Autumn migration** | From September to November a small V of birds crosses the top of the page now and then. She stops, follows them with her beak and calls after them twice; the ducklings look up with her. It is rare on purpose (minutes apart at the least), and it doesn't happen under “reduce motion”, with the water effects off or at the lowest playfulness. The birds fly on a small layer of their own, so her stage stays small. |
+| **Ducklings that grow up** | The ducklings grow with the days you spend together: fluffball, duckling, half-grown, nearly fledged, each stage a little bigger and more like mama. After 18 days one of them is grown up: she says goodbye and flies off into the world, and a new fluffball hatches from an egg in her place in the row. Only the ducklings that are out grow, the popup shows how far each of them is, and a family starts at different ages so they don't all leave on the same day. |
+| **Days together** | The popup counts how many days in a row you have spent with the ducks, with your record and the total beside it. A day counts once, as soon as you meet her on a page (the same moment brings the daily gift and lets the ducklings grow). A missed day ends the run, never the record or the total. Calendar days in your local time: the long and the short day of a clock change each count as one, flying west doesn't count a date twice, and a date skipped by a long flight east doesn't end the run. |
 | **Reading along** | Type into a text field and she watches the field instead of the cursor — and won't doze off while you type. |
 | **Focus mode** | On password fields and fullscreen videos she steps aside; afterwards she reports back with a “!”. |
 | **Selection snack** | Select text near her and she nibbles at the edge of the selection — “nom”. She only sees where the text is, never what it says. |
@@ -83,7 +86,7 @@ cache?” (twelve lines as well).
 
 Rare models are marked in the popup (blue = rare, purple = epic, gold = legendary).
 The 🎲 button picks at random — legendaries are rare. The popup also holds
-**72 achievements in bronze, silver, gold and diamond tiers** — from petting fan through
+**76 achievements in bronze, silver, gold and diamond tiers** — from petting fan through
 “Identity crisis”, “Croesus” and “Legacy system” to “Duck whisperer” and the 30-day “Regular”; clicking an achievement reveals how
 to earn it, and the header counts what you've collected.
 
@@ -96,11 +99,12 @@ cursor pecking, crumb feeding, “Esc near her dives the family”, “new rando
 this site” with an editable list of paused sites (a domain covers its subdomains), and
 a name for your duck (she says it when the petting bar is full) — everything applies
 instantly, without reloading. The model grid has a search box, a soundboard previews
-every sound, and 20 buttons trigger tricks directly (including feeding, fish hunt,
-shore leave, visitors, the disco ball, rubber duck debugging, a preview gift and a leaf).
+every sound, and 21 buttons trigger tricks directly (including feeding, fish hunt,
+shore leave, visitors, the disco ball, rubber duck debugging, a preview gift, a leaf and
+the migrating birds).
 
 She honors your system's “reduce motion” setting: with it enabled, pirouettes, shaking,
-bathing, dancing, the disco ball and the drifting leaves are skipped automatically — the trick buttons in
+bathing, dancing, the disco ball, the drifting leaves and the migrating birds are skipped automatically — the trick buttons in
 the popup still do everything on request.
 
 Keyboard shortcuts: `Alt+Shift+D` (on/off), `Alt+Shift+N` (next model).
@@ -122,10 +126,13 @@ until then she stays polite and mute.)
   opt-in, which would leave the duck invisible). Permissions: only `storage` and
   `activeTab`. No network access, no data collection, no external dependencies.
 - The duck lives in a **canvas inside a Shadow DOM** with `pointer-events: none` at the
-  very top of the stack — clicks, text selection and page CSS remain untouched. The canvas
+  very top of the stack — clicks, text selection and page CSS stay as they are. Only a
+  press directly on her is different: it starts no text selection, and if you drag her,
+  the click that ends the drag is swallowed. The canvas
   is only as big as the scene (a small fixed layer that travels with the duck), so a
   resting duck costs very little; calm scenes repaint at about 30 fps, anything in motion
-  at the display's refresh rate.
+  at the display's refresh rate. The autumn birds get a second small layer of their own
+  for the seconds they are in the air.
 - Inside `<iframe>`s only a tiny listener runs (`src/frame.js`) that reports the cursor
   position to the top window; drawing happens exclusively in the top window (one duck per
   tab, not one per frame).

@@ -154,7 +154,7 @@
   // nicht zwischen Geräten wandern). Ohne gespeicherten Zustand sind nur
   // Modell, Einstellungen und Seiten offen — der Rest wartet hinter dem Pfeil.
   var UI_KEY = 'cursorduck-ui';
-  var DEFAULT_COLLAPSED = { wardrobe: 1, gifts: 1, behaviour: 1, tricks: 1, achievements: 1 };
+  var DEFAULT_COLLAPSED = { wardrobe: 1, gifts: 1, family: 1, behaviour: 1, tricks: 1, achievements: 1 };
   function loadUi() {
     try { return JSON.parse(localStorage.getItem(UI_KEY)) || {}; } catch (e) { return {}; }
   }
@@ -209,7 +209,7 @@
     ['crumbs', 'Füttern', '🍞'], ['fish', 'Fisch-Jagd', '🐟'], ['dizzy', 'Schwindel', '😵'],
     ['dance', 'Tänzchen', '💃'], ['peekaboo', 'Kuckuck', '🫣'], ['waddle', 'Landgang', '🚶'],
     ['visitor', 'Besuch', '💕'], ['disco', 'Disco', '🪩'], ['debug', 'Debuggen', '🐤'],
-    ['gift', 'Geschenk', '🎁'], ['leaf', 'Blatt', '🍂']
+    ['gift', 'Geschenk', '🎁'], ['leaf', 'Blatt', '🍂'], ['birds', 'Vogelzug', '🕊️']
   ];
 
   // [Stat-Schlüssel, Ziel, Emoji, i18n-Key, Name (Fallback), Erklärung (Fallback), Stufe]
@@ -286,7 +286,11 @@
     ['drags', 50, '🚁', 'achDrag2', 'Wiederholungstäter', '50-mal am Schlafittchen gepackt. Sie hat inzwischen einen Anwalt — auch eine Ente.', 'silver'],
     ['hides', 10, '🤫', 'achHide', 'Nichts zu sehen', '10-mal per Esc abgetaucht. Der Chef kam gerade rein, oder?', 'bronze'],
     ['leaves', 5, '🍂', 'achLeaf', 'Herbstgefühl', '5 Herbstblätter angestupst oder darunter gedöst. Saison: September bis November.', 'bronze'],
-    ['streakDays', 30, '🔥', 'achStreak', 'Stammgast', '30 Tage in Folge besucht. Sie hat dir längst einen Stammplatz freigehalten.', 'diamond']
+    ['flocks', 3, '🕊️', 'achFlock', 'Fernweh', '3-mal den Zugvögeln nachgequakt. Saison: September bis November.', 'bronze'],
+    ['fledged', 1, '🎓', 'achFledge', 'Flügge', 'Dein erstes Küken ist ausgewachsen und in die Welt gezogen. Das nächste ist schon geschlüpft.', 'silver'],
+    ['streakDays', 7, '📆', 'achStreak7', 'Wochenkarte', '7 Tage in Folge zusammen. Sie hat dir einen Platz am Ufer reserviert.', 'silver'],
+    ['streakDays', 30, '🔥', 'achStreak', 'Stammgast', '30 Tage in Folge besucht. Sie hat dir längst einen Stammplatz freigehalten.', 'diamond'],
+    ['daysTotal', 100, '💯', 'achDays100', 'Hundert Tage', '100 Tage zusammen, mit oder ohne Pause dazwischen. Sie hat jeden einzelnen mitgezählt.', 'gold']
   ];
 
   // achievement display name by key (localized, German fallback from the list)
@@ -375,6 +379,69 @@
       today.textContent = isToday
         ? (MSG('giftToday') || 'Heute: ') + giftName(last)
         : (MSG('giftNone') || 'Einmal am Tag bringt sie dir etwas mit, sobald ihr euch auf einer Seite begegnet.');
+    }
+  }
+
+  // ── Days together ───────────────────────────────────────────
+  // The streak as it stands today (DuckModels.streakNow): the flame is lit
+  // once today is counted. The record and the total sit beside it.
+  var daysCache = null;
+  function renderDays() {
+    var box = document.getElementById('days');
+    if (!box || !daysCache) return;
+    var now = DuckModels.streakNow(daysCache, DuckModels.dayKey(new Date()));
+    document.getElementById('dayStreak').textContent = now.streak;
+    document.getElementById('dayLabel').textContent = now.streak === 1
+      ? (MSG('daysRowOne') || 'Tag in Folge') : (MSG('daysRowMany') || 'Tage in Folge');
+    box.classList.toggle('cold', !now.today);
+    document.getElementById('daySub').textContent = (MSG('daysBest') || 'Rekord: ') + daysCache.best + ' · ' +
+      daysCache.total + ' ' + (daysCache.total === 1 ? (MSG('daysTotalOne') || 'Tag zusammen') : (MSG('daysTotalMany') || 'Tage zusammen'));
+    document.getElementById('dayHint').textContent = now.today ? ''
+      : (MSG('daysHint') || 'Begegnet euch heute auf einer Seite, dann zählt der Tag.');
+    var info = document.getElementById('dbgInfo');
+    if (info) {
+      info.textContent = 'last ' + (daysCache.last || '–') + ' · streak ' + daysCache.streak + ' · best ' + daysCache.best +
+        ' · total ' + daysCache.total + (broodCache ? ' · ages ' + broodCache.ages.join(',') + ' · fledged ' + broodCache.fledged : '');
+    }
+  }
+
+  // ── Family: the ducklings at the stage they have grown to ───
+  var broodCache = null;
+  function stageName(S) { return MSG('stage_' + S.id) || S.name; }
+  function renderFamily() {
+    var wrap = document.getElementById('brood');
+    if (!wrap || !cfg || !broodCache) return;
+    wrap.textContent = '';
+    var stages = DuckModels.broodStages, base = heroModel();
+    var n = Math.max(0, Math.min(broodCache.ages.length, cfg.ducklings | 0));
+    for (var i = 0; i < n; i++) {
+      var age = broodCache.ages[i], st = DuckModels.stageOf(age), S = stages[st];
+      var left = (st + 1 < stages.length ? stages[st + 1].from : DuckModels.grownAt) - age;
+      var then = st + 1 < stages.length ? stageName(stages[st + 1]) : (MSG('stage_grown') || DuckModels.grown.name);
+      var d = document.createElement('div');
+      d.className = 'k';
+      var c = document.createElement('canvas');
+      var W = 62, H = 46, dpr = Math.min(2, devicePixelRatio || 1);
+      c.width = W * dpr; c.height = H * dpr;
+      var x = c.getContext('2d');
+      x.setTransform(dpr, 0, 0, dpr, 0, 0);
+      DuckRender.draw(x, DuckRender.babyOf(base, S.grow), { x: W / 2, y: H - 9, r: 18 * S.size, t: 1.4, dir: 1, reflection: false });
+      var name = document.createElement('span'); name.className = 'st'; name.textContent = S.emoji + ' ' + stageName(S);
+      var next = document.createElement('span');
+      next.textContent = left === 1 ? (MSG('broodNextOne') || 'noch 1 Tag')
+        : (MSG('broodNextMany') || 'noch {n} Tage').replace('{n}', left);
+      d.title = stageName(S) + ' → ' + then + ': ' + next.textContent;
+      d.appendChild(c); d.appendChild(name); d.appendChild(next);
+      wrap.appendChild(d);
+    }
+    var cnt = document.getElementById('broodCount');
+    if (cnt) cnt.textContent = n ? String(n) : '';
+    var note = document.getElementById('broodNote');
+    if (note) {
+      note.textContent = !n
+        ? (MSG('broodNone') || 'Gerade sind keine Küken unterwegs. Stell bei den Einstellungen welche ein: Sie wachsen mit jedem Tag, den ihr zusammen verbringt.')
+        : (MSG('broodNote') || 'Sie wachsen mit jedem Tag, den ihr zusammen verbringt, bis sie ausgewachsen in die Welt ziehen. Dann schlüpft ein neues.') +
+          (broodCache.fledged ? ' ' + (MSG('broodFledged') || 'Schon ausgeflogen: ') + broodCache.fledged : '');
     }
   }
 
@@ -473,14 +540,16 @@
       headRot: Math.sin(t * 0.9) * 0.12,
       reflection: true
     };
-    // Küken hinterher
+    // Küken hinterher, each at the stage she has grown to
     var n = cfg.ducklings | 0;
     for (var i = n; i >= 1; i--) {
       var bt = t - i * 0.42;
-      var bm = babyCache[m.id] || (babyCache[m.id] = DuckRender.babyOf(m));
+      var st = broodCache ? DuckModels.stageOf(broodCache.ages[i - 1] || 0) : 0;
+      var S = DuckModels.broodStages[st], bk = heroCache.key + '|' + st;
+      var bm = babyCache[bk] || (babyCache[bk] = DuckRender.babyOf(m, S.grow));
       DuckRender.draw(hctx, bm, {
         x: hero.width / 2 + Math.sin(bt * 0.55) * 90,
-        y: 142, r: 27, t: bt,
+        y: 142, r: 49 * S.size, t: bt,
         dir: Math.cos(bt * 0.55) >= 0 ? 1 : -1,
         bob: Math.sin(bt * 2.8) * 2, paddle: bt * 5, reflection: false
       });
@@ -554,6 +623,7 @@
         d.classList.add('on');
         showModel(m);
         renderWardrobe();
+        renderFamily();
       };
       wrap.appendChild(d);
     });
@@ -594,6 +664,7 @@
         var patch = {};
         patch[id] = id === 'sleepAfter' ? Math.round(v) : (id === 'ducklings' ? v | 0 : v);
         save(patch);
+        if (id === 'ducklings') renderFamily();
       };
     });
 
@@ -608,6 +679,7 @@
       save({ model: id });
       showModel(DuckModels.get(id));
       renderWardrobe();
+      renderFamily();
       buildModels(document.getElementById('modelSearch').value);   // keep the search filter
     };
 
@@ -642,6 +714,35 @@
       inp.value = '';
       setHosts(list);
     };
+
+    // Test switch for the day counter and the ducklings: five quick clicks on
+    // the counter show it. "+1 day" counts one more day together without
+    // moving the date; through the page's duck when there is one, so the
+    // ducklings over there get their ceremony.
+    var dbg = document.getElementById('dayDebug'), clicks = [];
+    dbg.hidden = !loadUi().debug;
+    document.getElementById('dayMain').onclick = function () {
+      var now = Date.now();
+      clicks = clicks.filter(function (t) { return now - t < 3000; });
+      clicks.push(now);
+      if (clicks.length < 5) return;
+      clicks = [];
+      dbg.hidden = !dbg.hidden;
+      var u = loadUi();
+      u.debug = dbg.hidden ? 0 : 1;
+      saveUi(u);
+    };
+    document.getElementById('dbgDay').onclick = function () {
+      if (!chrome.runtime.sendMessage) return;
+      var direct = function () {
+        chrome.runtime.sendMessage({ type: 'duck:day', day: DuckModels.dayKey(new Date()), at: Date.now(), force: true },
+          function () { void chrome.runtime.lastError; });
+      };
+      if (!activeTab) { direct(); return; }
+      chrome.tabs.sendMessage(activeTab.id, { type: 'duck:nextday' }, function (res) {
+        if (chrome.runtime.lastError || !res || !res.ok) direct();
+      });
+    };
   }
 
   // ── Start ───────────────────────────────────────────────────
@@ -651,20 +752,37 @@
     buildModels();
     bind();
     renderWardrobe();
+    renderFamily();
   });
 
-  chrome.storage.local.get({ stats: { pets: 0, pecks: 0, fish: 0, crumbs: 0, dances: 0, visits: 0 }, gifts: null }, function (o) {
-    // the gift badges count from the collection, which has its own storage key
-    var fromGifts = DuckModels.giftStats(o.gifts);
-    for (var gk in fromGifts) o.stats[gk] = fromGifts[gk];
-    renderGifts(o.gifts);
-    document.getElementById('pets').textContent = o.stats.pets || 0;
-    document.getElementById('pecks').textContent = o.stats.pecks || 0;
-    document.getElementById('fishN').textContent = o.stats.fish || 0;
-    renderAchievements(o.stats);
-    statsCache = o.stats;
-    renderWardrobe();
-  });
+  // Counters, collection, days and family live in storage.local. Read again
+  // whenever one of them changes: a tab may count the day while the popup is open.
+  function loadLocal() {
+    var keys = { stats: { pets: 0, pecks: 0, fish: 0, crumbs: 0, dances: 0, visits: 0 }, gifts: null, days: null, brood: null };
+    chrome.storage.local.get(keys, function (o) {
+      // 1.9.0 kept the streak in the counters; until the first claim after the update it is read from there
+      daysCache = DuckModels.daysOf(o.days, o.stats, o.gifts);
+      broodCache = DuckModels.normBrood(o.brood);
+      // derived badges: gifts from the collection, days from the days together, fledged from the brood
+      var derived = [DuckModels.giftStats(o.gifts), DuckModels.dayStats(daysCache), { fledged: broodCache.fledged }];
+      derived.forEach(function (from) { for (var k in from) o.stats[k] = from[k]; });
+      renderGifts(o.gifts);
+      renderDays();
+      renderFamily();
+      document.getElementById('pets').textContent = o.stats.pets || 0;
+      document.getElementById('pecks').textContent = o.stats.pecks || 0;
+      document.getElementById('fishN').textContent = o.stats.fish || 0;
+      renderAchievements(o.stats);
+      statsCache = o.stats;
+      renderWardrobe();
+    });
+  }
+  loadLocal();
+  if (chrome.storage.onChanged) {
+    chrome.storage.onChanged.addListener(function (changes, area) {
+      if (area === 'local' && (changes.days || changes.brood || changes.gifts)) loadLocal();
+    });
+  }
 
   chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
     activeTab = tabs && tabs[0];

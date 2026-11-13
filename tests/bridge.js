@@ -25,6 +25,24 @@
   // the scripts' own global: in Firefox `window` is only a view of the page's window
   globalThis.Date = FakeDate;
 
+  // The birds' layer as the page sees it: its box, and how much of its canvas is painted.
+  function skyBox() {
+    var el = document.querySelector('[data-cursor-duck-sky]');
+    if (!el) return null;
+    var r = el.getBoundingClientRect(), cs = getComputedStyle(el);
+    var c = el.shadowRoot ? el.shadowRoot.querySelector('canvas') : null, ink = 0;
+    if (c) {
+      try {
+        var px = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
+        for (var i = 3; i < px.length; i += 4) if (px[i] > 40) ink++;
+      } catch (e) { ink = -1; }
+    }
+    return {
+      x: r.left, y: r.top, w: r.width, h: r.height, ink: ink, layers: document.querySelectorAll('[data-cursor-duck-sky]').length,
+      pointerEvents: cs.pointerEvents, position: cs.position, canvas: c ? { w: c.width, h: c.height } : null
+    };
+  }
+
   function snapshot() {
     var e = window.__cursorDuck;
     if (!e) return null;
@@ -40,7 +58,17 @@
       hostDisplay: e.host.style.getPropertyValue('display'),
       stage: e.stage ? { w: e.stage.w, h: e.stage.h } : null,
       canvas: { w: e.canvas.width, h: e.canvas.height },
-      babies: e.babies.map(function (b) { return { x: b.x, y: b.y, vanish: b.vanish || 0, submerge: b.a.submerge }; }),
+      babies: e.babies.map(function (b) {
+        return { x: b.x, y: b.y, r: b.radius(), vanish: b.vanish || 0, submerge: b.a.submerge, stage: b.stage, egg: b.egg ? b.egg.t : null,
+          gap: b.gap, headRot: b.tgt.headRot, neck: b.model.neckLen, hat: b.model.hat || null };
+      }),
+      // (perf.mjs runs this bridge on the previous release too, which has no brood)
+      brood: e.broodAges ? { ages: e.broodAges.slice(), shown: e.broodShown.slice(), queue: e.broodQ.map(function (n) { return n.slot + ':' + n.kind; }) } : null,
+      fledge: e.fledge ? { x: e.fledge.x, y: e.fledge.y, t: e.fledge.t, rise: e.fledge.rise || 0, alpha: e.fledge.alpha == null ? 1 : e.fledge.alpha } : null,
+      flock: e.flock ? { x: e.flock.x, y: e.flock.y, dir: e.flock.dir, prog: e.flock.prog, n: e.flock.birds.length, half: e.flock.half,
+        back: e.flock.back, front: e.flock.front, called: e.flock.called, watching: e.flock.watching, looks: e.flock.looks || 0 } : null,
+      sky: skyBox(), flockCd: e.flockCd, headRot: d.a.headRot, face: d.face, calls: d.bwCalls || 0, wing: d.a.wingFlap,
+      says: window.__says || null,
       leaf: lf ? { x: lf.x, y: lf.y, z: lf.z, on: lf.on, life: lf.life, vx: lf.vx, spin: lf.spin } : null,
       giftObj: e.giftObj ? { id: e.giftObj.id, x: e.giftObj.x, y: e.giftObj.y } : null,
       giftQ: e.giftQ ? e.giftQ.id : null, leafCd: e.leafCd, frames: window.__frames || 0,
@@ -62,9 +90,27 @@
     setClock: function (iso) { setClock(iso); return new Date().toISOString(); },
     today: function () { return window.DuckModels.dayKey(new Date()); },
     leafNow: function () { window.__cursorDuck.leafCd = 0; return true; },
+    flockNow: function () { window.__cursorDuck.flockCd = 0; return true; },
+    setBrood: function (ages, news) { window.__cursorDuck.setBrood(ages, news); return true; },
+    // what a page would overflow by: the birds enter and leave across the edges
+    overflow: function () {
+      var el = document.scrollingElement || document.documentElement;
+      return { x: el.scrollWidth - el.clientWidth, y: el.scrollHeight - el.clientHeight };
+    },
     spawnLeafAt: function (dx, dy) {
       var e = window.__cursorDuck, lf = e.leaf || e.spawnLeaf();
       lf.x = e.duck.x + dx; lf.y = e.duck.y + dy; lf.z = 0; lf.vx = 0; lf.vy = 0; lf.cd = 0;
+      return true;
+    },
+    // what she says from here on, bubble by bubble
+    countSays: function () {
+      var d = window.__cursorDuck.duck;
+      if (!d.__said) {
+        var orig = d.say;
+        d.say = function (txt, color) { window.__says.push(String(txt) + ' ' + color); return orig.apply(this, arguments); };
+        d.__said = true;
+      }
+      window.__says = [];
       return true;
     },
     countFrames: function () {
@@ -108,7 +154,8 @@
       e._ensureLoop = function () {};
       e.apply({ model: model, ducklings: 3, playfulness: 2.5, peck: true, effects: true, follow: true, reduceMotion: false, escHide: true, sleepAfter: 5 });
       var ACTS = ['quack', 'flap', 'preen', 'dabble', 'dive', 'spin', 'bathe', 'shake', 'sleep', 'crumbs', 'fish', 'dizzy',
-        'dance', 'peekaboo', 'waddle', 'visitor', 'disco', 'debug', 'gift', 'leaf', 'burst', 'hide'];
+        'dance', 'peekaboo', 'waddle', 'visitor', 'disco', 'debug', 'gift', 'leaf', 'burst', 'hide', 'birds'];
+      var brood = null, hatched = 0, flew = 0;
       var seen = {}, bad = [], dt = 1 / 30, steps = Math.round(minutes * 60 / dt), dragLeft = 0, quiet = 0;
       function check(i) {
         d = e.duck;
@@ -118,6 +165,11 @@
         }
         if (e.fx.parts.length > 260) bad.push('particles ' + e.fx.parts.length);
         if (d.vanish && d.state !== 'hide' && d.state !== 'burst') bad.push('invisible in ' + d.state + ' at step ' + i);
+        if (document.querySelectorAll('[data-cursor-duck-sky]').length > 1) bad.push('two bird layers at step ' + i);
+        if (!e.flock !== !e.sky && i % 4 === 0) bad.push('bird layer without birds (or the other way round) at step ' + i);
+        for (k = 0; k < e.babies.length; k++) {
+          if (!(e.babies[k].radius() > 0) || !e.babies[k].model) bad.push('duckling ' + k + ' without a look at step ' + i);
+        }
         if (e.stage && e.stage.w * e.stage.h > Math.ceil(e.w + 1) * Math.ceil(e.h + 1) * 1.01) bad.push('stage ' + e.stage.w + 'x' + e.stage.h);
       }
       for (var i = 0; i < steps && bad.length < 5; i++) {
@@ -148,8 +200,17 @@
           e.apply({ enabled: false }); e.apply({ enabled: true });
         } else if (r < 0.038) {
           e.setMedia(rnd() < 0.5);
+        } else if (r < 0.043) {
+          // a day together, the way the background page reports it
+          var grown = window.DuckModels.growBrood(brood, e.babies.length);
+          brood = grown.brood;
+          e.setBrood(brood.ages, grown.news);
         }
+        for (var bi = 0; bi < e.babies.length; bi++) if (e.babies[bi].egg) hatched++;
+        if (e.fledge) flew++;
         if (dragLeft > 0 && --dragLeft === 0) e.endDrag(rnd() < 0.2);
+        // every trick in turn as well, so no run depends on the draw to get through all of them
+        if (i % 600 === 300) e.trigger(ACTS[((i / 600) | 0) % ACTS.length], 2);
         e.step(dt);
         if (i % 4 === 0) e.render();
         seen[e.duck.state] = (seen[e.duck.state] || 0) + 1;
@@ -163,22 +224,27 @@
       e.setPointer(e.w / 2, e.h / 2);
       e.apply({ follow: true, reduceMotion: false, playfulness: 0, peck: false, sleepAfter: 1e6 });
       // lowest water level of the last 10 s: a cursor resting on her rightly starts
-      // peekaboo, so one moment says little, but a stuck duck never comes up at all
+      // peekaboo, so one moment says little, but a stuck duck never comes up at all.
+      // A minute in all: every duckling may still be waiting for her ceremony.
       var lowest = 1;
-      for (var q = 0; q < 900; q++) {
+      for (var q = 0; q < 1800; q++) {
         e.step(dt);
         if (q % 8 === 0) e.render();
-        if (q >= 600) lowest = Math.min(lowest, e.duck.a.submerge);
+        if (q >= 1500) lowest = Math.min(lowest, e.duck.a.submerge);
       }
       d = e.duck;
       var end = {
         state: d.state, vanish: d.vanish || 0, submerge: lowest, carry: d.carry || null, giftRun: !!d.giftRun,
         babiesHidden: e.babies.filter(function (b) { return b.vanish || b.a.submerge > 0.2; }).length,
-        submerged: e.submerged, drag: !!e.drag, hoard: !!e.hoard, laptop: !!e.laptop, buddy: !!e.buddy, disco: !!e.disco
+        submerged: e.submerged, drag: !!e.drag, hoard: !!e.hoard, laptop: !!e.laptop, buddy: !!e.buddy, disco: !!e.disco,
+        flock: !!e.flock, sky: document.querySelectorAll('[data-cursor-duck-sky]').length, fledge: !!e.fledge,
+        eggs: e.babies.filter(function (b) { return b.egg; }).length, broodQ: e.broodQ.length,
+        shown: e.broodShown.slice(0, e.babies.length).join(','), ages: e.broodAges.slice(0, e.babies.length).join(',')
       };
       delete e._ensureLoop;
       e._wantPark = false;
       e.wake();
+      seen.egg = hatched; seen.fledge = flew;
       return { bad: bad, seen: seen, end: end };
     },
     getURL: function (p) { return chrome.runtime.getURL(p); },
@@ -195,9 +261,10 @@
     storageClear: function (area) {
       return new Promise(function (res) { chrome.storage[area].clear(function () { res(true); }); });
     },
-    claim: function (day) {
+    // straight at the background page: the first visit of `day` (force: the popup's test switch)
+    claim: function (day, at, force) {
       return new Promise(function (res) {
-        chrome.runtime.sendMessage({ type: 'duck:gift', day: day }, function (r) { res(r); });
+        chrome.runtime.sendMessage({ type: 'duck:day', day: day, at: at || 0, force: !!force }, function (r) { res(r); });
       });
     }
   };

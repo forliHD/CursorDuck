@@ -269,6 +269,37 @@ section.collapsed .sec-body { display: none; }
 .gift-desc { margin: 7px 0 0; font-size: 11px; line-height: 1.4; color: var(--muted); min-height: 1.4em; }
 .gift-desc:empty { display: none; }
 
+/* Days together: the counter is always in view, the test switch only after five clicks on it */
+.days { padding: 8px 12px; }
+.days-row { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 0 8px; }
+.days-main { font-size: 12.5px; color: var(--ink); cursor: default; user-select: none; white-space: nowrap; }
+.days-main .ico { font-size: 14px; }
+.days-main b { font-size: 19px; font-variant-numeric: tabular-nums; letter-spacing: -0.3px; }
+.days.cold .days-main .ico { filter: grayscale(1); opacity: .6; }
+.days-sub { margin-left: auto; font-size: 11px; color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.days-hint { margin-top: 2px; font-size: 11px; color: var(--muted); }
+.days-hint:empty { display: none; }
+.days-debug { display: flex; align-items: center; gap: 8px; margin-top: 7px; padding-top: 7px; border-top: 1px dashed var(--line); }
+.days-debug[hidden] { display: none; }
+.days-debug span { font-size: 10px; line-height: 1.35; color: var(--muted); font-variant-numeric: tabular-nums; word-break: break-word; }
+
+/* Family: every duckling at the stage she has grown to */
+.brood { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 5px; }
+.brood:empty { display: none; }
+.k {
+  min-width: 0; padding: 2px 0 2px; text-align: center;
+  border: 1.5px solid transparent; border-radius: 9px;
+  background: linear-gradient(#eaf6ff, #d5eafa);
+}
+@media (prefers-color-scheme: dark) { .k { background: linear-gradient(#22323f, #1b2836); } }
+.k canvas { display: block; width: 100%; height: auto; }
+.k span {
+  display: block; font-size: 9px; line-height: 1.2; color: var(--muted);
+  padding: 0 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.k span.st { color: var(--ink); }
+.brood-note { margin: 7px 0 0; font-size: 11px; line-height: 1.4; color: var(--muted); }
+
 /* Pausierte Seiten */
 .site-head {
   font-size: 11px; text-transform: uppercase; letter-spacing: .08em;

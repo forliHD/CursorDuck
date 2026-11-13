@@ -45,15 +45,27 @@ audio file must be CC0/public domain and documented in `audio/SOURCES.md`.
   only between press and release, a press that doesn't travel stays an ordinary click on
   links and buttons (text selection can't start on her, but a double-click selects the
   word), and Esc is never prevented or stopped (fields, dialogs and fullscreen keep it).
-- The daily gift is claimed in `src/background.js`, one at a time, so several tabs can't
-  each get one. The collection has its own `storage.local` key (`gifts`); its badges are
-  derived with `DuckModels.giftStats()`, nothing writes them into `stats`.
+- The first visit of a day is settled in `src/background.js`, one claim at a time
+  (`duck:day`), so several tabs can't each do it: it counts the day, lets the ducklings
+  that are out grow and hands out the gift. Each has its own `storage.local` key (`days`,
+  `brood`, `gifts`); their badges are derived with `DuckModels.dayStats()` and
+  `giftStats()`, nothing writes them into `stats`.
+- The rules for all three are pure functions in `src/models.js` (`countDay`, `isNewDay`,
+  `growBrood`, …) on local calendar days in `dayKey()` form. Distances come from the
+  calendar, never from elapsed hours; change them there and in `tests/unit.mjs`.
+- The engine only shows the ducklings' ages: the host hands them over with
+  `engine.setBrood(ages, news)`. Pages without storage (website, update page) get the
+  default family.
+- Anything that crosses the page stays off her stage: the autumn birds fly on a second
+  small layer (`engine.sky`) that exists for one crossing and is moved by its transform.
 
 ## Tests
 
 `tests/` is not part of the package. `cd tests && npm install` once, then:
 
-- `node tests/unit.mjs`: catalog, season logic, locale parity, numbers in the copy
+- `node tests/unit.mjs`: catalog, season logic, the day counter (streak, gaps, month and
+  year ends, clock changes, time zones), ducklings' growth, migration from 1.9.0, locale
+  parity, numbers in the copy
 - `node tests/e2e.mjs chrome|firefox [filter]`: the zip from `dist/` plus `tests/bridge.js`
   in real browsers (build first). Firefox: `npx @puppeteer/browsers install firefox@stable
   --path ~/.cache/puppeteer` or `FIREFOX_BIN`.
