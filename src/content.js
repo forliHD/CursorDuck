@@ -47,8 +47,8 @@
     for (var k in DEFAULTS) keys[k] = DEFAULTS[k];
     keys.disabledHosts = [];
     chrome.storage.sync.get(keys, function (cfg) {
-      chrome.storage.local.get({ stats: { pets: 0, pecks: 0 }, gifts: null }, function (loc) {
-        cb(cfg, loc.stats, loc.gifts);
+      chrome.storage.local.get({ stats: { pets: 0, pecks: 0 }, gifts: null, days: null, brood: null }, function (loc) {
+        cb(cfg, loc.stats, loc);
       });
     });
   }
@@ -116,23 +116,10 @@
   }
 
   function boot() {
-    readAll(function (cfg, stats, gifts) {
-      if (gifts && gifts.last) giftAskedDay = gifts.last;   // today's is out already: no need to ask
-      // Tages-Serie: einmal pro Kalendertag zählen (lokale Zeit, keine
-      // Netzwerk-Uhr). Idempotent pro Tag — mehrere Tabs zählen nicht doppelt.
-      try {
-        var today = new Date();
-        var dayKey = today.getFullYear() + '-' + (today.getMonth() + 1) + '-' + today.getDate();
-        if (stats && stats.streakLast !== dayKey) {
-          var yest = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 1);
-          var yKey = yest.getFullYear() + '-' + (yest.getMonth() + 1) + '-' + yest.getDate();
-          stats.streakDays = stats.streakLast === yKey ? (stats.streakDays || 0) + 1 : 1;
-          stats.streakLast = dayKey;
-          // persist right away — otherwise a day without petting or pecking
-          // never reached storage and the streak silently broke the next day
-          chrome.storage.local.set({ stats: stats });
-        }
-      } catch (e) { /* Serie ist Deko */ }
+    readAll(function (cfg, stats, loc) {
+      // today is counted and its gift is out already: no need to ask
+      if (loc.days && loc.days.last) daySeen = loc.days.last;
+      if (loc.gifts && loc.gifts.last) giftSeen = loc.gifts.last;
       var opts = {};
       for (var k in DEFAULTS) opts[k] = cfg[k];
       opts.reduceMotion = osReduceMotion();
@@ -155,6 +142,10 @@
       engine.giftName = function (id) {
         try { return chrome.i18n.getMessage('gift_' + id) || ''; } catch (e) { return ''; }
       };
+      engine.stageName = function (id) {
+        try { return chrome.i18n.getMessage('stage_' + id) || ''; } catch (e) { return ''; }
+      };
+      if (loc.brood) engine.setBrood(loc.brood.ages);
       engine.mount(document.documentElement);
       window.__cursorDuck = engine;   // Debug-Handle
       blocked = !siteAllowed(cfg);
@@ -163,27 +154,45 @@
     });
   }
 
-  // ── Daily gift ──────────────────────────────────────────────
+  // ── A day together ──────────────────────────────────────────
   // The first page she is actually on each day: a few seconds in view, with
   // somebody at the mouse (a tab left open overnight waits for its owner).
-  // The background page hands out the gift, so several tabs can't each get one.
-  var giftAskedDay = '';
-  var giftSeenFor = 0;
-  function giftTick() {
+  // That visit counts the day, lets the ducklings grow and brings the gift.
+  // The background page settles all three, so several tabs can't each do it.
+  var daySeen = '';     // the last day storage has counted…
+  var giftSeen = '';    // …and the day of the last gift
+  var dayAsked = '';
+  var claiming = 0;     // claims of ours that are out (the test switch can overlap the real one)
+  var broodHeld = null; // a brood change that arrived meanwhile
+  var seenFor = 0;
+  function dayTick() {
     if (!engine.running || engine.halted || engine.submerged || blocked || focusHold) {
-      giftSeenFor = 0;
+      seenFor = 0;
       return;
     }
-    if (++giftSeenFor < 3 || engine.pointerIdle > 30) return;
+    if (++seenFor < 3 || engine.pointerIdle > 30) return;
     var day = window.DuckModels.dayKey(new Date());
-    if (day === giftAskedDay) return;
-    giftAskedDay = day;
+    if (day === dayAsked || (day === daySeen && day === giftSeen)) return;
+    dayAsked = day;
+    claimDay(day, false);
+  }
+
+  function claimDay(day, force) {
+    claiming++;
     try {
-      chrome.runtime.sendMessage({ type: 'duck:gift', day: day }, function (res) {
-        if (chrome.runtime.lastError) { giftAskedDay = ''; return; }
-        if (res && res.gift && engine) engine.giveGift(res.gift, { isNew: res.isNew });
+      chrome.runtime.sendMessage({ type: 'duck:day', day: day, at: Date.now(), force: !!force }, function (res) {
+        var held = broodHeld;
+        claiming--;
+        if (!claiming) broodHeld = null;
+        if (chrome.runtime.lastError) { res = null; if (!force) dayAsked = ''; }
+        if (!engine) return;
+        // the ducklings first, with what happened to them today, then the gift.
+        // Without news of our own, whatever another tab reported meanwhile.
+        if (res && res.ages) engine.setBrood(res.ages, res.news);
+        else if (held && !claiming) engine.setBrood(held);
+        if (res && res.gift) engine.giveGift(res.gift, { isNew: res.isNew });
       });
-    } catch (e) { /* extension was reloaded: this tab keeps its duck, the next page asks again */ }
+    } catch (e) { claiming--; /* extension was reloaded: this tab keeps its duck, the next page asks again */ }
   }
 
   // ── Media watch: own document + sub-frame heartbeats → engine.setMedia ──
@@ -204,7 +213,7 @@
       else any = true;
     }
     engine.setMedia(any);
-    giftTick();
+    dayTick();
   }, 1000);
 
   // Follow OS reduced-motion changes live (Settings → Accessibility
@@ -251,7 +260,18 @@
       if (k === 'stats') { engine.stats = changes[k].newValue || engine.stats; continue; }
       if (k === 'gifts') {           // the popup's shelf; another tab may have claimed today's
         var gv = changes[k].newValue;
-        if (gv && gv.last) giftAskedDay = gv.last;
+        giftSeen = (gv && gv.last) || '';
+        continue;
+      }
+      if (k === 'days') {            // another tab may have counted today
+        var dv = changes[k].newValue;
+        daySeen = (dv && dv.last) || '';
+        continue;
+      }
+      if (k === 'brood') {           // they grew in another tab: the same ducklings here, without the fuss
+        var bv = changes[k].newValue;
+        if (claiming) broodHeld = bv ? bv.ages : null;
+        else engine.setBrood(bv ? bv.ages : null);
         continue;
       }
       if (k === 'reduceMotion') continue;   // comes from the OS, never from storage
@@ -266,6 +286,11 @@
     if (!msg || !engine) return;
     if (msg.type === 'duck:trigger') engine.trigger(msg.action, msg.dur);
     if (msg.type === 'duck:model') engine.setModel(msg.model);
+    // the popup's test switch: one more day together, on this page's ducklings
+    if (msg.type === 'duck:nextday') {
+      claimDay(window.DuckModels.dayKey(new Date()), true);
+      respond({ ok: true });
+    }
     if (msg.type === 'duck:ping') respond({ ok: true, model: engine.modelId, stats: engine.stats });
     return true;
   });

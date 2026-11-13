@@ -192,7 +192,7 @@
     ['dabble', 'Gründeln'], ['dive', 'Tauchen'], ['spin', 'Drehen'], ['bathe', 'Baden'],
     ['look', 'Umschauen'], ['bob', 'Wippen'], ['sleep', 'Schlafen'], ['peck', 'Picken'],
     ['startle', 'Schreck'], ['pet', 'Streicheln'],
-    ['gift', 'Geschenk 🎁'], ['leaf', 'Blatt 🍂'],
+    ['gift', 'Geschenk 🎁'], ['leaf', 'Blatt 🍂'], ['birds', 'Vogelzug 🕊️'],
     ['crumbs', 'Füttern 🍞'], ['fish', 'Fisch 🐟'], ['dizzy', 'Schwindel 😵'],
     ['dance', 'Tänzchen 💃'], ['peekaboo', 'Kuckuck 🫣'], ['visitor', 'Besuch 💕'],
     ['waddle', 'Landgang 🚶'], ['burst', 'Platzen 🎈'], ['debug', 'Debuggen 🐤']
@@ -205,6 +205,16 @@
     b.onclick = function () { engine.trigger(a[0], a[0] === 'sleep' ? 99 : 2.2); };
     rowEl.appendChild(b);
   });
+  // One more day together for the ducklings on this page (nothing is stored)
+  var demoBrood = null;
+  var dayBtn = document.createElement('button');
+  dayBtn.textContent = 'Ein Tag weiter 🐣';
+  dayBtn.onclick = function () {
+    var grown = DuckModels.growBrood(demoBrood, engine.babies.length);
+    demoBrood = grown.brood;
+    engine.setBrood(demoBrood.ages, grown.news);
+  };
+  rowEl.appendChild(dayBtn);
   // Simulates "a video with sound is playing on the page"
   var mediaBtn = document.getElementById('mediaBtn');
   mediaBtn.onclick = function () {

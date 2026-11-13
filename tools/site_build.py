@@ -68,6 +68,11 @@ def gifts_from(locale):
     return {key[5:]: val['message'] for key, val in msgs.items() if key.startswith('gift_')}
 
 
+def stages_from(locale):
+    msgs = json.loads(read('_locales', locale, 'messages.json'))
+    return {key[6:]: val['message'] for key, val in msgs.items() if key.startswith('stage_')}
+
+
 TAG = re.compile(r'<([a-zA-Z][a-zA-Z0-9]*)(\s[^>]*)?>')
 LD = re.compile(r'<script type="application/ld\+json">(.*?)</script>', re.S)
 
@@ -236,6 +241,7 @@ def main():
         },
         'names': names,
         'gifts': {'en': gifts_from('en'), 'de': gifts_from('de')},
+        'stages': {'en': stages_from('en'), 'de': stages_from('de')},
         'en': {'dom': en_dom},
         'de': de
     }

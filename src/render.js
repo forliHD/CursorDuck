@@ -1389,34 +1389,147 @@
 
   // Küken-Variante eines Modells: kleiner, runder, flauschig-gelb,
   // von Mamas Farben bleibt nur ein Hauch.
-  function babyOf(m) {
+  // `grow` (0..1, the stage's value from models.js) brings her closer to
+  // mama: longer neck, smaller head, mama's colours through the down, and
+  // almost grown her cheeks, crest and collar. 0 is the fluffball the
+  // ducklings always were.
+  function babyOf(m, grow) {
+    var g = Math.max(0, Math.min(1, grow || 0));
     var b = {};
     for (var k in m) b[k] = m[k];
-    b.scale = (m.scale || 1) * 0.95;
-    b.chonk = Math.min(1, (m.chonk || 0) + 0.55);
-    b.headR = m.headR * 1.24;
-    b.neckLen = m.neckLen * 0.5;
-    b.neckW = m.neckW * 1.1;
-    b.beakLen = m.beakLen * 0.78;
-    b.bodyH = m.bodyH * 1.06;
-    b.quackPitch = (m.quackPitch || 1) * 1.75;
-    b.hat = null; b.glasses = null; b.crest = null; b.neckRing = null; b.cheek = null;
-    b.body = mix('#ffe066', m.body, 0.22);
-    b.bodyDark = mix('#e8c33e', m.bodyDark, 0.22);
-    b.belly = mix('#fff6cc', m.belly, 0.15);
-    b.head = mix('#ffe884', m.head, 0.18);
-    b.headDark = mix('#e8c33e', m.headDark, 0.18);
-    b.wing = mix('#ffdc5c', m.wing, 0.22);
-    b.wingBar = mix('#fff6cc', m.wingBar, 0.3);
-    b.tail = mix('#ffdc5c', m.tail, 0.22);
-    b.beak = mix('#ffb03d', m.beak, 0.3);
-    b.beakDark = mix('#e08a10', m.beakDark, 0.3);
+    b.scale = (m.scale || 1) * (0.95 + 0.05 * g);
+    b.chonk = Math.min(1, (m.chonk || 0) + 0.55 * (1 - g));
+    b.headR = m.headR * (1.24 - 0.24 * g);
+    b.neckLen = m.neckLen * (0.5 + 0.5 * g);
+    b.neckW = m.neckW * (1.1 - 0.1 * g);
+    b.beakLen = m.beakLen * (0.78 + 0.22 * g);
+    b.bodyH = m.bodyH * (1.06 - 0.06 * g);
+    b.quackPitch = (m.quackPitch || 1) * (1.75 - 0.6 * g);
+    b.hat = null; b.glasses = null;
+    b.cheek = g >= 0.55 ? m.cheek : null;
+    b.neckRing = g >= 0.8 ? m.neckRing : null;
+    b.crest = g >= 0.8 && m.crest ? { len: m.crest.len * 0.7, color: m.crest.color, kind: m.crest.kind } : null;
+    var c = 0.22 + 0.7 * g, h = 0.18 + 0.72 * g, d = 0.3 + 0.6 * g;
+    b.body = mix('#ffe066', m.body, c);
+    b.bodyDark = mix('#e8c33e', m.bodyDark, c);
+    b.belly = mix('#fff6cc', m.belly, 0.15 + 0.7 * g);
+    b.head = mix('#ffe884', m.head, h);
+    b.headDark = mix('#e8c33e', m.headDark, h);
+    b.wing = mix('#ffdc5c', m.wing, c);
+    b.wingBar = mix('#fff6cc', m.wingBar, d);
+    b.tail = mix('#ffdc5c', m.tail, c);
+    b.beak = mix('#ffb03d', m.beak, d);
+    b.beakDark = mix('#e08a10', m.beakDark, d);
     return b;
+  }
+
+  // ── Hatching egg ──────────────────────────────────────────────
+  // A cream duck egg about s wide, standing on the waterline at (x, y).
+  // `crack` 0..1 runs the zigzag round its middle, `open` 0..1 lifts the top
+  // half off and away.
+  var EGG_ZIG = [-1, -0.62, -0.3, 0, 0.3, 0.62, 1];
+  function drawEgg(ctx, x, y, s, rot, crack, open) {
+    var w = s * 0.5, h = s * 0.66, cy = -h;
+    var i, zx, zy;
+    function zig(k) { return cy + (k % 2 ? -1 : 1) * s * 0.07; }
+    function shell() {
+      ctx.beginPath();
+      ctx.ellipse(0, cy, w, h, 0, 0, TAU);
+      var gr = ctx.createLinearGradient(-w, cy - h, w, cy + h);
+      gr.addColorStop(0, '#fffaf0');
+      gr.addColorStop(1, '#e6d6b4');
+      ctx.fillStyle = gr;
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(150,120,70,0.45)';
+      ctx.lineWidth = Math.max(0.7, s * 0.05);
+      ctx.stroke();
+      fillEll(ctx, w * 0.3, cy + h * 0.25, s * 0.05, s * 0.04, 0, 'rgba(140,150,110,0.45)');
+      fillEll(ctx, -w * 0.4, cy + h * 0.5, s * 0.04, s * 0.035, 0, 'rgba(140,150,110,0.45)');
+      fillEll(ctx, -w * 0.38, cy - h * 0.45, s * 0.09, s * 0.16, 0.4, 'rgba(255,255,255,0.8)');
+    }
+    // the half below (top: false) or above the zigzag
+    function half(top) {
+      ctx.beginPath();
+      ctx.moveTo(-w * 1.4, top ? cy - h * 1.5 : cy + h * 1.5);
+      for (i = 0; i < EGG_ZIG.length; i++) ctx.lineTo(EGG_ZIG[i] * w * 1.4, zig(i));
+      ctx.lineTo(w * 1.4, top ? cy - h * 1.5 : cy + h * 1.5);
+      ctx.closePath();
+      ctx.clip();
+    }
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(rot || 0);
+    if (!open) {
+      shell();
+    } else {
+      ctx.save(); half(false); shell(); ctx.restore();
+      ctx.save();
+      ctx.globalAlpha *= Math.max(0, 1 - open);
+      ctx.translate(-w * 0.6 * open, -h * 1.3 * open);
+      ctx.rotate(-1.1 * open);
+      half(true); shell();
+      ctx.restore();
+    }
+    if (crack > 0 && open < 1) {
+      ctx.strokeStyle = 'rgba(110,80,40,0.8)';
+      ctx.lineWidth = Math.max(0.8, s * 0.06);
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.beginPath();
+      var n = 1 + Math.round(Math.min(1, crack) * (EGG_ZIG.length - 1));
+      for (i = 0; i < n; i++) {
+        zx = EGG_ZIG[i] * w * 0.92; zy = zig(i);
+        if (i) ctx.lineTo(zx, zy); else ctx.moveTo(zx, zy);
+      }
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  // ── Migrating bird ────────────────────────────────────────────
+  // One bird of the flock, about 2.3 s long, flying along +x (dir -1 flips
+  // it), seen from the side: a slim body, the neck stretched out ahead, and
+  // swept-back wings whose tips follow `flap` (-1 down … 1 up). Dark with a
+  // light rim, so it reads on a bright page and on a dark one.
+  function birdBody(ctx, s) {
+    ctx.moveTo(-s * 0.95, -s * 0.03);
+    ctx.quadraticCurveTo(-s * 0.4, -s * 0.2, s * 0.15, -s * 0.13);
+    ctx.quadraticCurveTo(s * 0.55, -s * 0.1, s * 0.95, -s * 0.12);
+    ctx.quadraticCurveTo(s * 1.12, -s * 0.16, s * 1.2, -s * 0.06);
+    ctx.lineTo(s * 1.38, -s * 0.02);
+    ctx.lineTo(s * 1.18, s * 0.03);
+    ctx.quadraticCurveTo(s * 0.6, s * 0.02, s * 0.2, s * 0.1);
+    ctx.quadraticCurveTo(-s * 0.35, s * 0.2, -s * 0.95, -s * 0.03);
+    ctx.closePath();
+  }
+  function birdWing(ctx, s, flap, k, dx) {
+    var tipX = dx - s * 0.5 * k, tipY = -flap * s * 0.95 * k;
+    ctx.moveTo(dx + s * 0.32, -s * 0.05);
+    ctx.quadraticCurveTo(dx + s * 0.14, tipY * 0.8, tipX, tipY);
+    ctx.quadraticCurveTo(dx - s * 0.3, tipY * 0.3, dx - s * 0.38, 0);
+    ctx.closePath();
+  }
+  function drawBird(ctx, x, y, s, flap, dir) {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.scale(dir < 0 ? -1 : 1, 1);
+    ctx.lineJoin = 'round';
+    ctx.beginPath();
+    birdWing(ctx, s, flap, 0.78, s * 0.1);   // the far wing, a little ahead
+    birdBody(ctx, s);
+    birdWing(ctx, s, flap, 1, 0);
+    ctx.strokeStyle = 'rgba(255,255,255,0.62)';
+    ctx.lineWidth = Math.max(1.4, s * 0.26);
+    ctx.stroke();
+    ctx.fillStyle = 'rgba(62,74,94,0.96)';
+    ctx.fill();
+    ctx.restore();
   }
 
   root.DuckRender = {
     draw: draw, bounds: bounds, geom: geom, headWorld: headWorld,
     babyOf: babyOf, star: star, mix: mix, rgba: rgba,
-    gift: drawGift, leaf: drawLeaf, LEAF_COLS: LEAF_COLS
+    gift: drawGift, leaf: drawLeaf, LEAF_COLS: LEAF_COLS,
+    egg: drawEgg, bird: drawBird
   };
 })(typeof window !== 'undefined' ? window : this);

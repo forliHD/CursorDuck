@@ -156,10 +156,22 @@ async function settle(page, x = 700, y = 450) {
 // The spot on her that counts as "on her".
 const onHer = (s) => ({ x: s.x, y: s.y - s.r * 0.75 });
 
-// A day string for "no gift due": the content script keeps quiet if storage says it's done.
+// Today is settled: counted, and its gift is out. The content script keeps quiet if storage says so.
 async function noGiftToday(page) {
   const day = await duck(page, 'today');
-  await duck(page, 'storageSet', 'local', { gifts: { last: day, total: 0, counts: {} } });
+  await duck(page, 'storageSet', 'local', {
+    gifts: { last: day, total: 0, counts: {} }, days: { last: day, streak: 1, best: 1, total: 1 }
+  });
+}
+
+// What storage.local holds: the day counter, the family.
+const local = async (page, keys) => duck(page, 'storageGet', 'local', keys);
+const daysOf = async (page) => (await local(page, { days: null })).days;
+const broodOf = async (page) => (await local(page, { brood: null })).brood;
+// What 1.9.0 leaves behind: the streak in the play counters, no `days`, no `brood`.
+async function as190(page, stats, gifts) {
+  await duck(page, 'storageClear', 'local');
+  await duck(page, 'storageSet', 'local', { stats: { pets: 3, pecks: 1, ...stats }, ...(gifts ? { gifts } : {}) });
 }
 
 const results = [];
@@ -200,20 +212,22 @@ async function run() {
     assert.equal(all.escHide, true);
     assert.equal(all.randomOnStart, false);
     if (FIREFOX) {
-      // BiDi lists it as about:blank, so count the tabs: blank start tab, this one, the welcome page
-      assert.ok((await browser.pages()).length >= 3, 'the welcome page opened');
+      // BiDi lists it as about:blank, so count the tabs: blank start tab, this one, the welcome page.
+      // The tab is created right after the defaults are written; give it a moment to show up.
+      await until(async () => (await browser.pages()).length >= 3, 'the welcome page to open', 5000);
     } else {
       assert.ok((await browser.pages()).some((p) => p.url().endsWith('/welcome/welcome.html')), 'the welcome page opened');
     }
   });
 
-  await test('update: going from 1.8.1 opens the update page, a patch does not', async () => {
+  await test('update: going from 1.9.0 opens the update page, a patch does not', async () => {
     // the rule itself, fed the way onInstalled would feed it
     const src = fs.readFileSync(path.join(ROOT, 'src', 'background.js'), 'utf8');
     assert.ok(src.includes('prev[0] !== cur2[0] || prev[1] !== cur2[1]'));
     const opens = (prev, cur) => { const a = prev.split('.'), b = cur.split('.'); return a[0] !== b[0] || a[1] !== b[1]; };
-    assert.equal(opens('1.8.1', '1.9.0'), true);
-    assert.equal(opens('1.9.0', '1.9.1'), false);
+    assert.equal(opens('1.9.0', '1.10.0'), true);
+    assert.equal(opens('1.8.1', '1.10.0'), true);
+    assert.equal(opens('1.10.0', '1.10.1'), false);
   });
 
   // Keep today's gift from walking through the tests below; the gift group sets its own days.
@@ -956,7 +970,7 @@ async function run() {
     assert.equal(info.count, '3/14');
     assert.ok(info.mystery);
     assert.deepEqual(info.times, ['×3']);
-    assert.ok(info.ach.endsWith('/72'), info.ach);
+    assert.ok(info.ach.endsWith('/76'), info.ach);
     assert.deepEqual(p.errors, []);
   });
 
@@ -989,18 +1003,183 @@ async function run() {
     await p.evaluate(() => document.getElementById('escHide').click());
   });
 
+  await test('popup: the day counter shows streak, record and total, and lights up once today is counted', async () => {
+    const today = await (async () => { const pg = await open(); const d = await duck(pg, 'today'); await close(pg); return d; })();
+    const parts = today.split('-').map(Number);
+    const key = (off) => { const d = new Date(parts[0], parts[1] - 1, parts[2] + off); return d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate(); };
+    const read = (p) => p.evaluate(() => ({
+      n: document.getElementById('dayStreak').textContent, label: document.getElementById('dayLabel').textContent,
+      sub: document.getElementById('daySub').textContent, hint: document.getElementById('dayHint').textContent,
+      cold: document.getElementById('days').classList.contains('cold'), visible: document.getElementById('days').getBoundingClientRect().height > 20,
+      top: document.getElementById('days').getBoundingClientRect().top, debug: document.getElementById('dayDebug').hidden
+    }));
+    // counted today
+    let p = await popupPage({ local: { days: { last: today, streak: 12, best: 30, total: 87 }, gifts: null, stats: { pets: 0, pecks: 0 } } });
+    let v = await read(p);
+    assert.deepEqual([v.n, v.cold, v.hint], ['12', false, '']);
+    assert.ok(/30/.test(v.sub) && /87/.test(v.sub), v.sub);
+    assert.ok(v.visible && v.top < 330, 'in view without opening anything: ' + v.top);
+    assert.equal(v.debug, true, 'the test switch stays out of sight');
+    await close(p);
+    // yesterday: the run is alive, today not counted yet
+    p = await popupPage({ local: { days: { last: key(-1), streak: 12, best: 30, total: 87 }, gifts: null } });
+    v = await read(p);
+    assert.deepEqual([v.n, v.cold], ['12', true]);
+    assert.ok(v.hint.length > 10, 'says how today gets counted');
+    await close(p);
+    // the day before yesterday: over
+    p = await popupPage({ local: { days: { last: key(-2), streak: 12, best: 30, total: 87 }, gifts: null } });
+    v = await read(p);
+    assert.deepEqual([v.n, v.cold], ['0', true]);
+    assert.ok(/30/.test(v.sub), 'the record stays');
+    await close(p);
+    // one day reads as one day
+    p = await popupPage({ local: { days: { last: today, streak: 1, best: 1, total: 1 }, gifts: null } });
+    v = await read(p);
+    assert.equal(v.n, '1');
+    assert.ok(!/days|Tage/.test(v.label), 'singular: ' + v.label);
+    await close(p);
+    // not updated yet: the 1.9.0 streak is shown from the play counters
+    const pg = await open();
+    await duck(pg, 'storageClear', 'local');
+    await duck(pg, 'storageSet', 'local', { stats: { pets: 0, pecks: 0, streakDays: 9, streakLast: today } });
+    p = await openExtPage(pg, 'popup/popup.html');
+    await until(() => p.evaluate(() => document.getElementById('dayStreak').textContent === '9'), 'the old streak', 3000);
+    assert.deepEqual(p.errors, []);
+  });
+
+  await test('popup: day badges count from the record, so a missed day takes none away', async () => {
+    const p = await popupPage({ local: {
+      days: { last: '2026-1-1', streak: 1, best: 31, total: 100 }, brood: { ages: [0], fledged: 1 }, gifts: null,
+      stats: { pets: 0, pecks: 0, flocks: 3, streakDays: 2 }
+    } });
+    const done = await p.evaluate(() => [...document.querySelectorAll('#achievements .a.done .tx')].map((t) => t.textContent));
+    assert.equal(done.length, 5, done.join(', '));   // week, month, hundred days, fledged, birds
+    assert.equal(await p.evaluate(() => document.getElementById('achCount').textContent), '5/76');
+  });
+
+  await test('popup: the family shows every duckling at her stage, and how long until the next', async () => {
+    let p = await popupPage({ local: { brood: { ages: [0, 6, 11, 17, 3, 3, 3, 3], fledged: 2 }, gifts: null }, sync: { ducklings: 4 } });
+    await until(() => p.evaluate(() => document.querySelectorAll('#brood .k').length === 4), 'four tiles');
+    let v = await p.evaluate(() => ({
+      names: [...document.querySelectorAll('#brood .k .st')].map((n) => n.textContent),
+      next: [...document.querySelectorAll('#brood .k span:not(.st)')].map((n) => n.textContent),
+      note: document.getElementById('broodNote').textContent, count: document.getElementById('broodCount').textContent,
+      drawn: [...document.querySelectorAll('#brood canvas')].map((c) => { const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data; let n = 0; for (let i = 3; i < d.length; i += 4) if (d[i] > 40) n++; return n; })
+    }));
+    assert.equal(new Set(v.names).size, 4, 'four different stages: ' + v.names);
+    assert.deepEqual(v.next.map((t) => +t.replace(/\D/g, '')), [3, 1, 1, 1], v.next.join(' | '));
+    assert.ok(/2\s*$/.test(v.note), 'two have grown up: ' + v.note);
+    assert.equal(v.count, '4');
+    for (let i = 1; i < 4; i++) assert.ok(v.drawn[i] > v.drawn[i - 1], 'each drawn bigger than the one before: ' + v.drawn);
+    // the slider changes the family at once
+    await p.evaluate(() => { const el = document.getElementById('ducklings'); el.value = 2; el.dispatchEvent(new Event('input')); });
+    assert.equal(await p.evaluate(() => document.querySelectorAll('#brood .k').length), 2);
+    await p.evaluate(() => { const el = document.getElementById('ducklings'); el.value = 0; el.dispatchEvent(new Event('input')); });
+    v = await p.evaluate(() => ({ tiles: document.querySelectorAll('#brood .k').length, note: document.getElementById('broodNote').textContent }));
+    assert.equal(v.tiles, 0);
+    assert.ok(v.note.length > 20, 'says where the ducklings are');
+    assert.deepEqual(p.errors, []);
+  });
+
+  await test('popup: five clicks on the counter show the test switch, +1 day counts and grows without moving the date', async () => {
+    const pg = await open();
+    const today = await duck(pg, 'today');
+    await duck(pg, 'storageSet', 'sync', { ducklings: 2 });
+    await duck(pg, 'storageSet', 'local', {
+      days: { last: today, at: 1234, streak: 3, best: 3, total: 3 }, brood: { ages: [2, 16, 0, 0, 0, 0, 0, 0], fledged: 0 },
+      gifts: { last: today, total: 3, counts: { pebble: 3 } }
+    });
+    const p = await openExtPage(pg, 'popup/popup.html');
+    await until(() => p.evaluate(() => document.getElementById('dayStreak').textContent === '3'), 'the counter');
+    assert.equal(await p.evaluate(() => document.getElementById('dayDebug').hidden), true);
+    for (let i = 0; i < 4; i++) await p.evaluate(() => document.getElementById('dayMain').click());
+    assert.equal(await p.evaluate(() => document.getElementById('dayDebug').hidden), true, 'four are not enough');
+    await p.evaluate(() => document.getElementById('dayMain').click());
+    assert.equal(await p.evaluate(() => document.getElementById('dayDebug').hidden), false);
+    await p.evaluate(() => document.getElementById('dbgDay').click());
+    await until(() => p.evaluate(() => document.getElementById('dayStreak').textContent === '4'), 'one more day', 3000);
+    let all = await p.evaluate(() => new Promise((res) => chrome.storage.local.get(null, res)));
+    assert.deepEqual([all.days.last, all.days.at, all.days.streak, all.days.best, all.days.total], [today, 1234, 4, 4, 4]);
+    assert.deepEqual(all.brood.ages.slice(0, 2), [3, 17]);
+    assert.equal(all.gifts.total, 3, 'no gift from the test switch');
+    assert.ok(await p.evaluate(() => /ages 3,17/.test(document.getElementById('dbgInfo').textContent)), 'the raw state is there to read');
+    await p.evaluate(() => document.getElementById('dbgDay').click());
+    await until(() => p.evaluate(() => document.getElementById('dayStreak').textContent === '5'), 'and another', 3000);
+    all = await p.evaluate(() => new Promise((res) => chrome.storage.local.get(null, res)));
+    assert.deepEqual([all.brood.ages[1], all.brood.fledged], [0, 1], 'the elder one grew up');
+    await until(() => p.evaluate(() => /1\s*$/.test(document.getElementById('broodNote').textContent)), 'the family note follows', 2000);
+    // it stays open for the next popup, until five more clicks put it away
+    // reloaded from inside: Firefox's remote protocol doesn't navigate extension pages itself
+    await p.evaluate(() => { window.__old = true; location.reload(); }).catch(() => {});
+    await until(() => p.evaluate(() => !window.__old && !!document.getElementById('dayDebug') &&
+      document.getElementById('dayStreak').textContent === '5').catch(() => false), 'the popup again', 6000);
+    assert.equal(await p.evaluate(() => document.getElementById('dayDebug').hidden), false);
+    for (let i = 0; i < 5; i++) await p.evaluate(() => document.getElementById('dayMain').click());
+    assert.equal(await p.evaluate(() => document.getElementById('dayDebug').hidden), true);
+    assert.deepEqual(p.errors, []);
+  });
+
+  await test('popup: asked through the page, the test day gives the ducklings there their ceremony', async () => {
+    // Firefox turns a tab of its own into the popup; opened first, before it can reset what this test stores
+    const spare = FIREFOX ? await open({ cfg: { ducklings: 2 } }) : null;
+    const pg = await open({ cfg: { ducklings: 2 } });
+    const today = await duck(pg, 'today');
+    await duck(pg, 'storageSet', 'local', {
+      days: { last: today, streak: 3, best: 3, total: 3 }, brood: { ages: [2, 5, 0, 0, 0, 0, 0, 0], fledged: 0 },
+      gifts: { last: today, total: 3, counts: { pebble: 3 } }
+    });
+    await until(async () => (await state(pg)).brood.ages[0] === 2, 'the family', 2000);
+    // The popup sends this to the tab it was opened on. A popup opened as a tab has no such
+    // tab, so the message goes out by hand; only `pg` has a duck to hear it.
+    const p = await openExtPage(spare || pg, 'popup/popup.html');
+    const replies = await p.evaluate(() => new Promise((res) => {
+      chrome.tabs.query({}, (tabs) => {
+        let left = tabs.length;
+        const got = [];
+        tabs.forEach((t) => chrome.tabs.sendMessage(t.id, { type: 'duck:nextday' }, (r) => {
+          void chrome.runtime.lastError;
+          if (r) got.push(r);
+          if (--left === 0) res(got);
+        }));
+      });
+    }));
+    assert.deepEqual(replies, [{ ok: true }]);
+    await pg.bringToFront();
+    const s = await until(async () => { const v = await state(pg); return v.babies[0].stage === 1 && v.brood.queue.length === 0 ? v : null; }, 'her growth spurt', 9000, 60);
+    assert.deepEqual(s.brood.ages.slice(0, 2), [3, 6]);
+    const d = await daysOf(pg);
+    assert.deepEqual([d.streak, d.last], [4, today]);
+    assert.deepEqual(pg.errors, []);
+  });
+
   await test('update page: new features listed, buttons work, no errors', async () => {
     const page = await open();
     const p = await openExtPage(page, 'welcome/update.html');
     await until(() => p.evaluate(() => document.readyState === 'complete'), 'the page');
+    const stored = () => p.evaluate(() => new Promise((res) => chrome.storage.local.get({ brood: null, days: null }, (o) => res(JSON.stringify(o)))));
+    const storedBefore = await stored();
     const items = await p.evaluate(() => [...document.querySelectorAll('.card li')].map((li) => li.textContent));
-    assert.equal(items.length, 5);
+    assert.equal(items.length, 4);
+    assert.ok(items.every((t) => t.length > 40), 'every item has its text');
     await until(() => p.evaluate(() => !!window.__duck), 'the page duck');
-    await p.evaluate(() => document.getElementById('leafBtn').click());
-    assert.equal(await p.evaluate(() => !!window.__duck.leaf), true);
-    await p.evaluate(() => document.getElementById('giftBtn').click());
-    assert.equal(await p.evaluate(() => window.__duck.duck.state), 'gift');
-    await sleep(3000);
+    const fam = () => p.evaluate(() => window.__duck.babies.map((b) => b.stage));
+    const before = await fam();
+    assert.ok(before.length >= 3, 'a family to grow');
+    assert.ok(new Set(before).size > 1, 'at different stages: ' + before);
+    await p.evaluate(() => document.getElementById('birdsBtn').click());
+    assert.equal(await p.evaluate(() => !!window.__duck.flock), true);
+    await until(() => p.evaluate(() => document.querySelectorAll('[data-cursor-duck-sky]').length === 1), 'the birds\' layer', 2000);
+    // one more day: the two behind the eldest reach their next stage
+    await p.evaluate(() => document.getElementById('dayBtn').click());
+    await until(async () => { const now = await fam(); return now[1] === before[1] + 1 && now[2] === before[2] + 1; }, 'two growth spurts', 12000);
+    // and another: the eldest is grown up, leaves, and an egg takes her place
+    await p.evaluate(() => document.getElementById('dayBtn').click());
+    await until(() => p.evaluate(() => !!window.__duck.fledge), 'her farewell', 12000);
+    await until(() => p.evaluate(() => !!window.__duck.babies[0].egg), 'the egg', 3000);
+    await until(() => p.evaluate(() => !window.__duck.babies[0].egg && window.__duck.babies[0].stage === 0 && !window.__duck.fledge), 'the hatchling', 9000);
+    // nothing of this page's play is stored or counted
+    assert.equal(await stored(), storedBefore);
     assert.deepEqual(p.errors, []);
   });
 
@@ -1145,6 +1324,627 @@ async function run() {
     await until(async () => (await state(page)).leaf === null, 'the leaf to go', 6000);
   });
 
+  console.log('Days together');
+
+  await test('days: the first visit of a day counts it, on the page she is on', async () => {
+    let page = await open();
+    await duck(page, 'storageClear', 'local');
+    await close(page);
+    page = await open({ hash: '#clock=2026-11-13T10:00:00', claims: true });
+    await duck(page, 'storageClear', 'local');              // open() wrote its own counters; start from nothing
+    await page.mouse.move(600, 400);
+    const d = await until(() => daysOf(page), 'the day to be counted', 9000);
+    assert.deepEqual([d.last, d.streak, d.best, d.total], ['2026-11-13', 1, 1, 1]);
+    assert.ok(Math.abs(d.at - new Date('2026-11-13T10:00:00').getTime()) < 60000, 'with the moment of the visit: ' + d.at);
+    const g = (await local(page, { gifts: null })).gifts;
+    assert.equal(g.last, '2026-11-13', 'the gift comes with the same visit');
+    assert.ok(await broodOf(page), 'and the family has its record');
+    // the rest of the day: nothing more, however long she is watched
+    await sleep(4500);
+    assert.deepEqual((await daysOf(page)).total, 1);
+    assert.deepEqual(page.errors, []);
+  });
+
+  await test('days: day after day through the background page, and a missed day', async () => {
+    const page = await open();
+    await duck(page, 'storageClear', 'local');
+    const steps = [
+      ['2026-11-13', 1, 1, 1], ['2026-11-13', 1, 1, 1], ['2026-11-14', 2, 2, 2], ['2026-11-15', 3, 3, 3],
+      ['2026-11-17', 1, 3, 4],                               // the 16th is missing
+      ['2026-11-18', 2, 3, 5], ['2026-11-19', 3, 3, 6], ['2026-11-20', 4, 4, 7]
+    ];
+    for (const [day, streak, best, total] of steps) {
+      await duck(page, 'claim', day, 0);
+      const d = await daysOf(page);
+      assert.deepEqual([d.last, d.streak, d.best, d.total], [day, streak, best, total], day);
+    }
+  });
+
+  await test('days: the streak runs through the month end, New Year and a leap day', async () => {
+    const page = await open();
+    for (const run of [['2026-11-29', '2026-11-30', '2026-12-1'], ['2026-12-30', '2026-12-31', '2027-1-1', '2027-1-2'], ['2028-2-27', '2028-2-28', '2028-2-29', '2028-3-1']]) {
+      await duck(page, 'storageClear', 'local');
+      for (const day of run) await duck(page, 'claim', day, 0);
+      const d = await daysOf(page);
+      assert.deepEqual([d.last, d.streak, d.total], [run[run.length - 1], run.length, run.length], run.join(' '));
+      assert.equal((await local(page, { gifts: null })).gifts.total, run.length, 'a gift for every one of them');
+    }
+  });
+
+  await test('days: several tabs at once count the day once, and the ducklings grow once', async () => {
+    const first = await open({ cfg: { ducklings: 3 } });
+    await duck(first, 'storageSet', 'local', {
+      days: { last: '2026-11-13', streak: 4, best: 6, total: 20 }, gifts: { last: '2026-11-13', total: 3, counts: { shell: 3 } },
+      brood: { ages: [1, 5, 9, 4, 4, 4, 4, 4], fledged: 2 }
+    });
+    await close(first);
+    const pages = await Promise.all([1, 2, 3].map(() => open({ hash: '#clock=2026-11-14T09:00:00', claims: true, cfg: { ducklings: 3 } })));
+    const replies = await Promise.all(pages.map((p) => duck(p, 'claim', '2026-11-14', 0)));
+    assert.equal(replies.filter((r) => r && r.gift).length, 1, JSON.stringify(replies));
+    assert.equal(replies.filter((r) => r && r.ages).length, 1, 'one of them was told about the growth');
+    await sleep(4500);                                       // the tabs' own claims come and find nothing left to do
+    const d = await daysOf(pages[2]);
+    assert.deepEqual([d.last, d.streak, d.best, d.total], ['2026-11-14', 5, 6, 21]);
+    const b = await broodOf(pages[2]);
+    assert.deepEqual(b.ages, [2, 6, 10, 4, 4, 4, 4, 4], 'the three that are out, one day each');
+    assert.equal(b.fledged, 2);
+  });
+
+  await test('days: a tab left open past midnight counts the new day when its owner is back', async () => {
+    const page = await open({ hash: '#clock=2026-11-20T23:59:30', claims: true });
+    await duck(page, 'storageSet', 'local', {
+      days: { last: '2026-11-20', streak: 7, best: 7, total: 7 }, gifts: { last: '2026-11-20', total: 7, counts: { pebble: 7 } }
+    });
+    await sleep(1200);
+    await duck(page, 'setClock', '2026-11-21T00:00:10');
+    await duck(page, 'setEngine', 'pointerIdle', 300);       // nobody at the mouse
+    await sleep(2500);
+    assert.equal((await daysOf(page)).streak, 7, 'an empty room is not a day together');
+    await page.mouse.move(500, 300, { steps: 4 });
+    const d = await until(async () => { const v = await daysOf(page); return v.streak === 8 ? v : null; }, 'the day when somebody is back', 6000);
+    assert.deepEqual([d.last, d.total], ['2026-11-21', 8]);
+  });
+
+  await test('days: not on a paused site and not while switched off', async () => {
+    let page = await open();
+    const before = { days: { last: '2026-11-10', streak: 2, best: 2, total: 2 }, gifts: { last: '2026-11-10', total: 2, counts: { pebble: 2 } } };
+    await duck(page, 'storageSet', 'local', before);
+    await close(page);
+    page = await open({ hash: '#clock=2026-11-11T09:00:00', claims: true, cfg: { disabledHosts: ['127.0.0.1'] } });
+    await sleep(4500);
+    assert.equal((await daysOf(page)).total, 2, 'paused site');
+    await duck(page, 'storageSet', 'sync', { disabledHosts: [], enabled: false });
+    await sleep(4500);
+    assert.equal((await daysOf(page)).total, 2, 'switched off');
+    await duck(page, 'storageSet', 'sync', { enabled: true });
+    await until(async () => (await daysOf(page)).total === 3, 'the day once she is on the page', 8000);
+    assert.equal((await daysOf(page)).streak, 3);
+  });
+
+  await test('migration: the first visit after the update takes the 1.9.0 streak along', async () => {
+    let page = await open();
+    await as190(page, { streakDays: 12, streakLast: '2026-11-12' }, { last: '2026-11-12', total: 8, counts: { pebble: 8 } });
+    await close(page);
+    page = await open({ hash: '#clock=2026-11-13T09:00:00', claims: true, cfg: { ducklings: 2 } });
+    await as190(page, { streakDays: 12, streakLast: '2026-11-12' }, { last: '2026-11-12', total: 8, counts: { pebble: 8 } });
+    await page.mouse.move(600, 400);
+    const d = await until(() => daysOf(page), 'the new record', 9000);
+    assert.deepEqual([d.last, d.streak, d.best, d.total], ['2026-11-13', 13, 13, 13]);
+    const b = await broodOf(page);
+    assert.deepEqual(b.ages.slice(0, 3), [1, 6, 10], 'the starting family, the two that are out a day older');
+    assert.equal((await local(page, { gifts: null })).gifts.total, 9);
+    const stats = (await local(page, { stats: null })).stats;
+    assert.equal(stats.pets, 3, 'the play counters are left alone');
+    assert.deepEqual(page.errors, []);
+  });
+
+  await test('migration: updated on a day 1.9.0 had counted, the record is written and nothing counted twice', async () => {
+    const page = await open({ hash: '#clock=2026-11-13T15:00:00' });
+    await as190(page, { streakDays: 5, streakLast: '2026-11-13' }, { last: '2026-11-13', total: 5, counts: { shell: 5 } });
+    const res = await duck(page, 'claim', '2026-11-13', 0);
+    assert.equal(res.gift, null);
+    assert.deepEqual(res.news, []);
+    const d = await daysOf(page);
+    assert.deepEqual([d.last, d.streak, d.best, d.total], ['2026-11-13', 5, 5, 5]);
+    assert.deepEqual((await broodOf(page)).ages.slice(0, 4), [0, 5, 10, 15], 'nobody grew: the day was spent already');
+    // the next day goes on from there
+    await duck(page, 'claim', '2026-11-14', 0);
+    assert.equal((await daysOf(page)).streak, 6);
+  });
+
+  await test('migration: a fresh install starts everything at nothing', async () => {
+    const page = await open();
+    await duck(page, 'storageClear', 'local');
+    const res = await duck(page, 'claim', '2026-11-13', 0);
+    assert.ok(res.gift, 'a first gift');
+    const all = await local(page, null);
+    assert.deepEqual([all.days.streak, all.days.best, all.days.total, all.gifts.total, all.brood.fledged], [1, 1, 1, 1, 0]);
+    assert.equal(all.stats, undefined, 'the counters are the page\'s to write');
+  });
+
+  await test('migration: damaged records in storage are mended instead of spreading', async () => {
+    const page = await open({ cfg: { ducklings: 3 } });
+    await duck(page, 'storageSet', 'local', {
+      days: { last: 17, streak: 'x', best: -4, total: null }, brood: { ages: ['a', null, 99], fledged: 'y' },
+      gifts: { last: '2026-11-13', total: 1, counts: { pebble: 1 } }
+    });
+    const res = await duck(page, 'claim', '2026-11-13', 0);
+    assert.equal(res.gift, null);
+    const d = await daysOf(page), b = await broodOf(page);
+    assert.deepEqual([d.last, d.streak, d.best, d.total], ['2026-11-13', 1, 1, 1]);
+    assert.ok(b.ages.every((a) => Number.isInteger(a) && a >= 0 && a < 18), JSON.stringify(b.ages));
+    // the first two got their starting ages and this day on top; the one with the impossible
+    // age counted as nearly grown, so today she left
+    assert.deepEqual([b.ages.slice(0, 3), b.fledged], [[1, 6, 0], 1]);
+    // and a claim that isn't a date changes nothing: no day, no growth, no gift
+    const before = await local(page, null);
+    for (const bad of ['tomorrow', '', '2026-13-40', null]) {
+      const r = await duck(page, 'claim', bad, 0);
+      assert.deepEqual(r, { gift: null, news: [] }, String(bad));
+    }
+    assert.deepEqual(await local(page, null), before);
+    // the real day still gets what it is due afterwards
+    assert.ok((await duck(page, 'claim', '2026-11-14', 0)).gift, 'the next day brings its gift');
+    const s = await state(page);
+    assert.ok(s.babies.every((k) => k.r > 0 && k.stage >= 0), 'the ducklings on the page are fine');
+  });
+
+  console.log('Ducklings that grow up');
+
+  await test('brood: every duckling shows the stage of her age', async () => {
+    const page = await open({ cfg: { ducklings: 4, model: 'pirate' } });
+    await duck(page, 'storageSet', 'local', { brood: { ages: [0, 4, 8, 14, 0, 0, 0, 0], fledged: 0 } });
+    const s = await until(async () => { const v = await state(page); return v.babies.length === 4 && v.babies[3].stage === 3 ? v : null; }, 'the family', 3000);
+    assert.deepEqual(s.babies.map((b) => b.stage), [0, 1, 2, 3]);
+    for (let i = 1; i < 4; i++) {
+      assert.ok(s.babies[i].r > s.babies[i - 1].r, 'bigger with every stage');
+      assert.ok(s.babies[i].neck > s.babies[i - 1].neck, 'and longer in the neck');
+      assert.ok(s.babies[i].gap - s.babies[i - 1].gap > s.babies[i - 1].gap - (i > 1 ? s.babies[i - 2].gap : 0), 'with more room in the row');
+    }
+    assert.ok(Math.abs(s.babies[0].r - s.r * 0.55) < 0.01, 'the fluffball is the size the ducklings always were');
+    assert.ok(s.babies[3].r < s.r, 'and none is as big as mama');
+    assert.ok(s.babies.every((b) => b.hat === null), 'mama keeps her pirate hat to herself');
+    // another model: same ages, same stages
+    await duck(page, 'storageSet', 'sync', { model: 'swan' });
+    const s2 = await until(async () => { const v = await state(page); return v.cfg.model === 'swan' ? v : null; }, 'the swan', 2000);
+    assert.deepEqual(s2.babies.map((b) => b.stage), [0, 1, 2, 3]);
+    // fewer and more ducklings: each one keeps her own age
+    await duck(page, 'storageSet', 'sync', { ducklings: 2 });
+    await until(async () => (await state(page)).babies.length === 2, 'two', 2000);
+    await duck(page, 'storageSet', 'sync', { ducklings: 4 });
+    const s3 = await until(async () => { const v = await state(page); return v.babies.length === 4 ? v : null; }, 'four again', 2000);
+    assert.deepEqual(s3.babies.map((b) => b.stage), [0, 1, 2, 3]);
+    assert.deepEqual(page.errors, []);
+  });
+
+  await test('brood: a new day lets the ones that are out grow, on the page and in storage', async () => {
+    let page = await open();
+    const setup = {
+      days: { last: '2026-11-13', streak: 2, best: 2, total: 2 }, gifts: { last: '2026-11-13', total: 2, counts: { pebble: 2 } },
+      brood: { ages: [2, 6, 11, 2, 2, 2, 2, 2], fledged: 0 }
+    };
+    await duck(page, 'storageSet', 'local', setup);
+    await close(page);
+    page = await open({ hash: '#clock=2026-11-14T09:00:00', claims: true, cfg: { ducklings: 3 } });
+    await duck(page, 'storageSet', 'local', setup);
+    await page.mouse.move(600, 400);
+    const before = await state(page);
+    assert.deepEqual(before.babies.map((b) => b.stage), [0, 1, 2]);
+    await until(async () => (await daysOf(page)).streak === 3, 'the new day', 9000);
+    assert.deepEqual((await broodOf(page)).ages, [3, 7, 12, 2, 2, 2, 2, 2], 'the fourth stays at home and stays as she is');
+    // each of the three gets her moment, one after the other, once the gift is on the water
+    const seen = [];
+    const done = await until(async () => {
+      const v = await state(page);
+      seen.push(v.babies.map((b) => b.stage).join(''));
+      return v.brood.queue.length === 0 && v.babies[2].stage === 3 ? v : null;
+    }, 'three growth spurts', 20000, 100);
+    assert.deepEqual(done.babies.map((b) => b.stage), [1, 2, 3]);
+    assert.deepEqual(done.brood.shown.slice(0, 3), [3, 7, 12]);
+    assert.deepEqual([...new Set(seen)], ['012', '112', '122', '123'], 'one at a time, front to back');
+    assert.equal(done.state === 'gift', false);
+    assert.deepEqual(page.errors, []);
+  });
+
+  await test('brood: grown up, she flies off and a new one hatches from an egg in her place', async () => {
+    let page = await open();
+    const setup = {
+      days: { last: '2026-11-13', streak: 2, best: 2, total: 2 }, gifts: { last: '2026-11-14', total: 2, counts: { pebble: 2 } },
+      brood: { ages: [17, 5, 2, 2, 2, 2, 2, 2], fledged: 4 }
+    };
+    await duck(page, 'storageSet', 'local', setup);
+    await close(page);
+    page = await open({ hash: '#clock=2026-11-14T09:00:00', claims: true, cfg: { ducklings: 2 } });
+    await duck(page, 'storageSet', 'local', setup);
+    await page.mouse.move(600, 400);
+    const kid = (await state(page)).babies[0];
+    assert.equal(kid.stage, 3);
+    const f = await until(async () => (await state(page)).fledge, 'her farewell', 12000, 40);
+    assert.ok(Math.hypot(f.x - kid.x, f.y - kid.y) < 120, 'where she was swimming');
+    const b = await broodOf(page);
+    assert.deepEqual([b.ages[0], b.ages[1], b.fledged], [0, 6, 5]);
+    // up and away, fading; her sister stays who she is
+    const up = await until(async () => { const v = await state(page); return v.fledge && v.fledge.rise > 30 ? v : null; }, 'the take-off', 4000, 30);
+    assert.equal(up.babies[1].stage, 1);
+    assert.ok(up.stage.w * up.stage.h <= 900 * 720, `the stage follows her up, not across the page: ${up.stage.w}x${up.stage.h}`);
+    await until(async () => { const v = await state(page); return v.fledge === null && v.babies[0].egg !== null && v.babies[0].egg >= 0; }, 'the egg in her place', 5000, 40);
+    const out = await until(async () => { const v = await state(page); return v.babies[0].egg === null ? v : null; }, 'the hatchling', 5000, 40);
+    assert.equal(out.babies[0].stage, 0);
+    assert.ok(Math.abs(out.babies[0].r - out.r * 0.55) < 0.01, 'a fluffball');
+    await sleep(600);
+    const calm = await state(page);
+    assert.deepEqual([calm.fledge, calm.brood.queue.length, calm.babies[0].vanish], [null, 0, 0]);
+    assert.deepEqual(page.errors, []);
+  });
+
+  await test('brood: what happened in another tab arrives without the ceremony', async () => {
+    const page = await open({ cfg: { ducklings: 2 } });
+    await duck(page, 'storageSet', 'local', { brood: { ages: [2, 17, 0, 0, 0, 0, 0, 0], fledged: 0 }, days: { last: '2026-11-13', streak: 1, best: 1, total: 1 } });
+    await until(async () => (await state(page)).babies[1].stage === 3, 'the family', 2000);
+    // the claim is made elsewhere: this page only sees storage change
+    await duck(page, 'claim', '2026-11-14', 0);
+    const s = await until(async () => { const v = await state(page); return v.babies[0].stage === 1 && v.babies[1].stage === 0 ? v : null; }, 'the new looks', 2000);
+    assert.deepEqual([s.fledge, s.brood.queue.length, s.babies[1].egg], [null, 0, null]);
+    assert.equal((await broodOf(page)).fledged, 1);
+  });
+
+  await test('brood: the ceremony waits while she is under water, and while they are in the nest', async () => {
+    const page = await open({ cfg: { ducklings: 2 } });
+    await settle(page);
+    await page.keyboard.press('Escape');
+    await until(async () => (await state(page)).submerged, 'dive', 2000);
+    await duck(page, 'setBrood', [3, 0, 0, 0, 0, 0, 0, 0], [{ slot: 0, kind: 'grow', stage: 1 }, { slot: 1, kind: 'fledge' }]);
+    await sleep(2500);
+    let s = await state(page);
+    assert.deepEqual([s.brood.queue.length, s.fledge], [2, null], 'nothing happens down there');
+    await page.keyboard.press('Escape');
+    // they come up one after the other: each ceremony starts with its duckling in view, not on empty water
+    const starts = [];
+    s = await until(async () => {
+      const v = await state(page);
+      if (v.brood.queue.length < 2 - starts.length) starts.push(v);
+      return v.brood.queue.length === 0 && !v.fledge && v.babies[1].egg === null ? v : null;
+    }, 'both ceremonies', 15000, 25);
+    assert.equal(starts.length, 2);
+    assert.ok(starts[0].babies[0].vanish === 0 && starts[0].babies[0].submerge < 0.5, 'the first is up for her growth spurt: ' + JSON.stringify(starts[0].babies[0]));
+    assert.notEqual(starts[0].state, 'surface', 'and mama has finished coming up');
+    assert.equal(starts[0].submerged, false);
+    assert.deepEqual(s.babies.map((b) => b.stage), [1, 0]);
+    // tucked in for the night: nobody is woken for a growth spurt
+    await duck(page, 'trigger', 'sleep');
+    await until(async () => (await state(page)).state === 'sleep', 'her nap', 12000);
+    await duck(page, 'setBrood', [7, 0, 0, 0, 0, 0, 0, 0], [{ slot: 0, kind: 'grow', stage: 2 }]);
+    await sleep(2500);
+    s = await state(page);
+    assert.deepEqual([s.brood.queue.length, s.babies[0].stage, s.state], [1, 1, 'sleep']);
+    await page.mouse.move(640, 430, { steps: 4 });
+    s = await until(async () => { const v = await state(page); return v.brood.queue.length === 0 && v.babies[0].stage === 2 ? v : null; }, 'the spurt once they are up', 9000);
+    assert.deepEqual(page.errors, []);
+  });
+
+  await test('brood: sent under water mid-ceremony, the egg waits and hatches once they are back', async () => {
+    const page = await open({ cfg: { ducklings: 1 } });
+    await settle(page);
+    await duck(page, 'setBrood', [0, 0, 0, 0, 0, 0, 0, 0], [{ slot: 0, kind: 'fledge' }]);
+    await until(async () => (await state(page)).fledge, 'her farewell', 5000, 40);
+    await page.keyboard.press('Escape');
+    const under = await until(async () => { const v = await state(page); return v.parked ? v : null; }, 'the scene to empty', 8000);
+    assert.equal(under.fledge, null, 'she left with the dive');
+    const t0 = under.babies[0].egg;
+    assert.ok(t0 !== null && t0 < 2, 'the egg is still an egg: ' + t0);
+    await sleep(3000);
+    assert.equal((await state(page)).babies[0].egg, t0, 'and its clock stands still down there');
+    await page.keyboard.press('Escape');
+    const out = await until(async () => { const v = await state(page); return !v.submerged && v.babies[0].egg === null ? v : null; }, 'the hatchling', 9000, 50);
+    assert.deepEqual([out.babies[0].stage, out.babies[0].vanish], [0, 0]);
+    assert.deepEqual(page.errors, []);
+  });
+
+  await test('brood: under reduced motion she fades where she swims, and the egg does not rock', async () => {
+    const page = await open({ cfg: { ducklings: 1 } });
+    await settle(page);
+    await duck(page, 'setBrood', [17, 0, 0, 0, 0, 0, 0, 0]);
+    await duck(page, 'apply', { reduceMotion: true });
+    await duck(page, 'setBrood', [0, 0, 0, 0, 0, 0, 0, 0], [{ slot: 0, kind: 'fledge' }]);
+    let highest = 0, faded = false;
+    await until(async () => {
+      const v = await state(page);
+      if (v.fledge) { highest = Math.max(highest, v.fledge.rise); if (v.fledge.alpha < 0.5) faded = true; }
+      return v.brood.queue.length === 0 && !v.fledge && v.babies[0].egg === null && v.babies[0].stage === 0;
+    }, 'the quiet version', 12000, 40);
+    assert.equal(highest, 0, 'no take-off');
+    assert.ok(faded, 'she fades out instead');
+  });
+
+  await test('brood: big ducklings still fit the nest, and mama gets to sleep', async () => {
+    const page = await open({ cfg: { ducklings: 6, sleepAfter: 5 } });
+    await duck(page, 'setBrood', [14, 15, 16, 17, 13, 12, 0, 0]);
+    await settle(page);
+    await duck(page, 'trigger', 'sleep');
+    const s = await until(async () => { const v = await state(page); return v.state === 'sleep' ? v : null; }, 'her nap after tucking six big ones in', 16000);
+    assert.equal(s.babies.length, 6);
+    assert.deepEqual(page.errors, []);
+  });
+
+  console.log('Autumn migration');
+
+  // A flock on its way, with nothing else going on around her.
+  async function quietPond(page) {
+    await duck(page, 'setEngine', 'fishCd', 999);
+    await duck(page, 'setEngine', 'visitorCd', 999);
+    await duck(page, 'setEngine', 'leafCd', 999);
+  }
+
+  await test('birds: on their own only from September through November', async () => {
+    for (const [iso, expected] of [
+      ['2026-08-31T12:00:00', false], ['2026-09-01T12:00:00', true], ['2026-10-15T12:00:00', true],
+      ['2026-11-13T12:00:00', true], ['2026-11-30T23:30:00', true], ['2026-12-01T00:30:00', false], ['2027-04-10T12:00:00', false]
+    ]) {
+      const page = await open({ hash: '#clock=' + iso, cfg: { playfulness: 1 } });
+      await noGiftToday(page);
+      await quietPond(page);
+      await duck(page, 'flockNow');
+      await sleep(250);
+      const c = await state(page);
+      assert.equal(!!c.flock, expected, iso);
+      assert.ok(c.flockCd > 400, 'and the next ones are minutes away: ' + c.flockCd);
+      await close(page);
+    }
+  });
+
+  await test('birds: not on their own under reduced motion, with effects off, at low playfulness or while she is hidden', async () => {
+    const page = await open({ hash: '#clock=2026-10-15T12:00:00', cfg: { playfulness: 1 } });
+    await noGiftToday(page);
+    await quietPond(page);
+    await settle(page);
+    const none = async (why) => {
+      await duck(page, 'flockNow');
+      await sleep(250);
+      const c = await state(page);
+      assert.equal(c.flock, null, why);
+      assert.equal(c.sky, null, why + ': no layer either');
+    };
+    await duck(page, 'apply', { reduceMotion: true });
+    await none('reduced motion');
+    await duck(page, 'apply', { reduceMotion: false, effects: false });
+    await none('effects off');
+    await duck(page, 'apply', { effects: true, playfulness: 0.2 });
+    await none('low playfulness');
+    await duck(page, 'apply', { playfulness: 1 });
+    await page.keyboard.press('Escape');
+    await until(async () => (await state(page)).submerged, 'dive', 2000);
+    await none('hidden with Esc');
+    await page.keyboard.press('Escape');
+    await until(async () => !(await state(page)).submerged, 'back', 2000);
+    await duck(page, 'flockNow');
+    await until(async () => (await state(page)).flock, 'and on again', 1500);
+  });
+
+  await test('birds: rare by default, the first minutes of a page stay empty', async () => {
+    const page = await open({ hash: '#clock=2026-10-15T12:00:00', cfg: { playfulness: 1 } });
+    const c = await state(page);
+    assert.ok(c.flockCd >= 85 && c.flockCd <= 240, 'first flock after ' + c.flockCd + ' s');
+    assert.equal(c.flock, null);
+    assert.equal(c.sky, null, 'no second layer on the page while nothing flies');
+  });
+
+  await test('birds: they cross the top on a layer of their own, and the page never notices', async () => {
+    const page = await open({ hash: '#clock=2026-10-15T12:00:00' });
+    await noGiftToday(page);
+    await quietPond(page);
+    await page.mouse.move(700, 520);
+    await duck(page, 'place', 620, 540);
+    await sleep(900);
+    const idle = await state(page);
+    const over0 = await duck(page, 'overflow');
+    await duck(page, 'trigger', 'birds');
+    const xs = [], samples = [];
+    await until(async () => {
+      const v = await state(page);
+      if (!v.flock) return samples.length > 5;
+      if (v.sky) {
+        samples.push(v);
+        xs.push(v.flock.x * v.flock.dir);
+      }
+      return false;
+    }, 'the flock to cross', 22000, 60);
+    assert.ok(samples.length > 20, 'watched it cross: ' + samples.length + ' samples');
+    for (const v of samples) {
+      assert.equal(v.sky.layers, 1);
+      assert.equal(v.sky.position, 'fixed');
+      assert.equal(v.sky.pointerEvents, 'none');
+      assert.ok(v.sky.w <= 220 && v.sky.h <= 150, `a small layer: ${v.sky.w}x${v.sky.h}`);
+      assert.ok(v.sky.y >= 0 && v.sky.y + v.sky.h <= 190, `along the top edge: ${v.sky.y}..${v.sky.y + v.sky.h}`);
+      assert.ok(v.flock.n >= 5 && v.flock.n <= 7, 'a small V: ' + v.flock.n);
+      // her own stage stays where she is, as small as when nothing flies
+      assert.ok(v.stage.w * v.stage.h <= Math.max(idle.stage.w * idle.stage.h * 1.6, 448 * 384), `stage ${v.stage.w}x${v.stage.h}, idle ${idle.stage.w}x${idle.stage.h}`);
+      assert.ok(v.stage.h < 500, 'and never reaches up to the birds: ' + v.stage.h);
+    }
+    for (let i = 1; i < xs.length; i++) assert.ok(xs[i] >= xs[i - 1] - 0.01, 'always onward');
+    assert.ok(xs[xs.length - 1] - xs[0] > 600, 'all the way across');
+    assert.ok(samples.some((v) => v.sky.ink > 150), 'and they are painted: ' + Math.max(...samples.map((v) => v.sky.ink)));
+    assert.deepEqual(await duck(page, 'overflow'), over0, 'no scrollbar came or went');
+    const end = await state(page);
+    assert.deepEqual([end.flock, end.sky], [null, null], 'gone, layer and all');
+    // and with them gone the scene is calm again
+    await sleep(1500);
+    await duck(page, 'countFrames');
+    await sleep(1000);
+    const fps = await duck(page, 'frames');
+    assert.ok(fps <= 40, `back to the calm rate: ${fps} fps, busy ${JSON.stringify(await duck(page, 'busyFrames'))}`);
+    assert.deepEqual(page.errors, []);
+  });
+
+  await test('birds: a click on a link under the flock is the page\'s click', async () => {
+    const page = await open({ hash: '#clock=2026-10-15T12:00:00' });
+    await noGiftToday(page);
+    await quietPond(page);
+    await page.mouse.move(700, 520);
+    await duck(page, 'place', 620, 540);
+    const link = await page.evaluate(() => { const r = document.getElementById('link').getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; });
+    // several flocks if need be: each takes its own height, and this one has to pass over the link
+    let over = null;
+    for (let round = 0; round < 6 && !over; round++) {
+      await duck(page, 'trigger', 'birds');
+      over = await until(async () => {
+        const v = await state(page);
+        if (!v.flock) return 'gone';
+        return v.sky && v.sky.x < link.x - 8 && v.sky.x + v.sky.w > link.x + 8 && v.sky.y < link.y - 4 && v.sky.y + v.sky.h > link.y + 4 ? v : null;
+      }, 'the flock over the link', 22000, 25);
+      if (over === 'gone') over = null;
+    }
+    assert.ok(over, 'a flock passed over the link');
+    const top = await page.evaluate((p) => { const el = document.elementFromPoint(p.x, p.y); return el && el.id; }, link);
+    assert.equal(top, 'link', 'the page still finds its link under the layer');
+    await page.mouse.click(link.x, link.y);
+    await sleep(80);
+    const log = await page.evaluate(() => ({ click: window.__log.click, hash: location.hash }));
+    assert.deepEqual(log.click, ['link']);
+    assert.equal(log.hash, '#clicked');
+  });
+
+  await test('birds: she looks up, follows them and calls after them twice; it counts once', async () => {
+    const page = await open({ hash: '#clock=2026-10-15T12:00:00', cfg: { ducklings: 2 } });
+    await noGiftToday(page);
+    await quietPond(page);
+    await settle(page, 600, 480);
+    await duck(page, 'trigger', 'birds');
+    const w = await until(async () => { const v = await state(page); return v.state === 'birdwatch' ? v : null; }, 'her to notice', 9000, 40);
+    assert.ok(w.flock.prog > 0.09 && w.flock.prog < 0.8, 'once they are well in view: ' + w.flock.prog);
+    const up = await until(async () => { const v = await state(page); return v.state === 'birdwatch' && v.headRot < -0.3 ? v : null; }, 'her beak to go up', 2500, 40);
+    assert.equal(up.face, up.flock.x > up.x ? 1 : -1, 'turned toward them');
+    assert.ok(up.babies.every((b) => b.headRot <= -0.4), 'the ducklings look up with her');
+    assert.ok(up.speed < 40, 'and she has stopped to watch');
+    const watched = [];
+    const done = await until(async () => {
+      const v = await state(page);
+      if (v.state === 'birdwatch' && v.flock) watched.push(v);
+      return v.calls >= 2 || !v.flock ? v : null;
+    }, 'her two calls', 14000, 50);
+    assert.equal(done.calls, 2);
+    assert.equal(done.stats.flocks, 1);
+    assert.ok(done.flock.called);
+    assert.equal(done.flock.looks, 1, 'one look, start to finish');
+    // she keeps facing them all the way (right overhead either side is fine), beak up
+    for (const v of watched) {
+      if (Math.abs(v.flock.x - v.x) > v.r) assert.equal(v.face, v.flock.x > v.x ? 1 : -1, 'facing them at ' + v.flock.prog.toFixed(2));
+    }
+    assert.ok(watched.filter((v) => v.headRot < -0.25).length > watched.length * 0.7, 'beak up most of the time');
+    // and both calls came once they had passed her, or were nearly gone
+    assert.ok((done.flock.x - done.x) * done.flock.dir > 0 || done.flock.prog > 0.7, 'she called after them');
+    const after = await until(async () => { const v = await state(page); return !v.flock ? v : null; }, 'them to leave', 14000, 80);
+    await until(async () => (await state(page)).state !== 'birdwatch', 'her to get on with her day', 2000);
+    assert.equal((await state(page)).stats.flocks, 1, 'one flock, one count');
+    assert.equal(after.sky, null);
+    assert.deepEqual(page.errors, []);
+  });
+
+  await test('birds: asleep she lets them pass, and a moving cursor takes her along', async () => {
+    const page = await open({ hash: '#clock=2026-10-15T12:00:00' });
+    await noGiftToday(page);
+    await quietPond(page);
+    await settle(page, 600, 480);
+    await duck(page, 'trigger', 'sleep');
+    await until(async () => (await state(page)).state === 'sleep', 'nap', 3000);
+    await duck(page, 'trigger', 'birds');
+    await until(async () => { const v = await state(page); return v.flock && v.flock.prog > 0.5; }, 'half way', 12000);
+    let s = await state(page);
+    assert.equal(s.state, 'sleep');
+    assert.equal(s.stats.flocks || 0, 0);
+    await duck(page, 'setEngine', 'flock', null);
+    await sleep(120);
+    assert.equal((await state(page)).sky, null, 'the layer goes with the flock');
+    // awake and watching, then the cursor moves off: she follows it, not the birds
+    await page.mouse.move(610, 470, { steps: 3 });
+    await settle(page, 600, 480);
+    await duck(page, 'trigger', 'birds');
+    await until(async () => (await state(page)).state === 'birdwatch', 'her to watch', 9000, 40);
+    await page.mouse.move(150, 650, { steps: 12 });
+    await until(async () => (await state(page)).state !== 'birdwatch', 'her to come along', 3000, 40);
+    await until(async () => { const v = await state(page); return Math.hypot(v.x - 150, v.y - 650) < v.r * 4; }, 'her to arrive', 9000);
+    assert.deepEqual(page.errors, []);
+  });
+
+  await test('birds: with the cursor on the move she stays with it, and says “!” at most once', async () => {
+    const page = await open({ hash: '#clock=2026-10-15T12:00:00' });
+    await noGiftToday(page);
+    await quietPond(page);
+    await settle(page, 300, 500);
+    await duck(page, 'countSays');
+    await duck(page, 'trigger', 'birds');
+    // long sweeps to and fro, well ahead of her, for the whole crossing
+    let looks = 0, watching = 0, samples = 0, i = 0;
+    await until(async () => {
+      i++;
+      await page.mouse.move(600 + Math.sin(i / 5) * 420, 430 + Math.cos(i / 7) * 160, { steps: 3 });
+      const v = await state(page);
+      if (!v.flock) return true;
+      samples++;
+      looks = Math.max(looks, v.flock.looks);
+      if (v.state === 'birdwatch') watching++;
+      return false;
+    }, 'the flock to cross', 22000, 25);
+    const end = await state(page);
+    assert.ok(samples > 40, 'swept through the crossing: ' + samples);
+    // her “!” for the birds has its own blue; a cursor that jumps far or swipes through her
+    // gets the reactions it always got
+    assert.ok(end.says.filter((t) => t === '! #59b6f7').length <= 1, 'bubbles: ' + JSON.stringify(end.says));
+    // however the input arrives (in bursts, in Firefox), another look takes two seconds to come
+    assert.ok(looks <= 6, 'no flicker in and out of watching: ' + looks + ' looks, ' + watching + ' of ' + samples + ' samples watching');
+    assert.deepEqual(page.errors, []);
+  });
+
+  await test('birds: Esc, the off switch and a paused site take the flock with them', async () => {
+    const page = await open({ hash: '#clock=2026-10-15T12:00:00' });
+    await noGiftToday(page);
+    await quietPond(page);
+    await settle(page);
+    const inFlight = async () => {
+      await duck(page, 'trigger', 'birds');
+      await until(async () => (await state(page)).sky, 'the layer', 2000, 40);
+    };
+    await inFlight();
+    await page.keyboard.press('Escape');
+    await until(async () => (await state(page)).submerged, 'dive', 2000);
+    assert.equal(await page.evaluate(() => document.querySelectorAll('[data-cursor-duck-sky]').length), 0, 'Esc');
+    const parked = await until(async () => { const v = await state(page); return v.parked ? v : null; }, 'the scene to empty', 6000);
+    assert.equal(parked.flock, null);
+    await page.keyboard.press('Escape');
+    await until(async () => !(await state(page)).submerged, 'back', 2000);
+    await inFlight();
+    await duck(page, 'storageSet', 'sync', { enabled: false });
+    await until(() => page.evaluate(() => document.querySelectorAll('[data-cursor-duck-sky]').length === 0), 'switched off', 2000);
+    await duck(page, 'storageSet', 'sync', { enabled: true });
+    await until(async () => (await state(page)).running, 'on again', 2000);
+    await inFlight();
+    await duck(page, 'storageSet', 'sync', { disabledHosts: ['127.0.0.1'] });
+    await until(() => page.evaluate(() => document.querySelectorAll('[data-cursor-duck-sky]').length === 0), 'paused site', 2000);
+    await duck(page, 'storageSet', 'sync', { disabledHosts: [] });
+    assert.deepEqual(page.errors, []);
+  });
+
+  await test('birds: a requested flock under reduced motion still crosses, and she keeps her wings still', async () => {
+    const page = await open({ hash: '#clock=2026-10-15T12:00:00' });
+    await noGiftToday(page);
+    await quietPond(page);
+    await settle(page, 600, 480);
+    await duck(page, 'apply', { reduceMotion: true });
+    await duck(page, 'trigger', 'birds');
+    const a = await until(async () => { const v = await state(page); return v.flock && v.sky && v.sky.ink > 100 ? v : null; }, 'the gliding flock', 3000, 40);
+    const b = await until(async () => { const v = await state(page); return v.flock && v.flock.prog > a.flock.prog + 0.2 ? v : null; }, 'it to move on', 6000);
+    assert.ok(b.flock.prog > a.flock.prog);
+    let flapped = 0, watched = 0;
+    const done = await until(async () => {
+      const v = await state(page);
+      if (v.state === 'birdwatch') { watched++; flapped = Math.max(flapped, v.wing); }
+      return v.calls >= 2 || !v.flock ? v : null;
+    }, 'her calls', 14000, 30);
+    assert.equal(done.calls, 2, 'she still calls after them');
+    assert.ok(watched > 10, 'and was watched doing it: ' + watched);
+    assert.ok(flapped < 0.1, 'no wave with the second call: ' + flapped);
+    assert.deepEqual(page.errors, []);
+  });
+
   console.log('Quiet by default');
 
   await test('calm: idle at about 30 fps with a small stage, leaf or not', async () => {
@@ -1192,14 +1992,23 @@ async function run() {
     const info = await page.evaluate(() => ({
       ach: document.getElementById('statAch').textContent,
       tricks: document.getElementById('statTricks').textContent,
-      cards: ['f15h', 'f16h', 'f17h', 'f18h'].map((k) => (document.querySelector('[data-i18n="' + k + '"]') || {}).textContent),
+      cards: ['f15h', 'f16h', 'f17h', 'f18h', 'f19h', 'f20h', 'f21h'].map((k) => (document.querySelector('[data-i18n="' + k + '"]') || {}).textContent),
       log: false
     }));
-    info.log = await until(() => page.evaluate(() => document.getElementById('timeline').textContent.includes('1.9.0')), 'the duck log', 3000);
-    assert.equal(info.ach, '72');
-    assert.equal(info.tricks, '20');
+    info.log = await until(() => page.evaluate(() => document.getElementById('timeline').textContent.includes('1.10.0')), 'the duck log', 3000);
+    assert.equal(info.ach, '76');
+    assert.equal(info.tricks, '21');
     assert.ok(info.cards.every(Boolean), JSON.stringify(info.cards));
-    assert.ok(info.log, 'the duck log lists 1.9.0');
+    assert.ok(info.log, 'the duck log lists 1.10.0');
+    assert.ok(await page.evaluate(() => document.getElementById('timeline').textContent.includes('1.9.0')), 'and still 1.9.0');
+    // the hero's two ducklings are a fluffball and an older sister
+    assert.deepEqual(await page.evaluate(() => window.__duck.babies.map((b) => b.stage)), [0, 1]);
+    // (the label follows the browser's language, the bird doesn't)
+    assert.equal(await page.evaluate(() => [...document.querySelectorAll('#tricks button')].some((b) => b.textContent.includes('🕊'))), true);
+    await page.evaluate(() => window.__duck.trigger('birds'));
+    await until(() => page.evaluate(() => document.querySelectorAll('[data-cursor-duck-sky]').length === 1), 'the birds over the site', 2000);
+    assert.ok(await page.evaluate(() => { const el = document.scrollingElement; return el.scrollWidth <= el.clientWidth; }), 'no sideways scroll');
+    await page.evaluate(() => window.__duck.dropFlock());
     await page.evaluate(() => window.__duck.trigger('leaf'));
     assert.equal(await page.evaluate(() => !!window.__duck.leaf), true);
     await page.evaluate(() => window.__duck.trigger('gift'));
@@ -1222,12 +2031,18 @@ async function run() {
       lang: document.documentElement.lang,
       f15: document.querySelector('[data-i18n="f15h"]').textContent,
       f18: document.querySelector('[data-i18n="f18h"]').textContent,
-      name: window.__duck.giftName('shell')
+      f19: document.querySelector('[data-i18n="f19h"]').textContent,
+      f20: document.querySelector('[data-i18n="f20h"]').textContent,
+      f21: document.querySelector('[data-i18n="f21h"]').textContent,
+      name: window.__duck.giftName('shell'),
+      stage: window.__duck.stageName('fluff'), grown: window.__duck.stageName('grown')
     }));
     assert.equal(info.lang, 'de');
     assert.equal(info.f15, 'Am Schlafittchen');
     assert.equal(info.f18, 'Treibende Blätter');
+    assert.deepEqual([info.f19, info.f20, info.f21], ['Vogelzug im Herbst', 'Küken, die heranwachsen', 'Tage zusammen']);
     assert.equal(info.name, 'Muschel');
+    assert.deepEqual([info.stage, info.grown], ['Flaumküken', 'Ausgewachsen']);
     assert.deepEqual(page.errors, []);
   });
 
@@ -1249,6 +2064,10 @@ async function run() {
       assert.equal(e.babiesHidden, 0, JSON.stringify(e));
       assert.deepEqual([e.carry, e.giftRun, e.submerged, e.drag, e.hoard, e.laptop, e.buddy, e.disco],
         [null, false, false, false, false, false, false, false], JSON.stringify(e));
+      // the birds have left with their layer, and every duckling looks her age
+      assert.deepEqual([e.flock, e.sky, e.fledge, e.eggs, e.broodQ], [false, 0, false, 0, 0], JSON.stringify(e));
+      assert.equal(e.shown, e.ages, JSON.stringify(e));
+      assert.equal(await page.evaluate(() => document.querySelectorAll('[data-cursor-duck-sky]').length), 0);
       await duck(page, 'countFrames');
       await sleep(500);
       assert.ok(await duck(page, 'frames') > 5, 'the frame loop is still alive');
@@ -1257,7 +2076,8 @@ async function run() {
   }
 
   await test('soak: between them, the runs went through naps and leaf tricks too', async () => {
-    for (const st of ['dragged', 'dragback', 'hide', 'surface', 'gift', 'sleep', 'goldnap', 'codenap', 'tuckin', 'dance', 'burst', 'waddle']) {
+    for (const st of ['dragged', 'dragback', 'hide', 'surface', 'gift', 'sleep', 'goldnap', 'codenap', 'tuckin', 'dance', 'burst', 'waddle',
+      'birdwatch', 'egg', 'fledge']) {
       assert.ok(soakSeen[st] > 0, 'never reached ' + st + ': ' + JSON.stringify(soakSeen));
     }
   });

@@ -22,6 +22,18 @@
   </header>
 
   <main>
+    <section class="days" id="days" title="Tage, die ihr zusammen verbracht habt. Gezählt wird einmal am Tag, nur auf diesem Gerät." data-i18n-title="daysTitle">
+      <div class="days-row">
+        <div class="days-main" id="dayMain"><span class="ico">🔥</span> <b id="dayStreak">0</b> <span id="dayLabel">Tage in Folge</span></div>
+        <div class="days-sub" id="daySub"></div>
+      </div>
+      <div class="days-hint" id="dayHint"></div>
+      <div class="days-debug" id="dayDebug" hidden>
+        <button type="button" class="ghost" id="dbgDay" data-i18n="dbgDay">+1 Tag (Test)</button>
+        <span id="dbgInfo"></span>
+      </div>
+    </section>
+
     <section data-sec="model">
       <div class="sec-head">
         <h2 class="sec-toggle"><span class="ico">🦆</span> <span data-i18n="secModel">Entenmodell</span></h2>
@@ -49,6 +61,14 @@
         <p class="gift-today" id="giftToday"></p>
         <div class="gifts" id="gifts"></div>
         <p class="gift-desc" id="giftDesc"></p>
+      </div>
+    </section>
+
+    <section data-sec="family">
+      <h2 class="sec-toggle"><span class="ico">🐣</span> <span data-i18n="secFamily">Familie</span> <span class="cnt" id="broodCount"></span></h2>
+      <div class="sec-body">
+        <div class="brood" id="brood"></div>
+        <p class="brood-note" id="broodNote"></p>
       </div>
     </section>
 

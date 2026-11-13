@@ -519,7 +519,7 @@
   // sonst putzt sie sich seelenruhig fertig und wirkt abgehängt.
   var INTERRUPTIBLE = {
     look: 1, preen: 1, flap: 1, shake: 1, quack: 1,
-    dabble: 1, spin: 1, bathe: 1, bob: 1, dance: 1, leafnudge: 1
+    dabble: 1, spin: 1, bathe: 1, bob: 1, dance: 1, leafnudge: 1, birdwatch: 1
   };
 
   // Set pieces a click or a petting cursor must not break into.
@@ -536,6 +536,7 @@
     this.e = engine;
     this.model = model;
     this.baby = !!isBaby;
+    this.kid = 0.55;          // a duckling's size against mama's; grows with her stage
     this.x = 0; this.y = 0; this.vx = 0; this.vy = 0;
     this.dirF = 1;            // -1..1 → x-Skalierung, erlaubt echtes Drehen
     this.face = 1;            // Zielrichtung (Vorzeichen + Verkürzung bei steilem Kurs)
@@ -566,7 +567,7 @@
   }
 
   Duck.prototype.radius = function () {
-    return 26 * this.e.cfg.size * (this.baby ? 0.55 : 1);
+    return 26 * this.e.cfg.size * (this.baby ? this.kid : 1);
   };
 
   Duck.prototype.setState = function (s, dur) {
@@ -622,6 +623,7 @@
     this.tuckKiss = this.tuckHeart = this.dbgAha = this.dbgThanks = false;
     this.burstOh = this.burstPop = this.burstBack = this.cnPuzzled = this.mediaDance = false;
     this.watchT = 0; this.hoverT = 0; this.spinAcc = 0; this.lastAng = null;
+    this.bwCalls = 0; this.bwBeak = 0;
   };
 
   // Can the cursor pick her up right now? Not while she is under water.
@@ -1148,6 +1150,47 @@
           if (Math.random() < 0.4) this.say('♪', '#c98a2e');
         }
         if (this.stTime > this.stDur) { this.nudged = false; this.setState('idle', 1); }
+        break;
+      }
+
+      case 'birdwatch': {
+        // Birds overhead: she stops, follows them with her beak and, once they
+        // have passed, calls after them. Twice, the second time with feeling.
+        var flk = e.flock;
+        if (!flk || this.stTime > this.stDur) { this.bwCalls = 0; this.setState('idle', 1); break; }
+        this.vx = approach(this.vx, 0, 4, dt);
+        this.vy = approach(this.vy, 0, 4, dt);
+        var bdx = flk.x - this.x;
+        if (Math.abs(bdx) > r * 0.6) this.face = bdx > 0 ? 1 : -1;
+        var upAng = Math.atan2(flk.y - (this.y - r * 1.55), Math.max(Math.abs(bdx), r * 0.8));
+        t.headRot = clamp(upAng, -0.62, 0.1);
+        t.wingLift = 0.15;
+        this.bwNext = Math.max(0, (this.bwNext || 0) - dt);
+        var away = bdx * flk.dir > r * 2 || flk.prog > 0.7;
+        if (away && this.bwCalls < 2 && this.bwNext <= 0) {
+          this.bwCalls = (this.bwCalls || 0) + 1;
+          this.bwBeak = 0.5;
+          this.bwNext = 1.25;
+          var second = this.bwCalls === 2;
+          e.sound.quack(this.model.quackPitch * (second ? 1.1 : 1), second);
+          var hb = this.headWorld();
+          e.fx.note(hb.x + this.dirF * r * 0.5, hb.y - r * 0.4);
+          if (second && this.model.confetti) e.fx.confetti(hb.x, hb.y);
+          if (this.bwCalls === 1) {
+            flk.called = true;
+            e.stats.flocks = (e.stats.flocks || 0) + 1;
+            e.saveStats();
+          }
+        }
+        this.bwBeak = Math.max(0, (this.bwBeak || 0) - dt);
+        if (this.bwBeak > 0) {
+          var call = Math.sin((1 - this.bwBeak / 0.5) * Math.PI);
+          t.beakOpen = call * 0.9;
+          t.headRot -= call * 0.12;
+          t.squash = 1 + call * 0.05;
+          // the second call comes with a wave (not under reduced motion)
+          if (this.bwCalls === 2 && !cfg.reduceMotion) t.wingFlap = Math.abs(Math.sin(e.time * 15)) * call;
+        }
         break;
       }
 
@@ -2341,6 +2384,9 @@
 
   // ── Küken ─────────────────────────────────────────────────────
   var babyOf = DuckRender.babyOf;   // Modell-Variante lebt im Renderer
+  // An egg's seconds above water: it bobs up, cracks from CRACK on, the top
+  // lifts off at OPEN, and at HATCH she is out.
+  var EGG_CRACK = 0.8, EGG_OPEN = 1.95, EGG_HATCH = 2.25;
   var RUBBER = DuckModels.get('rubber');   // the techie's debugging buddy
 
   // ── Engine ────────────────────────────────────────────────────
@@ -2398,6 +2444,15 @@
     this.giftName = null;     // host-provided localized gift name
     this.leaf = null;         // at most one drifting leaf
     this.leafCd = rand(25, 70);
+    this.flock = null;        // autumn: a V of birds crossing the top of the page
+    this.flockCd = rand(90, 240);
+    this.sky = null;          // the flock's own little layer, there only while it flies
+    this.broodAges = DuckModels.normBrood(null).ages;   // days together per duckling slot (the host knows)
+    this.broodShown = this.broodAges.slice();           // …and the age each one looks right now
+    this.broodQ = [];         // growth news waiting for their little ceremony
+    this.broodCd = 0;
+    this.fledge = null;       // a duckling that is grown up and on her way out into the world
+    this.stageName = null;    // host-provided localized stage name
     this._bound = {};
     this.setModel(this.cfg.model);
     if (!this.cfg.follow) this.planRoam(true);
@@ -2665,16 +2720,223 @@
 
   Engine.prototype.rebuildBabies = function () {
     var want = Math.max(0, Math.min(8, this.cfg.ducklings | 0));
-    var bm = babyOf(this.duck.model);
+    this.babyModels = {};   // one per growth stage, built from this mama
     this.babies.length = 0;
     for (var i = 0; i < want; i++) {
-      var b = new Duck(this, bm, true);
+      var b = new Duck(this, this.duck.model, true);
       b.x = this.duck.x - (i + 1) * 24;
       b.y = this.duck.y + 6;
-      b.gap = 34 * this.cfg.size * (i + 1);
       if (this.submerged) { b.vanish = 1; b.a.submerge = 1; b.diving = true; }
       this.babies.push(b);
     }
+    this.styleBabies();
+  };
+
+  // ── Ducklings that grow up ────────────────────────────────────
+  // How old each duckling is, in days together, is the host's business (the
+  // extension counts the days in its background page). Here they get the
+  // look of their age, and on the day one of them reaches a new stage or is
+  // grown up there is a little ceremony. `news` is what
+  // DuckModels.growBrood() reported; those ducklings keep yesterday's look
+  // until their turn has come.
+  Engine.prototype.setBrood = function (ages, news) {
+    var i, n, k;
+    this.broodAges = DuckModels.normBrood({ ages: ages }).ages;
+    for (i = 0; news && i < news.length; i++) {
+      n = news[i];
+      if (!n || !(n.slot >= 0 && n.slot < this.broodAges.length)) continue;
+      // one ceremony per duckling: leaving home outranks a growth spurt
+      for (k = 0; k < this.broodQ.length && this.broodQ[k].slot !== (n.slot | 0); k++) { /* find */ }
+      if (k === this.broodQ.length) this.broodQ.push({ slot: n.slot | 0, kind: 'grow' });
+      if (n.kind === 'fledge') this.broodQ[k].kind = 'fledge';
+      this.broodCd = Math.max(this.broodCd, 1.2);
+    }
+    for (i = 0; i < this.broodAges.length; i++) {
+      for (k = 0; k < this.broodQ.length && this.broodQ[k].slot !== i; k++) { /* find */ }
+      if (k === this.broodQ.length) this.broodShown[i] = this.broodAges[i];
+    }
+    this.styleBabies();
+    this.wake();
+  };
+
+  Engine.prototype.babyModel = function (stage) {
+    return this.babyModels[stage] ||
+      (this.babyModels[stage] = babyOf(this.duck.model, DuckModels.broodStages[stage].grow));
+  };
+
+  // Look, size and place in the row for every duckling that is out.
+  Engine.prototype.styleBabies = function () {
+    var gap = 0;
+    for (var i = 0; i < this.babies.length; i++) {
+      var b = this.babies[i];
+      b.stage = DuckModels.stageOf(this.broodShown[i] || 0);
+      b.kid = DuckModels.broodStages[b.stage].size;
+      b.model = this.babyModel(b.stage);
+      gap += 34 * this.cfg.size * b.kid / 0.55;   // the big ones need more room in the row
+      b.gap = gap;
+    }
+  };
+
+  Engine.prototype.stageLabel = function (id) {
+    var n = this.stageName ? this.stageName(id) : '';
+    if (n) return n;
+    if (id === DuckModels.grown.id) return DuckModels.grown.name;
+    for (var i = 0; i < DuckModels.broodStages.length; i++) {
+      if (DuckModels.broodStages[i].id === id) return DuckModels.broodStages[i].name;
+    }
+    return '';
+  };
+
+  // The stage's name, floating up over her head (`r`: how tall she is right now).
+  Engine.prototype.babyTag = function (b, emoji, id, r) {
+    var label = this.stageLabel(id);
+    var tag = this.fx.exclaim(b.x, b.y - (r || b.radius()) * 2.9, emoji + (label ? ' ' + label : ''), '#c98a2e');
+    tag.life = 2.4;
+    tag.vy = -12;
+  };
+
+  Engine.prototype.tickBrood = function (dt) {
+    var f = this.fledge, q = this.broodQ, d = this.duck;
+    if (f) this.tickFledge(f, dt);
+    if (!q.length) return;
+    this.broodCd = Math.max(0, this.broodCd - dt);
+    // one at a time and after the gift; never under water, in the air or in the nest
+    if (this.broodCd > 0 || this.fledge || this.submerged || this.drag || this.nest ||
+        this.giftQ || this.giftObj || d.state === 'gift' || d.state === 'surface' || d.vanish) return;
+    var n = q[0], b = this.babies[n.slot];
+    // back from a dive they come up one after the other: her turn waits until she is up
+    if (b && (b.vanish || b.diving || b.a.submerge > 0.3)) return;
+    q.shift();
+    this.broodShown[n.slot] = this.broodAges[n.slot];
+    this.broodCd = 0.9;
+    if (!b) return;   // that one stays at home today (the slider was turned down)
+    if (n.kind === 'fledge') this.fledgeBaby(b);
+    else this.growBaby(b);
+    this.wake();
+  };
+
+  // A new stage: a hop, a proud peep, and she looks the part.
+  Engine.prototype.growBaby = function (b) {
+    this.styleBabies();
+    var r = b.radius(), S = DuckModels.broodStages[b.stage];
+    b.popT = 0.7;
+    b.hopY = this.cfg.reduceMotion ? 0 : r * 0.55;
+    if (this.cfg.effects) {
+      for (var i = 0; i < 6; i++) this.fx.sparkle(b.x + rand(-r, r), b.y - r * rand(0.3, 1.8), '#fff3b0', rand(3, 6));
+      this.fx.ripple(b.x, b.y, 3, r * 1.6, 0.8, 'rgba(255,255,255,0.5)', 1.5);
+    }
+    this.sound.quack(b.model.quackPitch, true);
+    this.babyTag(b, S.emoji, S.id);
+  };
+
+  // Grown up: she becomes a duck where she swims, says goodbye and takes
+  // off into the world. An egg bobs up in her place in the row.
+  Engine.prototype.fledgeBaby = function (b) {
+    var calm = this.cfg.reduceMotion;
+    this.fledge = {
+      x: b.x, y: b.y, dir: b.dirF >= 0 ? 1 : -1, t: 0, dur: calm ? 1.9 : 2.9,
+      r0: b.radius(), phase: b.phase, model: babyOf(this.duck.model, 1),
+      called: false, waved: false
+    };
+    b.egg = { t: calm ? -1.3 : -2.1 };   // waits below the surface until she has left
+    this.styleBabies();                  // the one who hatches gets the look of her own age
+    if (this.cfg.effects) {
+      for (var i = 0; i < 8; i++) {
+        this.fx.sparkle(b.x + rand(-1, 1) * b.radius() * 1.4, b.y - b.radius() * rand(0.3, 2.2), '#fff3b0', rand(3, 7));
+      }
+    }
+    this.babyTag(b, DuckModels.grown.emoji, DuckModels.grown.id, this.duck.radius());
+  };
+
+  Engine.prototype.tickFledge = function (f, dt) {
+    var d = this.duck, calm = this.cfg.reduceMotion;
+    f.t += dt;
+    var R = d.radius() * 0.92;
+    f.r = f.r0 + (R - f.r0) * clamp(f.t / 0.7, 0, 1);
+    if (!f.called && f.t > 0.55) {
+      f.called = true;
+      this.sound.quack(f.model.quackPitch, true);
+      this.fx.note(f.x + f.dir * f.r * 0.6, f.y - f.r * 1.9);
+    }
+    if (!f.waved && f.t > 1.0) {
+      // mama sees her off, if she has a moment
+      f.waved = true;
+      if (AT_LEISURE[d.state] && !d.vanish) {
+        d.face = f.x >= d.x ? 1 : -1;
+        this.fx.heart(d.x, d.y - d.radius() * 1.8, 6 * this.cfg.size);
+        this.sound.quack(d.model.quackPitch * 1.1, true);
+      }
+      if (this.cfg.effects && !calm) {
+        this.fx.splash(f.x, f.y, 0.9);
+        for (var i = 0; i < 4; i++) this.fx.droplet(f.x + rand(-f.r, f.r), f.y - f.r * 0.4, rand(-90, 90), -rand(40, 140), rand(1, 1.8));
+        this.fx.feather(f.x, f.y - f.r, f.model.belly);
+      }
+      this.sound.splash(0.6);
+    }
+    // up and away: a climb that gets steeper, fading as she goes
+    var k = clamp((f.t - 1.0) / (f.dur - 1.0), 0, 1);
+    f.k = k;
+    f.rise = calm ? 0 : k * k * R * 5.2;
+    f.drift = calm ? 0 : f.dir * k * k * R * 4.2;
+    f.alpha = 1 - clamp((k - (calm ? 0.2 : 0.55)) / (calm ? 0.8 : 0.45), 0, 1);
+    if (f.t >= f.dur) this.fledge = null;
+  };
+
+  Engine.prototype.drawFledge = function (ctx) {
+    var f = this.fledge;
+    if (!f) return;
+    var k = f.k || 0, calm = this.cfg.reduceMotion;
+    var pulse = f.t < 0.7 ? Math.sin(f.t / 0.7 * Math.PI) * 0.08 : 0;
+    DuckRender.draw(ctx, f.model, {
+      x: f.x + (f.drift || 0), y: f.y, r: f.r || f.r0, dir: f.dir, t: this.time + f.phase,
+      bob: k > 0 ? 0 : Math.sin(this.time * 2.4 + f.phase) * f.r0 * 0.06,
+      hop: f.rise || 0, lean: calm ? 0 : -0.32 * k, squash: 1 + pulse,
+      wingFlap: k > 0 && !calm ? Math.abs(Math.sin(this.time * 17)) : (f.t > 0.55 && f.t < 1.0 ? 0.6 : 0),
+      wingLift: 0.3, eyeHappy: 1, headRot: -0.15 - 0.2 * k,
+      beakOpen: f.t > 0.55 && f.t < 0.85 ? 0.7 : 0,
+      alpha: this.cfg.opacity * (f.alpha == null ? 1 : f.alpha),
+      water: k <= 0, reflection: false
+    });
+  };
+
+  Engine.prototype.hatch = function (b) {
+    var r = b.radius(), S = DuckModels.broodStages[b.stage || 0];
+    b.egg = null;
+    b.popT = 0.8;
+    b.hopY = this.cfg.reduceMotion ? 0 : r * 0.7;
+    if (this.cfg.effects) {
+      // bits of shell and a puff of down
+      for (var i = 0; i < 4; i++) this.fx.feather(b.x + rand(-r, r) * 0.6, b.y - r * rand(0.4, 1.3), '#fff6e0');
+      for (var j = 0; j < 5; j++) this.fx.sparkle(b.x + rand(-r, r), b.y - r * rand(0.3, 1.6), '#fff3b0', rand(3, 6));
+      this.fx.ripple(b.x, b.y, 3, r * 1.8, 0.8, 'rgba(255,255,255,0.5)', 1.5);
+    }
+    this.sound.peck();
+    this.sound.quack(b.model.quackPitch, true);
+    this.babyTag(b, S.emoji, S.id);
+    this.wake();
+  };
+
+  // A duckling as she is right now: herself, or the egg she is about to
+  // hatch from (it waits below the surface until its sister has left).
+  Engine.prototype.drawBaby = function (ctx, b) {
+    if (!b.egg) { DuckRender.draw(ctx, b.model, b.pose()); return; }
+    var g = b.egg, r = b.radius();
+    if (g.t < 0 || b.vanish) return;
+    var up = clamp(g.t / 0.45, 0, 1);
+    var crack = clamp((g.t - EGG_CRACK) / 1.0, 0, 1);
+    var open = clamp((g.t - EGG_OPEN) / (EGG_HATCH - EGG_OPEN), 0, 1);
+    var rock = this.cfg.reduceMotion ? 0 : Math.sin(g.t * 15) * 0.2 * crack * (1 - open);
+    var s = r * 1.55;
+    var y = b.y + r * 0.16 + (1 - up) * s * 0.9 + Math.sin(this.time * 2.4 + b.phase) * 1.2;
+    ctx.save();
+    ctx.globalAlpha *= up * this.cfg.opacity * (1 - b.a.submerge);
+    ctx.strokeStyle = 'rgba(255,255,255,0.4)';
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.ellipse(b.x, b.y + r * 0.1, s * 0.6, s * 0.17, 0, 0, TAU);
+    ctx.stroke();
+    DuckRender.egg(ctx, b.x, y, s, rock, crack, open);
+    ctx.restore();
   };
 
   Engine.prototype.apply = function (cfg) {
@@ -3031,9 +3293,11 @@
   };
 
   // ── Canvas ────────────────────────────────────────────────────
-  Engine.prototype.mount = function (parent) {
+  // A fixed, click-through box on top of the page with a canvas in its own
+  // shadow root: her stage, and the layer the autumn birds fly on.
+  function overlay(attr) {
     var host = document.createElement('div');
-    host.setAttribute('data-cursor-duck', '');
+    host.setAttribute(attr, '');
     var s = host.style;
     // The host is only as big as the ducks. A viewport-sized canvas is a
     // full-screen transparent layer, and clearing it every frame forces the
@@ -3061,11 +3325,16 @@
     var canvas = document.createElement('canvas');
     canvas.style.cssText = 'position:absolute;left:0;top:0;display:block;pointer-events:none;';
     shadow.appendChild(canvas);
-    (parent || document.documentElement).appendChild(host);
+    return { host: host, canvas: canvas };
+  }
 
-    this.host = host;
-    this.canvas = canvas;
-    this.ctx = canvas.getContext('2d');
+  Engine.prototype.mount = function (parent) {
+    var layer = overlay('data-cursor-duck');
+    (parent || document.documentElement).appendChild(layer.host);
+
+    this.host = layer.host;
+    this.canvas = layer.canvas;
+    this.ctx = layer.canvas.getContext('2d');
     this.resize();
     this.bindInput();
     return this;
@@ -3407,6 +3676,7 @@
   Engine.prototype.stop = function () {
     this.pause();
     this.halted = true;
+    this.dropFlock();
     if (this.host) this.host.style.setProperty('display', 'none', 'important');
   };
   Engine.prototype.destroy = function () {
@@ -3460,7 +3730,9 @@
 
     this.updateFish(dt);
     this.updateLeaf(dt);
+    this.updateFlock(dt);
     this.tickGift(dt);
+    this.tickBrood(dt);
 
     // Wilde Ente: Besuch abwickeln bzw. gelegentlich einen ankündigen
     if (this.visitor) {
@@ -3524,7 +3796,8 @@
       var nSide = d0.x > this.w / 2 ? -1 : 1;
       // Nest wächst mit Kükenzahl UND Entengröße: der Slot-Ring (bei
       // r*0.38) muss allen Küken Platz nebeneinander bieten.
-      var rB = 26 * this.cfg.size * 0.55;
+      var rB = 0;
+      for (var nr = 0; nr < this.babies.length; nr++) rB = Math.max(rB, this.babies[nr].radius());
       var nCount = Math.min(8, this.babies.length);
       var need = nCount >= 2
         ? (rB * 1.15) / (2 * Math.sin(Math.PI / nCount) * 0.38)
@@ -3772,6 +4045,28 @@
       else if (this.babyAct === 'doze') { t.eyeOpen = 0.05; t.headRot = 0.15; }
     }
 
+    // a new stage, or fresh out of the egg: a proud little wriggle
+    if (this.popT > 0) {
+      this.popT -= dt;
+      t.beakOpen = Math.max(0, Math.sin(this.popT * 18)) * 0.6;
+      if (!e.cfg.reduceMotion) {
+        t.squash = 1 + Math.sin(this.popT * 22) * 0.09;
+        t.wingFlap = Math.abs(Math.sin(e.time * 16));
+      }
+    }
+    // still in the egg: it bobs up, rocks, cracks, and out she comes. Under
+    // water (Esc) it simply waits.
+    if (this.egg && !e.submerged && !this.diving) {
+      this.egg.t += dt;
+      if (this.egg.t >= EGG_HATCH) e.hatch(this);
+    }
+    // birds overhead: the little ones look up with her
+    if (e.flock && e.duck.state === 'birdwatch' && !this.nesting && !this.eating) {
+      this.face = e.flock.x >= this.x ? 1 : -1;
+      t.headRot = -0.45;
+      this.babyActT = 0;
+    }
+
     // mama in the air: everybody flaps in sympathy
     if (e.drag && e.drag.active && !this.nesting) {
       t.wingFlap = Math.abs(Math.sin(e.time * 15 + this.phase));
@@ -3849,13 +4144,14 @@
     if (d.hopY > 0.6) return true;
     // Particles ride along at whatever rate the scene is already on. A ripple
     // left over from stopping must not pin the whole page at 60 fps.
-    if (this.fish || this.visitor || this.disco) return true;
+    if (this.fish || this.visitor || this.disco || this.flock || this.fledge) return true;
     if (this.giftObj && (this.giftObj.t < 0.5 || this.giftObj.life < 0.5)) return true;
     var babies = this.babies, i, b;
     for (i = 0; i < babies.length; i++) {
       b = babies[i];
       if (Math.abs(b.vx) + Math.abs(b.vy) > 48) return true;
       if (!b.nesting && b.babyActT > 0) return true;
+      if (b.egg || b.popT > 0) return true;
     }
     if (this.nest && (this.nest.sink || this.nest.appear < 0.98)) return true;
     if (this.hoard && (this.hoard.sink || this.hoard.appear < 0.98)) return true;
@@ -3932,6 +4228,12 @@
     if (this.giftObj) {
       var go = this.giftObj, gs = go.s * 2.6;
       growBox(b, go.x - gs, go.y - gs, go.x + gs, go.y + gs);
+    }
+    if (this.fledge) {
+      // grown to mama's size, and on her way up and out
+      var fg = this.fledge, fgr = this.duck.radius() * (fg.model.scale || 1);
+      var fgx = fg.x + (fg.drift || 0);
+      growBox(b, fgx - fgr * 3.8, fg.y - fgr * 5.4 - (fg.rise || 0), fgx + fgr * 3.8, fg.y + fgr * 2.8);
     }
     if (this.fx && this.fx.expandBounds) this.fx.expandBounds(b);
     if (!(b.x1 > b.x0) || !(b.y1 > b.y0)) {
@@ -4024,6 +4326,7 @@
       var b = this.babies[i];
       if (!b.nesting) order.push({ y: b.y, k: 'b', o: b });
     }
+    if (this.fledge) order.push({ y: this.fledge.y, k: 'f' });
     // Im Goldhaufen bildet die Ente mit dem Haufen eine Einheit
     // (Rückwand → Ente → Vorderrand), genau wie die Küken im Nest — und
     // ebenso am Laptop (Bildschirm → Ente → Tastaturkante).
@@ -4038,7 +4341,8 @@
     for (var oi = 0; oi < order.length; oi++) {
       var it = order[oi];
       if (it.k === 'v') DuckRender.draw(ctx, this.visitor.model, this.visitor.pose());
-      else if (it.k === 'b') DuckRender.draw(ctx, it.o.model, it.o.pose());
+      else if (it.k === 'b') this.drawBaby(ctx, it.o);
+      else if (it.k === 'f') this.drawFledge(ctx);
       else if (it.k === 'd') DuckRender.draw(ctx, this.duck.model, this.duck.pose());
       else if (it.k === 'g') this.drawHoard(ctx);
       else if (it.k === 'l') this.drawLaptop(ctx);
@@ -4049,6 +4353,7 @@
     if (this.leaf && (this.leaf.on || this.leaf.z > 0)) this.drawLeafObj(ctx);   // on her head, or still falling
     if (this.cfg.effects) this.fx.draw(ctx);
     if (this.disco) this.drawDiscoBall(ctx);   // hangs above everything
+    if (this.flock || this.sky) this.renderSky();
   };
 
   // ── Küken-Nest zeichnen ───────────────────────────────────────
@@ -4061,7 +4366,7 @@
       if (this.babies[i].nesting) ns.push(this.babies[i]);
     }
     ns.sort(function (a, b) { return a.y - b.y; });
-    for (var j = 0; j < ns.length; j++) DuckRender.draw(ctx, ns[j].model, ns[j].pose());
+    for (var j = 0; j < ns.length; j++) this.drawBaby(ctx, ns[j]);
     this.drawNestRing(ctx, false);
   };
 
@@ -4730,6 +5035,8 @@
     this.giftObj = null;
     this.leaf = null;
     this.fish = null;
+    this.fledge = null;
+    this.dropFlock();
     this.crumbs.length = 0;
     if (this.visitor) {
       this.fx.splash(this.visitor.x, this.visitor.y, 0.8);
@@ -5059,6 +5366,139 @@
     ctx.restore();
   };
 
+  // ── Autumn migration ──────────────────────────────────────────
+  // A small V of birds crosses the top of the page; she looks up and calls
+  // after them. The flock flies on a layer of its own, only as big as the
+  // flock and moved by its transform: on her stage it would stretch the
+  // canvas from her up to the top edge and all the way across the page.
+  Engine.prototype.spawnFlock = function () {
+    if (!this.host || this.w < 320 || this.h < 240) return null;
+    var dir = Math.random() < 0.5 ? -1 : 1;
+    var s = 6.5 * clamp(this.cfg.size, 0.75, 1.5);
+    var n = 5 + ((Math.random() * 3) | 0);   // 5 to 7 birds
+    var gx = s * 3.1, gy = s * 1.25;
+    var ranks = Math.ceil((n - 1) / 2), birds = [];
+    for (var i = 0; i < n; i++) {
+      // the leader in front, the others in turn on the upper and the lower arm
+      var rank = Math.ceil(i / 2), arm = i % 2 ? -1 : 1;
+      birds.push({
+        dx: -rank * gx + (i ? rand(-0.5, 0.5) * s : 0),
+        dy: arm * rank * gy + (i ? rand(-0.4, 0.4) * s : 0),
+        phase: Math.random() * TAU, rate: rand(2.8, 3.4)
+      });
+    }
+    // room behind and ahead of the leader and to either side: the flock's box
+    var back = ranks * gx + s * 2, front = s * 2, half = ranks * gy + s * 2;
+    this.flock = {
+      dir: dir, s: s, birds: birds, t: 0, flown: 0, prog: 0,
+      back: back, front: front, half: half,
+      x0: dir > 0 ? -front - 4 : this.w + front + 4,
+      y0: half + rand(8, 28),
+      vx: clamp(this.w / 10, 95, 210),
+      cd: 0, watching: false, called: false
+    };
+    this.flock.x = this.flock.x0;
+    this.flock.y = this.flock.y0;
+    this.wake();
+    return this.flock;
+  };
+
+  Engine.prototype.updateFlock = function (dt) {
+    var fl = this.flock, d = this.duck;
+    if (!fl) {
+      // On their own only in autumn, never under reduced motion or with
+      // effects off, and rarely. Clock checked at spawn time, not per frame.
+      if (this.cfg.effects && !this.cfg.reduceMotion && this.cfg.playfulness > 0.25 && !this.submerged) {
+        this.flockCd -= dt * this.cfg.playfulness;
+        if (this.flockCd <= 0) {
+          this.flockCd = rand(420, 900);
+          if (DuckModels.birdsInSeason()) this.spawnFlock();
+        }
+      }
+      return;
+    }
+    fl.t += dt;
+    fl.flown += fl.vx * dt;
+    fl.x = fl.x0 + fl.dir * fl.flown;
+    // how far across they are, by the page as wide as it is now
+    fl.prog = clamp(fl.flown / (this.w + fl.back + fl.front + 8), 0, 1);
+    fl.y = fl.y0 + Math.sin(fl.prog * Math.PI) * 9;   // a shallow arc across the page
+    // gone once the last of them is past the far edge (or the window shrank around them)
+    if (fl.dir > 0 ? fl.x - fl.back > this.w + 4 : fl.x + fl.back < -4) { this.dropFlock(); return; }
+    // She notices them once they are well in view, if she has nothing better
+    // to do; whisked away before her call, she gets another look.
+    if (fl.watching && d.state !== 'birdwatch') { fl.watching = false; fl.cd = 2; }
+    fl.cd = Math.max(0, fl.cd - dt);
+    if (!fl.watching && !fl.called && fl.cd <= 0 && fl.prog > 0.1 && fl.prog < 0.8 &&
+        AT_LEISURE[d.state] && !d.vanish && !this.submerged && !this.drag && !this.giftQ && !this.crumbsInView() &&
+        !this.calledAway()) {
+      fl.watching = true;
+      d.bwCalls = 0; d.bwBeak = 0; d.bwNext = 0.5;
+      d.setState('birdwatch', 24);
+      if (!fl.looks) d.say('!', '#59b6f7');   // the surprise is for the first look only
+      fl.looks = (fl.looks || 0) + 1;
+    }
+  };
+
+  // Is the cursor pulling her along right now? The same rule that breaks off
+  // her pastimes in Duck.update(): far ahead of her and on the move. Stopping
+  // for the birds then would only last a frame.
+  Engine.prototype.calledAway = function () {
+    var d = this.duck;
+    if (!this.cfg.follow) return false;
+    var keep = d.radius() * 1.9 * clamp(this.cfg.distance || 1, 1, 3);
+    return this.pointerSpeed > 60 && Math.hypot(this.px - d.x, this.py - d.y) > keep * 3;
+  };
+
+  Engine.prototype.dropFlock = function () {
+    this.flock = null;
+    var sky = this.sky;
+    if (!sky) return;
+    this.sky = null;
+    if (sky.host.parentNode) sky.host.parentNode.removeChild(sky.host);
+  };
+
+  // The birds' layer: mounted for one crossing, next to her stage.
+  Engine.prototype.mountSky = function (fl) {
+    if (!this.host || !this.host.parentNode) return null;
+    var pad = 6;
+    var layer = overlay('data-cursor-duck-sky');
+    var w = Math.ceil(fl.back + fl.front + pad * 2), h = Math.ceil(fl.half * 2 + pad * 2);
+    var dpr = this.dprBase || Math.min(2, root.devicePixelRatio || 1);
+    layer.canvas.width = Math.round(w * dpr);
+    layer.canvas.height = Math.round(h * dpr);
+    layer.canvas.style.width = w + 'px';
+    layer.canvas.style.height = h + 'px';
+    layer.host.style.setProperty('width', w + 'px', 'important');
+    layer.host.style.setProperty('height', h + 'px', 'important');
+    this.host.parentNode.appendChild(layer.host);
+    this.sky = { host: layer.host, canvas: layer.canvas, ctx: layer.canvas.getContext('2d'), dpr: dpr, pad: pad };
+    return this.sky;
+  };
+
+  Engine.prototype.renderSky = function () {
+    var fl = this.flock, sky = this.sky;
+    if (!fl) { this.dropFlock(); return; }
+    if (!sky) sky = this.mountSky(fl);
+    if (!sky || !sky.ctx) return;
+    var ctx = sky.ctx, dpr = sky.dpr, calm = this.cfg.reduceMotion;
+    // the leader's place on the layer; the others trail behind her
+    var lead = (fl.dir > 0 ? fl.back : fl.front) + sky.pad;
+    sky.host.style.setProperty('transform',
+      'translate3d(' + (fl.x - lead).toFixed(2) + 'px,' + (fl.y - fl.half - sky.pad).toFixed(2) + 'px,0)', 'important');
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, sky.canvas.width, sky.canvas.height);
+    ctx.setTransform(dpr * fl.dir, 0, 0, dpr, lead * dpr, (fl.half + sky.pad) * dpr);
+    ctx.globalAlpha = this.cfg.opacity;
+    for (var i = 0; i < fl.birds.length; i++) {
+      var b = fl.birds[i];
+      // under reduced motion they glide instead of flapping
+      var flap = calm ? 0.3 : Math.sin(fl.t * b.rate * TAU + b.phase);
+      var sway = calm ? 0 : Math.sin(fl.t * 1.3 + b.phase) * fl.s * 0.22;
+      DuckRender.bird(ctx, b.dx, b.dy + sway, fl.s, flap, 1);
+    }
+  };
+
   // ── Debug/Steuer-API ──────────────────────────────────────────
   // Deterministisch weiterrechnen (für Tests/Screenshots, unabhängig von rAF)
   Engine.prototype.simulate = function (seconds, dt) {
@@ -5085,6 +5525,10 @@
     }
     if (action === 'leaf') {
       if (!this.leaf) this.spawnLeaf();
+      return action;
+    }
+    if (action === 'birds') {
+      if (!this.flock) this.spawnFlock();
       return action;
     }
     if (action === 'fish') {
