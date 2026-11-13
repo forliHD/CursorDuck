@@ -67,8 +67,10 @@ audio file must be CC0/public domain and documented in `audio/SOURCES.md`.
   year ends, clock changes, time zones), ducklings' growth, migration from 1.9.0, locale
   parity, numbers in the copy
 - `node tests/e2e.mjs chrome|firefox [filter]`: the zip from `dist/` plus `tests/bridge.js`
-  in real browsers (build first). Firefox: `npx @puppeteer/browsers install firefox@stable
-  --path ~/.cache/puppeteer` or `FIREFOX_BIN`.
+  in real browsers (build first). The `site:` tests drive the website from `_site/`
+  (`python3 tools/site_build.py` first), served with the policy from `site/_headers`.
+  Firefox: `npx @puppeteer/browsers install firefox@stable --path ~/.cache/puppeteer` or
+  `FIREFOX_BIN`.
 - `node tests/perf.mjs`: idle CPU and frame rate of two packaged versions side by side
   (edit `VERSIONS`); a release must not idle heavier than the one before it
 
@@ -103,6 +105,16 @@ German string, the build checks it). `python3 tools/site_build.py` assembles
 version, counts and model names); Cloudflare Pages runs the same command with
 `_site` as output directory. The site runs the real engine, so it never needs
 screenshots or videos of the duck.
+
+The page's duck has what the extension's has, because she is the same code. The
+hero carries the popup's trick buttons and the feature cards have try-it buttons
+(free roam, dive, gift, leaf, birds, wardrobe, a day later). Each only asks the
+engine for what the popup or a day in the extension would. The build reads the
+trick list from `popup/popup.js` and the labels the site shares with the popup
+(tricks, wardrobe, day counter, family) from `_locales/` into `data.js`, so they
+have no second copy in `site/`. The family and the day counter on the cards are a
+preview on a calendar of their own (`passDay()` in `site/site.js`, on
+`DuckModels.countDay` and `growBrood`): the site stores nothing for them.
 
 For search engines the start page exists twice: `/` (English, x-default) and
 `/de/`, which the build pre-renders from `index.html` + `de.json`, linked by
