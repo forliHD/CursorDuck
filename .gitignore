@@ -14,3 +14,7 @@ _site/
 .wrangler/
 .dev.vars
 node_modules/
+
+# Python bytecode
+__pycache__/
+*.pyc
