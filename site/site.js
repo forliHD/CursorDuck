@@ -2,8 +2,8 @@
 /* The page runs the real extension engine: the duck that follows the visitor is
  * the shipped code, not a video. Everything else here is glue: language toggle,
  * store detection, the trick bar, the try-it buttons on the feature cards, the
- * model gallery, the changelog and a tiny procedural beat that the media-dance
- * feature can react to. */
+ * model gallery, the changelog, the folds that keep the page short on a phone
+ * and a tiny procedural beat that the media-dance feature can react to. */
 (function () {
   'use strict';
 
@@ -33,6 +33,11 @@
     nowSwimming: 'Swimming right now:',
     moreTricks: 'More tricks',
     fewerTricks: 'Fewer tricks',
+    moreDucks: 'Show all {n} ducks',
+    fewerDucks: 'Show fewer ducks',
+    moreIdeas: 'Show all {n} ideas',
+    fewerIdeas: 'Show fewer ideas',
+    olderReleases: 'Earlier versions ({n})',
     heroHintTouch: 'Psst, she’s already here. Tap anywhere and she comes over.',
     roamStop: '🏊 Follow me again',
     diveBack: '🫧 Come back up',
@@ -135,6 +140,7 @@
     renderBeatBtn();
     renderTheme();
     renderMenuLabels();
+    renderPeeks();
     try { doc.dispatchEvent(new CustomEvent('cd:lang', { detail: lang })); } catch (e) { /* old browser */ }
   }
 
@@ -573,6 +579,8 @@
     var box = $('#timeline');
     if (!box || !releases) return;
     box.innerHTML = '';
+    // on a phone the newest entry's notes and everything before it fold away
+    var older = fold('older-releases', T('olderReleases').replace('{n}', releases.length - 1));
     releases.forEach(function (r, i) {
       var art = el('article', 'release');
       var h = el('h3', '', 'v' + r.version + ' · ' + (r.title[lang] || r.title.en));
@@ -591,16 +599,18 @@
       art.appendChild(meta);
       var ul = el('ul');
       (r.items[lang] || r.items.en).forEach(function (s) { ul.appendChild(el('li', '', s)); });
-      if (i < 2) {
-        art.appendChild(ul);
-      } else {
-        var det = el('details');
-        det.appendChild(el('summary', '', T('whatsNew')));
-        det.appendChild(ul);
-        art.appendChild(det);
+      var notes = null;
+      if (i === 0) {
+        notes = fold('latest-notes', T('whatsNew'));
+      } else if (i > 1) {
+        notes = el('details');
+        notes.appendChild(el('summary', '', T('whatsNew')));
       }
-      box.appendChild(art);
+      if (notes) notes.appendChild(ul);
+      art.appendChild(notes || ul);
+      (i === 0 ? box : older).appendChild(art);
     });
+    if (releases.length > 1) box.appendChild(older);
   }
 
   // ── Numbers from the build (data.js) ──────────────────────────
@@ -729,6 +739,128 @@
     renderBeatBtn();
   }
 
+  // ── Folds: closed on a phone, open everywhere else ────────────
+  // theme.js decides what a phone is (html.compact) and opens them before the
+  // first paint where they belong open. Here the page remembers, for this visit,
+  // what somebody opened or closed, on each kind of screen: a phone turned on its
+  // side or a window pulled wide doesn't lose it.
+  var compactQ = window.CD_COMPACT || null;
+  var foldState = { compact: {}, wide: {} };
+  function isCompact() { return !!(compactQ && compactQ.matches); }
+  function foldOpen(id) {
+    var s = foldState[isCompact() ? 'compact' : 'wide'][id];
+    return s === undefined ? !isCompact() : s;
+  }
+  function setFold(d, open) {
+    if (d.hasAttribute('data-fold')) foldState[isCompact() ? 'compact' : 'wide'][d.id] = open;
+    d.open = open;
+  }
+  function applyFolds() {
+    $$('details[data-fold]').forEach(function (d) { d.open = foldOpen(d.id); });
+    renderPeeks();
+  }
+  // a fold built by the page itself (the changelog); on a wide screen it shows no handle
+  function fold(id, label) {
+    var d = el('details', 'quiet');
+    d.id = id;
+    d.setAttribute('data-fold', '');
+    d.open = foldOpen(id);
+    d.appendChild(el('summary', '', label));
+    return d;
+  }
+  // Lists cut short on a phone (the ducks, the ideas): the first few, and a
+  // button for the rest. On a wide screen the list is whole and the button gone.
+  function isHeading(e) { return /^H[1-6]$/.test(e.tagName); }
+  function peekButton(list) { return $('.peek-btn[aria-controls="' + list.id + '"]'); }
+  function renderPeeks() {
+    $$('[data-peek]').forEach(function (list) {
+      var b = peekButton(list), max = Number(list.getAttribute('data-peek')), n = 0;
+      if (!b) return;
+      Array.prototype.forEach.call(list.children, function (e) {
+        e.classList.toggle('beyond', n >= max);   // a heading goes with what stands below it
+        if (!isHeading(e)) n++;
+      });
+      var all = !!foldState.compact[list.id];
+      list.classList.toggle('all', all);
+      b.hidden = n <= max;
+      b.setAttribute('aria-expanded', all ? 'true' : 'false');
+      setText(b, T(b.getAttribute(all ? 'data-fewer' : 'data-more')).replace('{n}', n));
+    });
+  }
+  function navHeight() { var n = $('.nav'); return n ? n.offsetHeight : 0; }
+  function togglePeek(list) {
+    var all = !foldState.compact[list.id];
+    var first = $('.beyond:not(h3)', list);
+    foldState.compact[list.id] = all;
+    renderPeeks();
+    if (all) {
+      // on to the first one that was hidden: that is where the keyboard goes next
+      var f = first && (first.tabIndex >= 0 ? first : $('button, a[href]', first));
+      if (f) f.focus({ preventScroll: true });
+    } else if (list.getBoundingClientRect().top < navHeight()) {
+      peekButton(list).scrollIntoView({ block: 'center', behavior: 'instant' });   // what was below the list came up
+    }
+  }
+  // Whatever a link points at gets opened: the fold itself, every fold around it,
+  // and the one a section is about (data-opens).
+  function reveal(target) {
+    for (var e = target; e && e.nodeType === 1; e = e.parentNode) {
+      if (e.tagName === 'DETAILS' && !e.open) setFold(e, true);
+    }
+    var id = target.hasAttribute('data-peek') ? target.id : target.getAttribute('data-opens');
+    if (!id || !isCompact()) return;
+    foldState.compact[id] = true;   // also for one that isn't there yet: the changelog may still be on its way
+    applyFolds();
+  }
+  function hashTarget(hash) {
+    var id = '';
+    try { id = decodeURIComponent(String(hash || '').replace(/^#/, '')); } catch (e) { /* not one of ours */ }
+    return id ? doc.getElementById(id) : null;
+  }
+  function openHash(behavior) {
+    var t = hashTarget(location.hash);
+    if (!t) return;
+    reveal(t);
+    t.scrollIntoView({ behavior: behavior });
+  }
+  function setupFolds() {
+    if (!$('details[data-fold]')) return;
+    applyFolds();
+    if (compactQ && compactQ.addEventListener) compactQ.addEventListener('change', applyFolds);
+    else if (compactQ && compactQ.addListener) compactQ.addListener(applyFolds);
+    // toggle doesn't bubble. It comes a moment after the change, so a fold that
+    // applyFolds() opened only reports what it already is.
+    doc.addEventListener('toggle', function (ev) {
+      var d = ev.target;
+      if (!d.hasAttribute || !d.hasAttribute('data-fold')) return;
+      foldState[isCompact() ? 'compact' : 'wide'][d.id] = d.open;
+      // closed by its handle at the top of the screen, from far down in it: stay with it
+      if (!d.open && d.getBoundingClientRect().top < navHeight() - 1) d.scrollIntoView({ behavior: 'instant' });
+    }, true);
+    $$('[data-peek]').forEach(function (list) {
+      var b = peekButton(list);
+      if (b) b.onclick = function () { togglePeek(list); };
+      // the ideas arrive later, and come again with every vote
+      if (window.MutationObserver) new MutationObserver(renderPeeks).observe(list, { childList: true });
+    });
+    // before the browser scrolls to it: what is folded away has no place to scroll to
+    doc.addEventListener('click', function (ev) {
+      if (ev.button || ev.ctrlKey || ev.metaKey || ev.shiftKey || ev.altKey) return;
+      var a = ev.target.closest && ev.target.closest('a[href^="#"]');
+      var t = a && hashTarget(a.getAttribute('href'));
+      if (t) reveal(t);
+    });
+    window.addEventListener('hashchange', function () { openHash('auto'); });
+  }
+  // A link from elsewhere. A reload or the way back keep the place they had.
+  function openFirstHash() {
+    var nav = null;
+    try { nav = performance.getEntriesByType('navigation')[0]; } catch (e) { /* old browser */ }
+    if (!nav || nav.type === 'navigate') { openHash('instant'); return; }
+    var t = hashTarget(location.hash);
+    if (t) reveal(t);
+  }
+
   // ── Menu (hamburger), active section, back to top ─────────────
   var menuOpen = false;
   function setMenu(open) {
@@ -786,6 +918,7 @@
 
   // ── Boot ──────────────────────────────────────────────────────
   function init() {
+    setupFolds();
     setupMenu();
     setupScrollSpy();
     setupToTop();
@@ -803,6 +936,7 @@
     if (tb) tb.onclick = toggleTheme;
     var bb = $('#beatBtn');
     if (bb) bb.onclick = toggleBeat;
+    openFirstHash();
     try {
       var mq = window.matchMedia('(prefers-color-scheme: dark)');
       if (mq.addEventListener) mq.addEventListener('change', renderTheme);

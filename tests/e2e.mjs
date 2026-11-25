@@ -2020,6 +2020,12 @@ async function run() {
   const text = (page, sel) => page.evaluate((q) => { const e = document.querySelector(q); return e ? e.textContent.replace(/\s+/g, ' ').trim() : null; }, sel);
   const sideways = (page) => page.evaluate(() => { const el = document.scrollingElement; return el.scrollWidth - el.clientWidth; });
   const stored = (page) => page.evaluate(() => JSON.stringify([Object.keys(localStorage).sort(), Object.keys(sessionStorage).sort()]));
+  const PHONE = FIREFOX ? { width: 390, height: 844 } : { width: 390, height: 844, isMobile: true, hasTouch: true };
+  // Which folds are open, by id; what of a list is on screen.
+  const openFolds = (page) => page.evaluate(() => [...document.querySelectorAll('details[data-fold]')].filter((d) => d.open).map((d) => d.id));
+  // (not by its box: Chromium lays out what is inside a closed fold as well)
+  const shown = (page, sel) => page.evaluate((q) => [...document.querySelectorAll(q)].filter((e) => e.checkVisibility()).length, sel);
+  const openAll = (page) => page.evaluate(() => document.querySelectorAll('details').forEach((d) => { d.open = true; }));
 
   await test('site: counts, new cards and the tricks run on the real engine', async () => {
     const page = await sitePage('/');
@@ -2399,9 +2405,11 @@ async function run() {
   });
 
   await test('site: on a phone nothing sticks out sideways and every new button is within reach', async () => {
-    const page = await sitePage('/?lang=en', { viewport: FIREFOX ? { width: 390, height: 844 } : { width: 390, height: 844, isMobile: true, hasTouch: true } });
+    const page = await sitePage('/?lang=en', { viewport: PHONE });
     await quiet(page);
     assert.equal(await sideways(page), 0);
+    await openAll(page);
+    await press(page, '[aria-controls="gallery"]');
     await press(page, '#moreTricks');
     await press(page, '#hatBtn');
     await press(page, '#glassesBtn');
@@ -2409,24 +2417,213 @@ async function run() {
     await press(page, '#birdsBtn');
     await until(() => page.evaluate(() => document.querySelectorAll('[data-cursor-duck-sky]').length === 1), 'the birds', 2000);
     assert.equal(await sideways(page), 0, 'with everything open');
-    const out = await page.evaluate(() => [...document.querySelectorAll('#tricks button, .feat .row > *, #family .kid, #streak')]
+    const reach = '#tricks button, .feat .row > *, #family .kid, #streak, summary, .peek-btn, .tile, .release';
+    const out = await page.evaluate((q) => [...document.querySelectorAll(q)]
       .filter((e) => { const r = e.getBoundingClientRect(); return r.width > 0 && (r.left < 0 || r.right > innerWidth); })
-      .map((e) => e.textContent.trim().slice(0, 24)));
+      .map((e) => e.textContent.trim().slice(0, 24)), reach);
     assert.deepEqual(out, []);
+    assert.equal(await shown(page, '.feat .row button'), 11, 'with the groups open, every button is on the page');
     // the birds fit the narrow sky
     const sky = await page.evaluate(() => { const r = document.querySelector('[data-cursor-duck-sky]').getBoundingClientRect(); return [Math.round(r.width), Math.round(r.height)]; });
     assert.ok(sky[0] <= 220 && sky[1] <= 150, 'a small layer: ' + sky);
     await clean(page);
   });
 
+  await test('site: folds: a phone starts with the short page, and everything is still on it', async () => {
+    const page = await sitePage('/?lang=en', { viewport: PHONE });
+    await until(() => page.evaluate(() => !!document.getElementById('older-releases')), 'the duck log', 3000);
+    assert.deepEqual(await openFolds(page), [], 'everything closed');
+    const height = await page.evaluate(() => document.documentElement.scrollHeight);
+    assert.ok(height < 6000, 'the page is short: ' + height);
+    // the words are in the page all the same, for search engines and find-in-page
+    const there = await page.evaluate(() => ({
+      groups: [...document.querySelectorAll('.group')].map((g) => g.id + ':' + g.querySelectorAll('.feat').length),
+      cards: [...document.querySelectorAll('.feat h4[data-i18n]')].filter((h) => h.textContent.trim()).length,
+      words: document.getElementById('features').textContent.includes('a new fluffball hatches from an egg'),
+      tiles: document.querySelectorAll('#gallery .tile').length, releases: document.querySelectorAll('.release').length
+    }));
+    assert.deepEqual(there.groups, ['play:6', 'browsing:6', 'pond-life:6', 'day-by-day:3']);
+    assert.deepEqual([there.cards, there.words, there.tiles], [21, true, 39], JSON.stringify(there));
+    assert.deepEqual([await shown(page, '.feat'), await shown(page, '#tricks button'), await shown(page, '#gallery .tile'), await shown(page, '.release')], [0, 0, 6, 1]);
+    // by keyboard: the handles are ordinary stops, Enter opens, Space closes
+    await page.evaluate(() => document.querySelector('#play > summary').focus());
+    await page.keyboard.press('Enter');
+    await until(async () => (await openFolds(page)).join() === 'play', 'the group to open', 1500);
+    assert.equal(await shown(page, '.feat'), 6);
+    await page.keyboard.press('Tab');
+    assert.equal(await page.evaluate(() => document.activeElement.id), 'roamBtn', 'Tab goes into it');
+    await page.evaluate(() => document.querySelector('#play > summary').focus());
+    await page.keyboard.press('Space');
+    await until(async () => (await openFolds(page)).length === 0, 'the group to close', 1500);
+    await page.keyboard.press('Tab');
+    assert.equal(await page.evaluate(() => document.activeElement.parentNode.id), 'browsing', 'Tab passes what is closed');
+    assert.equal(await sideways(page), 0);
+    await clean(page);
+  });
+
+  await test('site: folds: the ducks and the ideas show a few, a button shows the rest', async () => {
+    const page = await sitePage('/?lang=en', { viewport: PHONE });
+    const btn = '[aria-controls="gallery"]';
+    const state = () => page.evaluate((q) => { const b = document.querySelector(q); return [b.textContent, b.getAttribute('aria-expanded')]; }, btn);
+    assert.deepEqual(await state(), ['Show all 39 ducks', 'false']);
+    await page.evaluate((q) => document.querySelector(q).focus(), btn);
+    await page.keyboard.press('Enter');
+    assert.deepEqual(await state(), ['Show fewer ducks', 'true']);
+    assert.equal(await shown(page, '#gallery .tile'), 39);
+    assert.equal(await page.evaluate(() => [...document.querySelectorAll('#gallery .tile')].indexOf(document.activeElement)), 6, 'the keyboard goes on with the first new duck');
+    // the rest is the real thing: pick one
+    await page.evaluate(() => [...document.querySelectorAll('#gallery .tile')].pop().click());
+    assert.equal(await page.evaluate(() => window.__duck.modelId), await page.evaluate(() => DuckModels.list[38].id));
+    await press(page, btn);
+    assert.deepEqual([await state(), await shown(page, '#gallery .tile')], [['Show all 39 ducks', 'false'], 6]);
+    // the ideas arrive later (there is no board behind this server: five by hand, two of them built)
+    assert.equal(await shown(page, '[aria-controls="pads"]'), 0, 'no button without ideas');
+    const ideas = (n) => page.evaluate((k) => {
+      const box = document.getElementById('pads');
+      box.textContent = '';
+      for (let i = 0; i < k; i++) {
+        if (i === 3) box.appendChild(document.createElement('h3')).textContent = 'Already built';
+        const p = box.appendChild(document.createElement('article'));
+        p.className = 'pad';
+        p.appendChild(document.createElement('button')).textContent = 'crumb ' + i;
+      }
+    }, n);
+    await ideas(5);
+    await until(async () => (await shown(page, '[aria-controls="pads"]')) === 1, 'the button', 1500);
+    assert.deepEqual([await text(page, '[aria-controls="pads"]'), await shown(page, '#pads .pad'), await shown(page, '#pads h3')], ['Show all 5 ideas', 3, 0], 'a heading goes with what it stands above');
+    await press(page, '[aria-controls="pads"]');
+    assert.deepEqual([await text(page, '[aria-controls="pads"]'), await shown(page, '#pads .pad'), await shown(page, '#pads h3')], ['Show fewer ideas', 5, 1]);
+    assert.equal(await page.evaluate(() => document.activeElement.textContent), 'crumb 3');
+    await ideas(5);   // a vote: the board is drawn again
+    await sleep(60);
+    assert.equal(await shown(page, '#pads .pad'), 5, 'still all of them');
+    await ideas(2);
+    await until(async () => (await shown(page, '[aria-controls="pads"]')) === 0, 'two need no button', 1500);
+    await clean(page);
+  });
+
+  await test('site: folds: a link opens what it points at, on arrival, from the menu and a second time', async () => {
+    let page = await sitePage('/?lang=en#pond-life', { viewport: PHONE });
+    const topOf = (sel) => page.evaluate((q) => Math.round(document.querySelector(q).getBoundingClientRect().top), sel);
+    assert.deepEqual(await openFolds(page), ['pond-life']);
+    await until(async () => { const y = await topOf('#pond-life'); return y >= 55 && y < 130; }, 'the group right below the bar', 2500);
+    // the menu: a section and the one list it is about
+    await press(page, '#menuBtn');
+    await press(page, '#siteNav a[href="#ducks"]');
+    assert.equal(await shown(page, '#gallery .tile'), 39);
+    assert.equal(await text(page, '[aria-controls="gallery"]'), 'Show fewer ducks');
+    await press(page, '#siteNav a[href="#changelog"]');
+    await until(async () => (await openFolds(page)).includes('older-releases'), 'the earlier versions', 2000);
+    assert.equal(await shown(page, '.release'), await page.evaluate(() => document.querySelectorAll('.release').length));
+    // closed again, the same link opens it again (the address doesn't change this time)
+    await page.evaluate(() => { document.getElementById('older-releases').open = false; });
+    await until(async () => !(await openFolds(page)).includes('older-releases'), 'closed', 1500);
+    await sleep(80);
+    await press(page, '#siteNav a[href="#changelog"]');
+    assert.ok((await openFolds(page)).includes('older-releases'));
+    // the address bar: a question, and a card inside a closed group
+    await page.evaluate(() => { location.hash = '#faq-safari'; });
+    await until(() => page.evaluate(() => document.getElementById('faq-safari').open), 'the question', 1500);
+    await page.evaluate(() => { location.hash = '#focus-mode'; });
+    await until(() => page.evaluate(() => document.getElementById('browsing').open), 'the group around the card', 1500);
+    await until(async () => { const y = await topOf('#focus-mode'); return y > 60 && y < 420; }, 'the card in view', 4000);
+    assert.equal(await page.evaluate(() => document.getElementById('play').open), false, 'the others stay closed');
+    // nowhere, and nonsense: nothing happens
+    await page.evaluate(() => { location.hash = '#nowhere'; });
+    await page.evaluate(() => { location.hash = '#%E0%A4%A'; });
+    await sleep(120);
+    await clean(page);
+    await close(page);
+    // the changelog arrives after the page: a link to it waits for that
+    page = await sitePage('/de/#changelog', { viewport: PHONE });
+    await until(async () => (await openFolds(page)).includes('older-releases'), 'the earlier versions on arrival', 3000);
+    assert.equal(await page.evaluate(() => location.hash), '#changelog', 'the address keeps its target');
+    await clean(page);
+  });
+
+  await test('site: folds: in German too, and a language switch leaves open what is open', async () => {
+    const page = await sitePage('/de/#day-by-day', { viewport: PHONE });
+    await until(() => page.evaluate(() => !!document.getElementById('older-releases')), 'the duck log', 3000);
+    assert.deepEqual(await openFolds(page), ['day-by-day']);
+    const n = await page.evaluate(() => document.querySelectorAll('.release').length - 1);
+    assert.deepEqual(await page.evaluate(() => [...document.querySelectorAll('.group h3, #her-tricks > summary, #older-releases > summary, .peek-btn:not([hidden])')].map((e) => e.textContent)),
+      ['🎪 Ihre Kunststücke', 'Mit ihr spielen', 'Während du surfst', 'Leben auf dem Teich', 'Tag für Tag', 'Alle 39 Enten zeigen', `Frühere Versionen (${n})`]);
+    await page.evaluate(() => { document.getElementById('older-releases').open = true; });
+    await press(page, '[aria-controls="gallery"]');
+    await sleep(80);
+    await press(page, '#langBtn');
+    assert.deepEqual(await openFolds(page), ['day-by-day', 'older-releases'], 'the rebuilt log is open again');
+    assert.deepEqual([await text(page, '#play h3'), await text(page, '#older-releases > summary'), await text(page, '[aria-controls="gallery"]')],
+      ['Playing with her', `Earlier versions (${n})`, 'Show fewer ducks']);
+    assert.equal(await sideways(page), 0);
+    await clean(page);
+  });
+
+  await test('site: folds: wide screens see everything, and each kind of screen keeps what was opened on it', async () => {
+    const page = await sitePage('/?lang=en');
+    await until(() => page.evaluate(() => !!document.getElementById('older-releases')), 'the duck log', 3000);
+    const all = await page.evaluate(() => [...document.querySelectorAll('details[data-fold]')].map((d) => d.id));
+    assert.deepEqual(all, ['her-tricks', 'play', 'browsing', 'pond-life', 'day-by-day', 'latest-notes', 'older-releases']);
+    assert.deepEqual(await openFolds(page), all);
+    assert.deepEqual([await shown(page, '.feat'), await shown(page, '#gallery .tile'), await shown(page, '.peek-btn'), await shown(page, '.quiet > summary')], [21, 39, 0, 0]);
+    // a group can be closed here as well
+    await press(page, '#play > summary');
+    await until(async () => !(await openFolds(page)).includes('play'), 'closed', 1500);
+    await sleep(80);
+    // the window becomes a phone: folded, and what is opened there belongs there
+    await page.setViewport({ width: 390, height: 844 });
+    await until(async () => (await openFolds(page)).length === 0, 'the short page', 3000);
+    assert.deepEqual([await shown(page, '#gallery .tile'), await shown(page, '.peek-btn')], [6, 1]);
+    await press(page, '#pond-life > summary');
+    await until(async () => (await openFolds(page)).join() === 'pond-life', 'one group', 1500);
+    await sleep(80);
+    await page.setViewport({ width: 1100, height: 720 });
+    await until(async () => (await openFolds(page)).length === all.length - 1, 'the wide page', 3000);
+    assert.ok(!(await openFolds(page)).includes('play'), 'as it was left');
+    await page.setViewport({ width: 390, height: 844 });
+    await until(async () => (await openFolds(page)).join() === 'pond-life', 'and back to the phone', 3000);
+    await clean(page);
+  });
+
+  await test('site: folds: the open group’s handle stays in reach, and closing it keeps the place', async () => {
+    const page = await sitePage('/?lang=en#browsing', { viewport: PHONE });
+    const rect = (sel) => page.evaluate((q) => { const r = document.querySelector(q).getBoundingClientRect(); return { top: Math.round(r.top), bottom: Math.round(r.bottom) }; }, sel);
+    // deep inside the group the handle is still on screen, below the bar
+    await page.evaluate(() => document.querySelector('#diveBtn').scrollIntoView({ block: 'end', behavior: 'instant' }));
+    const bar = await rect('.nav'), handle = await rect('#browsing > summary');
+    assert.ok((await rect('#browsing')).top < -200, 'far down in it');
+    assert.ok(handle.top >= bar.bottom - 1 && handle.top < bar.bottom + 20, JSON.stringify([bar, handle]));
+    await press(page, '#browsing > summary');
+    await until(async () => { const r = await rect('#browsing > summary'); return r.top >= bar.bottom - 1 && r.bottom < 844; }, 'the closed group still on screen', 2000);
+    await clean(page);
+  });
+
+  await test('site: folds: without the page script a wide screen opens them, a phone’s still work by hand', async () => {
+    let page = await sitePage('/?lang=en', { block: /\/site\.js/ });
+    assert.deepEqual(await openFolds(page), ['her-tricks', 'play', 'browsing', 'pond-life', 'day-by-day'], 'theme.js, while the page is read');
+    assert.equal(await shown(page, '.feat'), 21);
+    await close(page);
+    page = await sitePage('/?lang=en', { viewport: PHONE, block: /\/site\.js/ });
+    assert.deepEqual(await openFolds(page), []);
+    await press(page, '#play > summary');
+    assert.deepEqual([await openFolds(page), await shown(page, '.feat')], [['play'], 6]);
+  }, { chromeOnly: true, why: 'requests are only intercepted in Chromium here' });
+
   await test('site: touch: the hint talks about tapping, a tap presses the buttons, a long press drags her', async () => {
     const page = await sitePage('/?lang=en', { viewport: { width: 390, height: 844, isMobile: true, hasTouch: true } });
     await quiet(page);
     assert.match(await text(page, '[data-i18n="heroHint"]'), /Tap anywhere/);
+    const middle = async (sel) => {
+      await page.evaluate((q) => document.querySelector(q).scrollIntoView({ block: 'center', behavior: 'instant' }), sel);
+      await sleep(300);
+      return page.evaluate((q) => { const r = document.querySelector(q).getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; }, sel);
+    };
+    // a tap opens the group the card is in
+    const handle = await middle('#browsing > summary');
+    await page.touchscreen.tap(handle.x, handle.y);
+    await until(() => page.evaluate(() => document.getElementById('browsing').open), 'the group to open', 1500);
     // a tap on a card button, at its place on the page
-    await page.evaluate(() => document.getElementById('diveBtn').scrollIntoView({ block: 'center', behavior: 'instant' }));
-    await sleep(300);
-    const at = await page.evaluate(() => { const r = document.getElementById('diveBtn').getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; });
+    const at = await middle('#diveBtn');
     await page.touchscreen.tap(at.x, at.y);
     await until(() => page.evaluate(() => window.__duck.submerged), 'a tap on Dive', 1500);
     await page.touchscreen.tap(at.x, at.y);

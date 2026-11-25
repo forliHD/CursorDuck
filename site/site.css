@@ -249,6 +249,30 @@ a { color: var(--accent-deep); }
 .title { margin: 0; font: 600 clamp(30px, 4.2vw, 44px)/1.1 var(--font-display); letter-spacing: -0.015em; }
 .sub { color: var(--muted); margin: 12px 0 0; font-size: 18px; }
 
+/* feature groups: the cards by topic. Closed on a phone, open everywhere else
+   (html.compact from theme.js, site.js does the rest) */
+.group { margin: 0 0 14px; scroll-margin-top: 78px; }
+.group > summary {
+  display: grid; grid-template-columns: auto minmax(0, 1fr) auto; column-gap: 14px; align-items: center;
+  padding: 14px 20px; border: 1px solid var(--line); border-radius: var(--radius);
+  background: var(--card); box-shadow: var(--shadow); cursor: pointer; list-style: none;
+}
+.group > summary::-webkit-details-marker { display: none; }
+.group > summary:hover { border-color: var(--accent); }
+.group > summary h3 { grid-column: 2; margin: 0; font: 600 21px/1.25 var(--font-display); }
+.g-ico { grid-row: 1 / span 2; font-size: 26px; line-height: 1; }
+.g-sub { grid-column: 2; color: var(--muted); font-size: 14.5px; line-height: 1.35; }
+.group > summary::after {
+  content: ''; grid-column: 3; grid-row: 1 / span 2; width: 9px; height: 9px; margin: 0 4px 5px;
+  border: solid var(--accent-deep); border-width: 0 2.5px 2.5px 0; transform: rotate(45deg); transition: transform .15s ease;
+}
+.group[open] > summary::after { transform: rotate(225deg); margin: 5px 4px 0; }
+.group > .features { margin: 14px 0 26px; }
+summary:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+/* a fold that only a phone has: without a handle, and always open, on wide screens */
+.quiet > summary { display: none; }
+.peek-btn { display: none; }
+
 /* feature cards */
 .features { display: grid; grid-template-columns: repeat(auto-fit, minmax(290px, 1fr)); gap: 16px; }
 .feat {
@@ -256,7 +280,7 @@ a { color: var(--accent-deep); }
   padding: 22px 24px; box-shadow: var(--shadow);
 }
 .feat .ico { font-size: 28px; line-height: 1; margin-bottom: 10px; }
-.feat h3 { margin: 0; font: 600 21px var(--font-display); }
+.feat h4 { margin: 0; font: 600 21px var(--font-display); }
 .feat p { color: var(--muted); margin: 6px 0 0; }
 .feat.try { border: 2px dashed var(--accent); }
 .tag {
@@ -408,19 +432,63 @@ a { color: var(--accent-deep); }
 @media (max-width: 760px) {
   .nav-inner { gap: 8px; }
   .brand { font-size: 19px; }
-  .hero { padding-top: 56px; }
-  .eyebrow { font-size: 12px; padding: 5px 12px; }
-  .pond { height: 150px; margin-top: 30px; }
-  .section { padding: 52px 0; }
-  .tag { float: none; display: inline-block; margin: 0 0 8px; }
+  .hero { padding-top: 36px; }
+  .eyebrow { font-size: 11.5px; letter-spacing: .03em; padding: 5px 12px; }
+  .lead { margin: 16px auto 24px; }
+  .pond { height: 120px; margin-top: 18px; }
+  .section { padding: 36px 0; scroll-margin-top: 34px; }
+  .section-head { margin-bottom: 20px; }
+  .sub { font-size: 17px; margin-top: 8px; }
+  .features { gap: 12px; }
+  .feat { padding: 16px 18px; }
+  .feat .ico { float: left; font-size: 23px; margin: 0 10px 0 0; }
+  .feat h4 { font-size: 20px; }
+  .feat > p:first-of-type { clear: left; }
+  .tag { font-size: 10.5px; margin: 1px 0 0 8px; }
+  /* numbers beside their words instead of above them */
+  .stats { gap: 8px; }
+  .stat {
+    display: flex; align-items: center; gap: 10px; flex: 1 1 40%; max-width: none;
+    padding: 8px 14px; text-align: left; line-height: 1.25;
+  }
+  .stat b { font-size: 26px; }
+  .zeros { grid-template-columns: 1fr; gap: 8px; }
+  .zero { display: flex; align-items: center; gap: 16px; padding: 10px 18px; text-align: left; line-height: 1.3; }
+  .zero b { font-size: 34px; }
+  .zero span { margin: 0; }
+  .faq summary { padding: 10px 0; font-size: 18px; }
 }
+@media (max-width: 480px) {
+  .gallery { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+  .tile { padding: 6px 2px 8px; }
+  .tile canvas { max-width: 100%; object-fit: contain; }
+}
+/* ── A phone: folded up ─────────────────────────────────────────── */
+.compact .quiet > summary { display: list-item; cursor: pointer; color: var(--accent-deep); font-weight: 800; padding: 8px 0; }
+.compact .hero .quiet { margin-top: 16px; }
+.compact .hero .quiet > summary { display: inline-flex; color: var(--ink); padding: 0 22px; list-style: none; }
+.compact .hero .quiet > summary::-webkit-details-marker { display: none; }
+.compact .hero .quiet > summary::after { content: '+'; color: var(--accent-deep); font-size: 20px; }
+.compact .hero .quiet[open] > summary::after { content: '–'; }
+.compact .release .quiet > summary { margin: 0; padding: 4px 0; }
+.compact #older-releases > .release:first-of-type { margin-top: 16px; }
+.compact .release { margin-bottom: 18px; }
+.compact [data-peek]:not(.all) > .beyond { display: none; }
+.compact .peek-btn:not([hidden]) { display: flex; width: 100%; margin-top: 14px; }
+.compact [data-peek="6"]:not(.all) ~ .legend { display: none; }
+/* the handle of an open group stays in reach */
+.compact .group[open] > summary { position: sticky; top: 68px; z-index: 5; }
+.compact .group > summary { padding: 12px 16px; }
+.compact .group { margin-bottom: 10px; scroll-margin-top: 68px; }
+.compact .feat[id], .compact .shelf { scroll-margin-top: 160px; }
+@media (min-width: 761px) { .feat[id], .shelf { scroll-margin-top: 78px; } }
 @media (max-width: 480px) {
   #navInstall { display: none; }
 }
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
   .wave svg, .lily { animation: none; }
-  .btn, .tile { transition: none; }
+  .btn, .tile, .group > summary::after { transition: none; }
 }
 
 /* ── Wishing pond ───────────────────────────────────────────────── */
@@ -471,6 +539,7 @@ a { color: var(--accent-deep); }
   background: var(--accent-soft); color: var(--accent-deep); border-radius: 14px;
   padding: 10px 14px; margin-bottom: 14px; font-weight: 800;
 }
+.admin-bar[hidden] { display: none; }
 .admin-bar .spacer { flex: 1; }
 .pad.pending { border: 2px dashed #e0a51c; }
 .badge.pending { background: #e0a51c; color: #3a2a00; }
