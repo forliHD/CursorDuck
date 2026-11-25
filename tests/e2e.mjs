@@ -2267,7 +2267,7 @@ async function run() {
     assert.equal(dead.length, 11);
     assert.deepEqual(dead.filter((b) => b[1] !== (b[0] !== 'beatBtn')), [], 'all greyed out but the beat');
     assert.deepEqual([await text(page, '#streak'), await page.evaluate(() => document.querySelectorAll('#family .kid').length)], ['', 0], 'no counter without her');
-    assert.equal(await shown(page, '.shelf'), 0, 'and no empty shelves');
+    assert.equal(await shown(page, '.shelf, .tune'), 0, 'and no empty shelves');
     assert.deepEqual(page.errors, []);
     await close(page);
     page = await sitePage('/?lang=en', { block: /\/data\.js/ });
@@ -2864,6 +2864,41 @@ async function run() {
     await page.evaluate(() => location.reload());
     await until(() => page.evaluate(() => !!window.__duck && document.getElementById('badgeCount').textContent === '0/76').catch(() => false), 'a fresh start after a reload', 4000);
     await clean(page);
+  });
+
+  await test('site: settings: size, speed and ducklings for this visit, and the family on the card follows', async () => {
+    const page = await sitePage('/?lang=en');
+    await quiet(page);
+    const before = await kept(page);
+    assert.equal(await page.evaluate(() => document.getElementById('settings').open), false, 'closed until asked for');
+    const panel = () => page.evaluate(() => [...document.querySelectorAll('.tune-box label')].map((l) => l.textContent + ' ' + document.querySelector('output[for="' + l.htmlFor + '"]').textContent));
+    assert.deepEqual(await panel(), ['Size 1.1×', 'Speed 1.0×', 'Ducklings 2']);
+    await press(page, '#settings > summary');
+    // by keyboard, the way a slider is moved
+    await page.evaluate(() => document.getElementById('tuneBabies').focus());
+    for (let i = 0; i < 9; i++) await page.keyboard.press('ArrowRight');
+    assert.deepEqual([await panel(), await page.evaluate(() => [window.__duck.cfg.ducklings, window.__duck.babies.length])], [['Size 1.1×', 'Speed 1.0×', 'Ducklings 6'], [6, 6]]);
+    assert.equal(await page.evaluate(() => document.querySelectorAll('#family .kid').length), 6, 'six of them on the card');
+    await page.keyboard.press('Home');
+    assert.deepEqual(await page.evaluate(() => [window.__duck.babies.length, document.querySelectorAll('#family .kid').length]), [0, 0]);
+    await page.evaluate(() => document.getElementById('tuneSize').focus());
+    await page.keyboard.press('End');
+    assert.equal(await page.evaluate(() => window.__duck.cfg.size), 2.2);
+    await page.evaluate(() => document.getElementById('tuneSpeed').focus());
+    await page.keyboard.press('Home');
+    assert.equal(await page.evaluate(() => window.__duck.cfg.speed), 0.4);
+    await press(page, '#langBtn');
+    assert.deepEqual(await panel(), ['Größe 2.2×', 'Tempo 0.4×', 'Küken 0']);
+    assert.equal(await kept(page), before, 'nothing of it is stored');
+    await clean(page);
+    await close(page);
+    // on a phone it waits inside the tricks, and fits
+    const phone = await sitePage('/?lang=en#settings', { viewport: PHONE });
+    assert.deepEqual([await openFolds(phone), await shown(phone, '.tune-box')], [['her-tricks'], 1], 'the link opens both');
+    const out = await phone.evaluate(() => [...document.querySelectorAll('.tune-box, .tune-box *')]
+      .filter((e) => { const r = e.getBoundingClientRect(); return r.left < 0 || r.right > innerWidth; }).length);
+    assert.deepEqual([out, await sideways(phone)], [0, 0]);
+    await clean(phone);
   });
 
   await test('site: folds: a link to the collection or the badges opens the shelf and the group it is in', async () => {

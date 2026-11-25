@@ -120,6 +120,18 @@
       <details class="quiet" id="her-tricks" data-fold>
         <summary class="btn btn-ghost" data-i18n="foldTricks">🎪 Try her tricks</summary>
         <div class="tricks" id="tricks"></div>
+        <details class="tune" id="settings">
+          <summary class="btn btn-ghost btn-mini" data-i18n="tuneFold">🎚️ Size, speed, ducklings</summary>
+          <div class="tune-box">
+            <label for="tuneSize"></label><output for="tuneSize"></output>
+            <input id="tuneSize" type="range" min="0.5" max="2.2" step="0.05" data-tune="size" data-label="lblSize">
+            <label for="tuneSpeed"></label><output for="tuneSpeed"></output>
+            <input id="tuneSpeed" type="range" min="0.4" max="2.2" step="0.05" data-tune="speed" data-label="lblSpeed">
+            <label for="tuneBabies"></label><output for="tuneBabies"></output>
+            <input id="tuneBabies" type="range" min="0" max="6" step="1" data-tune="ducklings" data-label="lblDucklings">
+            <p class="hint" data-i18n="tuneNote">For this visit only. The popup has these and many more.</p>
+          </div>
+        </details>
       </details>
     </div>
     <div class="pond" aria-hidden="true">

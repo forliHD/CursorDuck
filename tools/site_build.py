@@ -75,11 +75,13 @@ def stages_from(locale):
 
 
 # Strings the site shows exactly as the popup does: the trick buttons, the
-# wardrobe, the day counter, the family, the gifts and the badges. They come
-# from the extension's locale files, so the two never drift apart.
+# wardrobe, the day counter, the family, the gifts, the badges and a few
+# settings. They come from the extension's locale files, so the two never drift
+# apart.
 SHARED_KEYS = ['daysRowOne', 'daysRowMany', 'daysBest', 'daysTotalOne', 'daysTotalMany',
                'broodNextOne', 'broodNextMany', 'broodFledged',
-               'tierBronze', 'tierSilver', 'tierGold', 'tierDiamond']
+               'tierBronze', 'tierSilver', 'tierGold', 'tierDiamond',
+               'lblSize', 'lblSpeed', 'lblDucklings']
 SHARED = re.compile(r'^(?:trick_|wear_|giftD_)[a-z]+$|^ach[A-Z][A-Za-z0-9]*$|^(?:%s)$' % '|'.join(SHARED_KEYS))
 
 

@@ -563,6 +563,25 @@
     box.appendChild(doc.createTextNode(' '));
     box.appendChild(el('small', '', X('daysBest') + d.best + ' · ' + d.total + ' ' + X(d.total === 1 ? 'daysTotalOne' : 'daysTotalMany')));
   }
+  // A few of the popup's settings, for this visit: its words, its ranges
+  function renderTune() {
+    var box = $('#settings');
+    if (!box) return;
+    if (!engine || !DATA.ext) { box.hidden = true; return; }
+    $$('[data-tune]', box).forEach(function (input) {
+      var key = input.getAttribute('data-tune'), v = engine.cfg[key];
+      input.value = v;
+      setText($('label[for="' + input.id + '"]', box), X(input.getAttribute('data-label')));
+      setText($('output[for="' + input.id + '"]', box), key === 'ducklings' ? String(v) : v.toFixed(1) + '×');
+    });
+  }
+  function tune(input) {
+    var patch = {};
+    patch[input.getAttribute('data-tune')] = Number(input.value);
+    applyDuck(patch);
+    renderTune();
+    renderFamily();   // more ducklings, or fewer
+  }
   function renderRoam() {
     var b = $('#roamBtn');
     if (!b || !engine) return;
@@ -602,6 +621,7 @@
     renderStreak();
     renderGifts();
     renderBadges();
+    renderTune();
   }
   function setupTry() {
     var field = $('#focusField');
@@ -619,6 +639,7 @@
     on('birdsBtn', function () { engine.trigger('birds'); renderDive(); });
     on('hatBtn', function () { nextWear('hat'); });
     on('glassesBtn', function () { nextWear('glasses'); });
+    $$('[data-tune]').forEach(function (input) { input.oninput = function () { tune(input); }; });
     $$('[data-day]').forEach(function (b) {
       b.onclick = function () { passDay(Number(b.getAttribute('data-day')) || 1); };
     });
