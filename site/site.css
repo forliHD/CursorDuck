@@ -288,12 +288,18 @@ summary:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
   background: var(--accent-soft); color: var(--accent-deep);
   font-size: 11.5px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase;
 }
-.feat textarea {
-  width: 100%; margin-top: 14px; min-height: 84px; resize: vertical;
+.feat textarea, .feat .field {
+  width: 100%; margin-top: 14px;
   border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px;
   font: inherit; color: var(--ink); background: var(--bg);
 }
-.feat textarea:focus { outline: 2px solid var(--accent); border-color: transparent; }
+.feat textarea { min-height: 84px; resize: vertical; }
+.feat textarea:focus, .feat .field:focus { outline: 2px solid var(--accent); border-color: transparent; }
+.feat .field::placeholder { color: var(--muted); opacity: 1; }
+.field-label { display: block; margin-top: 14px; font-weight: 800; font-size: 14px; }
+.feat .field-label + .field { margin-top: 4px; }
+.feat p.state { color: var(--accent-deep); font-weight: 800; }
+.feat p.state:empty { margin: 0; }
 .selectme {
   margin: 14px 0 0; padding: 12px 14px; border-radius: 12px; background: var(--bg);
   font-style: italic; cursor: text; color: var(--ink);

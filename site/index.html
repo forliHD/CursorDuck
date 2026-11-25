@@ -237,10 +237,15 @@
                 <span class="hint" data-i18n="f16note">No Esc key on a touchscreen? This button does the same.</span>
               </div>
             </article>
-            <article class="feat" id="focus-mode">
+            <article class="feat try" id="focus-mode">
+              <span class="tag" data-i18n="tryTag">Try it</span>
               <div class="ico" aria-hidden="true">🙈</div>
               <h4 data-i18n="f13h">Focus mode &amp; calm mode</h4>
-              <p data-i18n="f13p">On password fields and fullscreen videos she steps aside. With “reduce motion” enabled in your system she skips pirouettes, dancing and the disco ball.</p>
+              <p data-i18n="f13p">On password fields and fullscreen videos she steps aside, and reports back with a “!”. With “reduce motion” enabled in your system she skips pirouettes, dancing and the disco ball.</p>
+              <label class="field-label" for="focusField" data-i18n="focusLabel">A pretend password</label>
+              <input class="field" id="focusField" type="password" autocomplete="off" spellcheck="false" data-1p-ignore data-lpignore="true" data-bwignore aria-describedby="focusNote" data-i18n-ph="focusPh" placeholder="Click in here and she’s gone.">
+              <p class="hint state" id="focusState" role="status"></p>
+              <p class="hint" id="focusNote" data-i18n="f13note">Please not a real one. Nothing in this field is read or sent, and it empties itself when you leave it.</p>
             </article>
           </div>
         </details>

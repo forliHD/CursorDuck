@@ -42,6 +42,7 @@
     roamStop: '🏊 Follow me again',
     diveBack: '🫧 Come back up',
     wearing: 'Wearing: {what}',
+    focusAway: '🙈 She has stepped aside. Leave the field and she’s back.',
     another: 'Another duck',
     soundOn: 'Sound on',
     soundOff: 'Sound off',
@@ -253,7 +254,7 @@
     engine.setBrood(pv.brood.ages);
     try {
       var q = window.matchMedia('(prefers-reduced-motion: reduce)');
-      var onChange = function () { engine.apply({ reduceMotion: !!q.matches }); };
+      var onChange = function () { applyDuck({ reduceMotion: !!q.matches }); };
       if (q.addEventListener) q.addEventListener('change', onChange);
       else if (q.addListener) q.addListener(onChange);
     } catch (e) { /* stays on the boot value */ }
@@ -261,6 +262,54 @@
       engine.setMedia(beat.playing || mediaPlaying());
       renderDive();   // Esc may have sent her under, or brought her back
     }, 1000);
+    setupFocusMode();
+  }
+
+  // ── Focus mode: the rule of the extension's content script ────
+  // On a password field and a fullscreen video she steps aside, and reports back
+  // with "!". Only watched from outside: no key is looked at, least of all Esc.
+  var focusHold = false, focusTimer = 0;
+  function focusHoldNow() {
+    try {
+      var fe = doc.fullscreenElement || doc.webkitFullscreenElement;
+      if (fe) {
+        var tag = (fe.tagName || '').toUpperCase();
+        if (tag === 'VIDEO' || tag === 'IFRAME' || !!(fe.querySelector && fe.querySelector('video'))) return true;
+      }
+      var ae = doc.activeElement;
+      return !!(ae && (ae.tagName || '').toUpperCase() === 'INPUT' && String(ae.type || '').toLowerCase() === 'password');
+    } catch (e) { return false; }
+  }
+  function updateFocusHold() {
+    var hold = focusHoldNow();
+    if (hold !== focusHold) {
+      focusHold = hold;
+      if (hold) engine.stop(); else engine.start();
+      if (!hold && engine.duck && !engine.submerged) {
+        try { engine.duck.say('!', '#4a90d9'); } catch (e) { /* decoration */ }
+      }
+    }
+    renderFocus();
+  }
+  // a tick later: between two password fields the focus is on nothing for a moment
+  function scheduleFocusCheck() {
+    if (focusTimer) return;
+    focusTimer = setTimeout(function () { focusTimer = 0; updateFocusHold(); }, 0);
+  }
+  function setupFocusMode() {
+    ['fullscreenchange', 'webkitfullscreenchange', 'focusin', 'focusout'].forEach(function (type) {
+      doc.addEventListener(type, scheduleFocusCheck);
+    });
+    updateFocusHold();   // the focus may be in such a field already
+  }
+  // A new setting starts the engine: while she has stepped aside it must not
+  function applyDuck(patch) {
+    engine.apply(patch);
+    if (focusHold) engine.stop();
+  }
+  function renderFocus() {
+    var box = $('#focusState'), field = $('#focusField');
+    if (box) setText(box, focusHold && doc.activeElement === field ? T('focusAway') : '');
   }
   function modelName(id) {
     var n = NAMES[lang] && NAMES[lang][id];
@@ -276,7 +325,7 @@
     c.appendChild(el('b', '', modelName(engine.modelId)));
   }
   function pickModel(id) {
-    engine.apply({ model: id });
+    applyDuck({ model: id });
     renderCurrent();
     renderFamily();   // the ducklings take after her
     renderDive();     // and a new duck comes up if the old one was under
@@ -336,7 +385,7 @@
     snd.type = 'button';
     snd.onclick = function () {
       soundOn = !soundOn;
-      engine.apply({ sound: soundOn });
+      applyDuck({ sound: soundOn });
       store('cd-sound', soundOn ? '1' : '0');
       renderTricks();
     };
@@ -444,7 +493,7 @@
     DuckModels.wardrobe.forEach(function (w) { if (w.kind === kind) ids.push(w.id); });
     var key = kind === 'hat' ? 'hat' : 'glasses', patch = {};
     patch[key] = ids[(ids.indexOf(engine.cfg[key] || '') + 1) % ids.length];
-    engine.apply(patch);
+    applyDuck(patch);
     renderWearing();
     renderDive();   // she comes up to show it
   }
@@ -457,18 +506,21 @@
   function renderTry() {
     renderRoam();
     renderDive();
+    renderFocus();
     renderWearing();
     renderFamily();
     renderStreak();
   }
   function setupTry() {
+    var field = $('#focusField');
+    if (field) field.addEventListener('blur', function () { field.value = ''; });   // whatever it was, it stays nowhere
     if (!engine) {
       // the engine did not load: a button that does nothing is worse than a grey one
       $$('.feat .row button').forEach(function (b) { if (b.id !== 'beatBtn') b.disabled = true; });
       return;
     }
     function on(id, fn) { var b = doc.getElementById(id); if (b) b.onclick = fn; }
-    on('roamBtn', function () { engine.apply({ follow: !engine.cfg.follow }); renderRoam(); });
+    on('roamBtn', function () { applyDuck({ follow: !engine.cfg.follow }); renderRoam(); });
     on('diveBtn', function () { engine.trigger('hide'); renderDive(); });
     on('giftBtn', function () { engine.trigger('gift'); renderDive(); });
     on('leafBtn', function () { engine.trigger('leaf'); renderDive(); });

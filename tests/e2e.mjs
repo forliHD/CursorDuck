@@ -2609,6 +2609,174 @@ async function run() {
     assert.deepEqual([await openFolds(page), await shown(page, '.feat')], [['play'], 6]);
   }, { chromeOnly: true, why: 'requests are only intercepted in Chromium here' });
 
+  // Focus mode on the page: is she away, and what has she said since.
+  const away = (page) => page.evaluate(() => window.__duck.halted === true && window.__duck.running === false &&
+    window.__duck.host.style.getPropertyValue('display') === 'none');
+  const back = (page) => page.evaluate(() => window.__duck.running === true && window.__duck.host.style.getPropertyValue('display') === 'block');
+  const listen = (page) => page.evaluate(() => {
+    const d = window.__duck.duck, say = d.say;
+    if (!window.__said) d.say = function (t) { window.__said.push(t); return say.apply(this, arguments); };
+    window.__said = [];
+  });
+  const said = (page) => page.evaluate(() => window.__said.filter((t) => t === '!').length);
+
+  await test('site: focus mode: she steps aside for the password field on the card, and reports back with “!”', async () => {
+    const page = await sitePage('/?lang=en');
+    await quiet(page);
+    await listen(page);
+    const before = await stored(page);
+    await page.evaluate(() => document.getElementById('focusField').scrollIntoView({ block: 'center', behavior: 'instant' }));
+    await sleep(200);
+    assert.deepEqual([await text(page, '#focusState'), await back(page)], ['', true]);
+    const at = await page.evaluate(() => { const r = document.getElementById('focusField').getBoundingClientRect(); return { x: r.x + 60, y: r.y + r.height / 2 }; });
+    await page.mouse.click(at.x, at.y);
+    await until(() => away(page), 'her to step aside', 1500);
+    assert.equal(await text(page, '#focusState'), '🙈 She has stepped aside. Leave the field and she’s back.');
+    await page.keyboard.type('not a real one');
+    assert.equal(await page.evaluate(() => document.getElementById('focusField').value), 'not a real one', 'the field is an ordinary field');
+    // whatever else changes meanwhile, she stays away: a new duck, a hat, the language, the system's motion setting
+    await page.evaluate(() => [...document.querySelectorAll('#gallery .tile')][2].click());
+    await press(page, '#hatBtn');
+    await press(page, '#roamBtn');
+    await press(page, '#roamBtn');
+    await press(page, '#langBtn');
+    assert.equal(await text(page, '#focusState'), '🙈 Sie ist abgetreten. Verlass das Feld, und sie ist wieder da.');
+    await page.mouse.move(at.x + 200, at.y + 120, { steps: 5 });
+    await sleep(200);
+    assert.equal(await away(page), true, 'still away');
+    assert.equal(await page.evaluate(() => window.__duck.cfg.hat), 'cap', 'and the settings arrived');
+    await press(page, '#langBtn');
+    await listen(page);
+    await page.keyboard.press('Tab');
+    await until(() => back(page), 'her back', 1500);
+    assert.deepEqual([await said(page), await text(page, '#focusState')], [1, '']);
+    assert.equal(await page.evaluate(() => document.getElementById('focusField').value), '', 'the field has emptied itself');
+    assert.equal((await stored(page)).replace('"cd-lang"', ''), before, 'nothing is stored but the language that was picked');
+    await clean(page);
+  });
+
+  await test('site: focus mode: the moderators’ login counts too, and from field to field she doesn’t pop up', async () => {
+    const page = await sitePage('/?lang=en&admin');
+    await until(() => away(page), 'her away on arrival: the login has the focus', 2000);
+    assert.equal(await page.evaluate(() => document.activeElement.id), 'adminTokenInput');
+    assert.equal(await text(page, '#focusState'), '', 'the card speaks of its own field only');
+    await listen(page);
+    await page.evaluate(() => {
+      window.__starts = 0;
+      const start = window.__duck.start;
+      window.__duck.start = function () { window.__starts++; return start.apply(this, arguments); };
+    });
+    await page.evaluate(() => document.getElementById('focusField').focus());
+    await sleep(150);
+    await page.evaluate(() => document.getElementById('adminTokenInput').focus());
+    await sleep(150);
+    assert.deepEqual([await away(page), await said(page), await page.evaluate(() => window.__starts)], [true, 0, 0]);
+    // an ordinary text field is no reason to go
+    await page.evaluate(() => document.querySelector('#browsing textarea').focus());
+    await until(() => back(page), 'her back', 1500);
+    assert.equal(await said(page), 1);
+    await clean(page);
+  });
+
+  await test('site: focus mode: a fullscreen video sends her away, a fullscreen picture doesn’t', async () => {
+    const page = await sitePage('/?lang=en');
+    await quiet(page);
+    await page.evaluate(() => {
+      for (const [id, inner] of [['fsVideo', 'video'], ['fsPlain', 'p']]) {
+        const box = document.body.appendChild(document.createElement('div'));
+        box.id = id;
+        box.appendChild(document.createElement(inner));
+        const b = document.body.appendChild(document.createElement('button'));
+        b.id = id + 'Btn';
+        b.textContent = id;
+        b.addEventListener('click', () => box.requestFullscreen());
+      }
+    });
+    await listen(page);
+    const full = async (id) => {
+      await page.evaluate((i) => document.getElementById(i).scrollIntoView({ block: 'center', behavior: 'instant' }), id + 'Btn');
+      await sleep(150);
+      const at = await page.evaluate((i) => { const r = document.getElementById(i).getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; }, id + 'Btn');
+      await page.mouse.click(at.x, at.y);
+      await until(() => page.evaluate(() => !!document.fullscreenElement), 'fullscreen', 2500);
+    };
+    const leave = async () => {
+      await page.evaluate(() => document.exitFullscreen());
+      await until(() => page.evaluate(() => !document.fullscreenElement), 'leaving fullscreen', 2500);
+    };
+    await full('fsPlain');
+    await sleep(200);
+    assert.equal(await away(page), false);
+    await leave();
+    const quietly = await said(page);
+    await full('fsVideo');
+    await until(() => away(page), 'her to step aside for the video', 1500);
+    await leave();
+    await until(() => back(page), 'her back', 1500);
+    assert.equal(await said(page) - quietly, 1);
+    await clean(page);
+  });
+
+  await test('site: focus mode: under water she stays under water, without a word', async () => {
+    const page = await sitePage('/?lang=en');
+    await quiet(page);
+    await page.mouse.move(560, 330);
+    await sleep(300);
+    await press(page, '#diveBtn');
+    await until(() => page.evaluate(() => window.__duck._parked), 'the family under water', 5000);
+    await listen(page);
+    await page.evaluate(() => document.getElementById('focusField').focus());
+    await until(() => page.evaluate(() => window.__duck.halted), 'focus mode', 1500);
+    await page.evaluate(() => document.getElementById('focusField').blur());
+    await until(() => page.evaluate(() => !window.__duck.halted), 'focus mode to end', 1500);
+    assert.deepEqual(await page.evaluate(() => [window.__duck.submerged, window.__duck.host.style.getPropertyValue('display')]), [true, 'none']);
+    assert.deepEqual([await said(page), await text(page, '#diveBtn')], [0, '🫧 Come back up']);
+    await press(page, '#diveBtn');
+    await until(() => back(page), 'her back up', 2000);
+    await clean(page);
+  });
+
+  await test('site: Esc is never taken away from the page: not by a fold, the password field or the menu', async () => {
+    const page = await sitePage('/?lang=en', { viewport: { width: 800, height: 720 } });
+    await quiet(page);
+    await page.mouse.move(400, 300);
+    await page.evaluate(() => {
+      window.__esc = [];
+      window.addEventListener('keydown', (e) => { if (e.key === 'Escape') window.__esc.push(e.defaultPrevented); });   // the last stop of the bubble phase
+    });
+    for (const focus of ['#focusField', '#play > summary', '#collection > summary, #day-by-day > summary', '#faq-safari > summary', '#langBtn']) {
+      await page.evaluate((q) => document.querySelector(q).focus(), focus);
+      await sleep(60);
+      const was = await page.evaluate(() => window.__esc.length);
+      await page.keyboard.press('Escape');
+      assert.deepEqual(await page.evaluate((n) => window.__esc.slice(n), was), [false], focus);
+      assert.equal(await page.evaluate((q) => document.activeElement === document.querySelector(q), focus), true, focus + ' keeps the focus');
+      if (focus === '#focusField') {
+        assert.deepEqual(await page.evaluate(() => [window.__duck.submerged, window.__duck.halted]), [false, true], 'in the field Esc is the field’s');
+      }
+    }
+    await press(page, '#menuBtn');
+    const was = await page.evaluate(() => window.__esc.length);
+    await page.keyboard.press('Escape');
+    assert.deepEqual(await page.evaluate((n) => window.__esc.slice(n), was), [false], 'the menu closes without keeping the key');
+    await clean(page);
+  });
+
+  await test('site: focus mode: by touch, in the folded page', async () => {
+    const page = await sitePage('/?lang=en#focus-mode', { viewport: PHONE });
+    await quiet(page);
+    await until(() => page.evaluate(() => document.getElementById('browsing').open), 'the group around the card', 2000);
+    await page.evaluate(() => document.getElementById('focusField').scrollIntoView({ block: 'center', behavior: 'instant' }));
+    await sleep(300);
+    const at = await page.evaluate(() => { const r = document.getElementById('focusField').getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; });
+    await page.touchscreen.tap(at.x, at.y);
+    await until(() => away(page), 'her to step aside', 1500);
+    await page.evaluate(() => document.activeElement.blur());   // the keyboard's "done"
+    await until(() => back(page), 'her back', 1500);
+    assert.equal(await sideways(page), 0);
+    await clean(page);
+  }, { chromeOnly: true, why: 'touch input is only emulated in Chromium here' });
+
   await test('site: touch: the hint talks about tapping, a tap presses the buttons, a long press drags her', async () => {
     const page = await sitePage('/?lang=en', { viewport: { width: 390, height: 844, isMobile: true, hasTouch: true } });
     await quiet(page);
