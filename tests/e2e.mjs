@@ -2692,10 +2692,11 @@ async function run() {
     const page = await sitePage('/?lang=en');
     await quiet(page);
     await page.evaluate(() => {
-      for (const [id, inner] of [['fsVideo', 'video'], ['fsPlain', 'p']]) {
-        const box = document.body.appendChild(document.createElement('div'));
+      // a picture, a player around a video, the video itself, an embedded player's frame
+      for (const [id, outer, inner] of [['fsPlain', 'div', 'p'], ['fsPlayer', 'div', 'video'], ['fsVideo', 'video', ''], ['fsFrame', 'iframe', '']]) {
+        const box = document.body.appendChild(document.createElement(outer));
         box.id = id;
-        box.appendChild(document.createElement(inner));
+        if (inner) box.appendChild(document.createElement(inner));
         const b = document.body.appendChild(document.createElement('button'));
         b.id = id + 'Btn';
         b.textContent = id;
@@ -2718,12 +2719,14 @@ async function run() {
     await sleep(200);
     assert.equal(await away(page), false);
     await leave();
-    const quietly = await said(page);
-    await full('fsVideo');
-    await until(() => away(page), 'her to step aside for the video', 1500);
-    await leave();
-    await until(() => back(page), 'her back', 1500);
-    assert.equal(await said(page) - quietly, 1);
+    for (const id of ['fsPlayer', 'fsVideo', 'fsFrame']) {
+      await listen(page);
+      await full(id);
+      await until(() => away(page), 'her to step aside for ' + id, 1500);
+      await leave();
+      await until(() => back(page), 'her back after ' + id, 1500);
+      assert.equal(await said(page), 1, id);
+    }
     await clean(page);
   });
 
