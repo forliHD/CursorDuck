@@ -2551,6 +2551,32 @@ async function run() {
     await clean(page);
   });
 
+  await test('site: folds: what a link points at lands in view, not under the bar or the group’s handle', async () => {
+    const ids = ['her-tricks', 'settings', 'play', 'browsing', 'pond-life', 'day-by-day', 'focus-mode', 'collection', 'badges', 'gallery', 'older-releases', 'faq-speed', 'faq-safari'];
+    for (const viewport of [PHONE, { width: 1100, height: 720 }]) {
+      const page = await sitePage('/de/', { viewport });   // German: the longer handles
+      await until(() => page.evaluate(() => !!document.getElementById('older-releases')), 'the duck log', 3000);
+      await page.evaluate(() => { document.documentElement.style.scrollBehavior = 'auto'; });
+      const off = [];
+      for (const id of ids) {
+        await page.evaluate((i) => { window.scrollTo(0, 0); location.hash = '#' + i; }, id);
+        await sleep(160);
+        const r = await page.evaluate((i) => {
+          const t = document.getElementById(i), own = t.tagName === 'DETAILS' ? t.querySelector('summary') : null;
+          const head = own && own.checkVisibility() ? own : t;
+          const g = t.closest('.group'), h = g && g !== t ? g.querySelector('summary') : null;
+          const covered = Math.max(document.querySelector('.nav').getBoundingClientRect().bottom,
+            h && getComputedStyle(h).position === 'sticky' ? h.getBoundingClientRect().bottom : 0);
+          return { top: Math.round(head.getBoundingClientRect().top), covered: Math.round(covered), h: innerHeight };
+        }, id);
+        if (!(r.top >= r.covered - 1 && r.top < r.h - 40)) off.push(id + ' ' + JSON.stringify(r));
+      }
+      assert.deepEqual(off, [], viewport.width + ' px wide');
+      await clean(page);
+      await close(page);
+    }
+  });
+
   await test('site: folds: in German too, and a language switch leaves open what is open', async () => {
     const page = await sitePage('/de/#day-by-day', { viewport: PHONE });
     await until(() => page.evaluate(() => !!document.getElementById('older-releases')), 'the duck log', 3000);

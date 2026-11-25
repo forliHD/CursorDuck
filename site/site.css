@@ -267,7 +267,8 @@ a { color: var(--accent-deep); }
 
 /* feature groups: the cards by topic. Closed on a phone, open everywhere else
    (html.compact from theme.js, site.js does the rest) */
-.group { margin: 0 0 14px; scroll-margin-top: 78px; }
+details[id], .feat[id], [data-peek] { scroll-margin-top: 78px; }   /* a link to it lands below the bar */
+.group { margin: 0 0 14px; }
 .group > summary {
   display: grid; grid-template-columns: auto minmax(0, 1fr) auto; column-gap: 14px; align-items: center;
   padding: 14px 20px; border: 1px solid var(--line); border-radius: var(--radius);
@@ -552,11 +553,11 @@ summary:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
 .compact [data-peek="6"]:not(.all) ~ .legend { display: none; }
 .compact .group > summary { padding: 12px 16px; }
 .compact .group { margin-bottom: 10px; scroll-margin-top: 68px; }
-.feat[id], .shelf { scroll-margin-top: 78px; }
 @media (min-height: 501px) {
-  /* the handle of an open group stays in reach (a phone on its side has no room for it) */
+  /* the handle of an open group stays in reach (a phone on its side has no room for it),
+     and what is linked inside lands below it, three lines of German included */
   .compact .group[open] > summary { position: sticky; top: 68px; z-index: 5; }
-  .compact .feat[id], .compact .shelf { scroll-margin-top: 160px; }
+  .compact .feat[id], .compact .shelf[id] { scroll-margin-top: 194px; }
 }
 @media (max-width: 480px) {
   #navInstall { display: none; }
