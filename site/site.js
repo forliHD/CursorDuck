@@ -42,6 +42,9 @@
     roamStop: '🏊 Follow me again',
     diveBack: '🫧 Come back up',
     wearing: 'Wearing: {what}',
+    giftNew: '✨ New in your collection: {what}',
+    giftAgain: '🎁 Another one: {what}',
+    giftUnknown: 'Not found yet',
     focusAway: '🙈 She has stepped aside. Leave the field and she’s back.',
     another: 'Another duck',
     soundOn: 'Sound on',
@@ -252,6 +255,9 @@
       return (names && names[id]) || '';
     };
     engine.setBrood(pv.brood.ages);
+    pv.days = DuckModels.countDay(null, DuckModels.dayKey(pv.date), 0);   // today counts: she is here
+    var counted = false;
+    engine.onStats = function () { counted = true; };
     try {
       var q = window.matchMedia('(prefers-reduced-motion: reduce)');
       var onChange = function () { applyDuck({ reduceMotion: !!q.matches }); };
@@ -261,6 +267,7 @@
     setInterval(function () {
       engine.setMedia(beat.playing || mediaPlaying());
       renderDive();   // Esc may have sent her under, or brought her back
+      if (counted) { counted = false; renderBadges(); }
     }, 1000);
     setupFocusMode();
   }
@@ -403,7 +410,9 @@
   var pv = {
     brood: { ages: [2, 16, 6, 11, 2, 16, 6, 11] },   // each a day or two short of the next step
     days: null,
-    date: new Date()
+    date: new Date(),
+    gifts: { total: 0, counts: {}, lastKind: '', isNew: false },
+    shownGift: ''   // the one the shelf tells about
   };
   // The next day she is met on a page (gap 2: a day was missed in between):
   // the same rules as in the extension, on a calendar that only exists here.
@@ -422,7 +431,89 @@
     engine.setBrood(pv.brood.ages, grown.news);
     renderFamily();
     renderStreak();
+    renderBadges();
     renderDive();
+  }
+  // A gift by the extension's own draw (what is missing counts double), into a
+  // collection that only exists here. Asked for, so she brings it right away.
+  function bringGift() {
+    var g = pv.gifts, id = DuckModels.rollGift(Math.random, g.counts);
+    g.isNew = !g.counts[id];
+    g.counts[id] = (g.counts[id] || 0) + 1;
+    g.total += 1;
+    g.lastKind = pv.shownGift = id;
+    if (engine.drag) engine.endDrag(true);
+    if (engine.submerged) engine.surface();
+    engine.startGiftRun({ id: id, isNew: g.isNew });
+    renderGifts();
+    renderBadges();
+    renderDive();
+  }
+  // The shelf, the way the popup shows it: found ones in full, the others as an outline
+  function renderGifts() {
+    var box = $('#gifts'), g = pv.gifts, found = 0;
+    if (!box) return;
+    if (!engine || !window.DuckRender || !DATA.ext) { $('#collection').hidden = true; return; }
+    DuckModels.gifts.forEach(function (gift, i) {
+      var n = g.counts[gift.id] || 0, b = box.children[i];
+      if (n) found++;
+      if (!b) {
+        b = el('button');
+        b.type = 'button';
+        var c = el('canvas'), W = 60, H = 44, dpr = Math.min(2, window.devicePixelRatio || 1);
+        c.width = W * dpr; c.height = H * dpr;
+        var x = c.getContext('2d');
+        x.setTransform(dpr, 0, 0, dpr, 0, 0);
+        DuckRender.gift(x, gift.id, W / 2, H / 2, 15, 1);
+        b.appendChild(c);
+        b.appendChild(el('span'));
+        b.appendChild(el('i'));
+        b.onclick = function () { pv.shownGift = gift.id; renderGifts(); };
+        box.appendChild(b);
+      }
+      b.className = 'g ' + gift.tier + (n ? '' : ' locked') + (g.lastKind === gift.id ? ' on' : '');
+      b.disabled = !n;
+      setText(b.childNodes[1], n ? engine.giftLabel(gift.id) : '???');
+      setText(b.childNodes[2], n > 1 ? '×' + n : '');
+      if (n) b.removeAttribute('aria-label'); else b.setAttribute('aria-label', T('giftUnknown'));
+    });
+    setText($('#giftCount'), found + '/' + DuckModels.gifts.length);
+    setText($('#giftDesc'), pv.shownGift ? engine.giftLabel(pv.shownGift) + ': ' + X('giftD_' + pv.shownGift) : '');
+    setText($('#giftNews'), g.lastKind ? T(g.isNew ? 'giftNew' : 'giftAgain').replace('{what}', engine.giftLabel(g.lastKind)) : '');
+  }
+  // The popup's badges, counted live: what the engine has seen on this page, the
+  // pretend days, the collection and the ducklings that have left
+  var BADGES = DATA.badges || [];
+  function renderBadges() {
+    var box = $('#badgeList'), earned = 0, stats = {};
+    if (!box) return;
+    if (!engine || !BADGES.length || !DATA.ext) { $('#badges').hidden = true; return; }
+    [engine.stats, DuckModels.giftStats(pv.gifts), DuckModels.dayStats(pv.days), { fledged: pv.brood.fledged || 0 }].forEach(function (from) {
+      for (var k in from) stats[k] = from[k];
+    });
+    BADGES.forEach(function (a, i) {
+      var val = stats[a[0]] || 0, done = val >= a[1], d = box.children[i];
+      if (done) earned++;
+      if (!d) {
+        d = el('details', 'ach ' + a[4]);
+        d.setAttribute('name', 'badge');   // one explanation at a time, as in the popup
+        var s = el('summary');
+        s.appendChild(el('span', 'em', a[2])).setAttribute('aria-hidden', 'true');
+        s.appendChild(el('span', 'tx'));
+        s.appendChild(el('span', 'pr'));
+        d.appendChild(s);
+        var p = d.appendChild(el('p'));
+        p.appendChild(el('b'));
+        p.appendChild(el('span'));
+        box.appendChild(d);
+      }
+      d.classList.toggle('done', done);
+      setText($('.tx', d), X(a[3]));
+      setText($('.pr', d), done ? '✓' : Math.min(val, a[1]) + '/' + a[1]);
+      setText($('p b', d), X('tier' + a[4].charAt(0).toUpperCase() + a[4].slice(1)) + ' · ');
+      setText($('p span', d), X(a[3] + 'D'));
+    });
+    setText($('#badgeCount'), earned + '/' + BADGES.length);
   }
   // The ducklings that are out, each at her stage, the way the popup shows them.
   // Only what changed is rewritten: the box is a live region, and a screen
@@ -464,7 +555,6 @@
   function renderStreak() {
     var box = $('#streak');
     if (!box || !engine || !DATA.ext) return;
-    if (!pv.days) pv.days = DuckModels.countDay(null, DuckModels.dayKey(pv.date), 0);   // today counts: she is here
     var d = pv.days;
     box.textContent = '';
     box.appendChild(el('b', '', '🔥 ' + d.streak));
@@ -510,6 +600,8 @@
     renderWearing();
     renderFamily();
     renderStreak();
+    renderGifts();
+    renderBadges();
   }
   function setupTry() {
     var field = $('#focusField');
@@ -522,7 +614,7 @@
     function on(id, fn) { var b = doc.getElementById(id); if (b) b.onclick = fn; }
     on('roamBtn', function () { applyDuck({ follow: !engine.cfg.follow }); renderRoam(); });
     on('diveBtn', function () { engine.trigger('hide'); renderDive(); });
-    on('giftBtn', function () { engine.trigger('gift'); renderDive(); });
+    on('giftBtn', bringGift);
     on('leafBtn', function () { engine.trigger('leaf'); renderDive(); });
     on('birdsBtn', function () { engine.trigger('birds'); renderDive(); });
     on('hatBtn', function () { nextWear('hat'); });

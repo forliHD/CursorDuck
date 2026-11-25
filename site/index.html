@@ -328,13 +328,25 @@
               <p data-i18n="f17p">On your first page of the day she dives and comes up with a little present: a pebble, a shell, a snail, and very rarely a pearl or a golden egg. The popup keeps your collection, on your device only.</p>
               <div class="row">
                 <button class="btn btn-ghost btn-mini" id="giftBtn" type="button" data-i18n="tryGift">🎁 Bring me one</button>
-                <span class="hint" data-i18n="f17note">Just to look at: this page keeps no collection.</span>
               </div>
+              <p class="hint state" id="giftNews" role="status"></p>
+              <details class="shelf" id="collection">
+                <summary><span data-i18n="shelfGifts">Your collection</span> <b class="cnt" id="giftCount"></b></summary>
+                <div class="gifts" id="gifts"></div>
+                <p class="hint" id="giftDesc" role="status"></p>
+              </details>
+              <p class="hint" data-i18n="f17note">Here every press brings one. Nothing is stored: a reload empties the collection.</p>
             </article>
-            <article class="feat">
+            <article class="feat try">
+              <span class="tag" data-i18n="tryTag">Try it</span>
               <div class="ico" aria-hidden="true">🏆</div>
               <h4 data-i18n="f12h">Achievements</h4>
               <p data-i18n="f12p">76 badges in bronze, silver, gold and diamond, from petting fan through “Identity crisis” to the 30-day “Regular”. Every badge tells you how to earn it.</p>
+              <details class="shelf" id="badges">
+                <summary><span data-i18n="shelfBadges">All badges</span> <b class="cnt" id="badgeCount"></b></summary>
+                <div class="badges" id="badgeList"></div>
+              </details>
+              <p class="hint" data-i18n="f12note">Counted live while you play on this page, days and gifts included. Nothing is stored: a reload starts over.</p>
             </article>
           </div>
         </details>

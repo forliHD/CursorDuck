@@ -8,9 +8,9 @@ This script
   1. copies site/ to _site/,
   2. adds src/{models,render,effects,engine}.js, audio/ and icons/,
   3. writes _site/data.js with the version, the model/achievement/trick counts,
-     the popup's trick buttons, the names and labels the site shares with the
-     extension in both languages (from _locales/) and the site strings (English
-     from the markup, German from site/de.json),
+     the popup's trick buttons and badges, the names and labels the site shares
+     with the extension in both languages (from _locales/) and the site strings
+     (English from the markup, German from site/de.json),
   4. checks that every data-i18n key used in the HTML has a German string and
      that releases.json is well-formed; when the newest release is missing from
      it, the entry is generated from the update page strings (tools/release_log.py),
@@ -75,11 +75,12 @@ def stages_from(locale):
 
 
 # Strings the site shows exactly as the popup does: the trick buttons, the
-# wardrobe, the day counter and the family. They come from the extension's
-# locale files, so the two never drift apart.
+# wardrobe, the day counter, the family, the gifts and the badges. They come
+# from the extension's locale files, so the two never drift apart.
 SHARED_KEYS = ['daysRowOne', 'daysRowMany', 'daysBest', 'daysTotalOne', 'daysTotalMany',
-               'broodNextOne', 'broodNextMany', 'broodFledged']
-SHARED = re.compile(r'^(?:trick_|wear_)[a-z]+$|^(?:%s)$' % '|'.join(SHARED_KEYS))
+               'broodNextOne', 'broodNextMany', 'broodFledged',
+               'tierBronze', 'tierSilver', 'tierGold', 'tierDiamond']
+SHARED = re.compile(r'^(?:trick_|wear_|giftD_)[a-z]+$|^ach[A-Z][A-Za-z0-9]*$|^(?:%s)$' % '|'.join(SHARED_KEYS))
 
 
 def shared_from(locale):
@@ -224,7 +225,16 @@ def main():
     seasonal = len(re.findall(r"^\s+season: \{", models_js, re.M))
     hats = len(re.findall(r"kind: 'hat'", models_js))
     glasses = len(re.findall(r"kind: 'glasses'", models_js))
-    achievements = len(re.findall(r"^\s+\['", block(popup_js, 'var ACHIEVEMENTS = ['), re.M))
+    badge_block = block(popup_js, 'var ACHIEVEMENTS = [')
+    achievements = len(re.findall(r"^\s+\['", badge_block, re.M))
+    # the popup's badges, in its order: [counter, goal, emoji, name key, tier]; the one
+    # for the whole collection counts the gifts
+    gifts = re.findall(r"^\s+\{ id: '([a-z]+)',", block(models_js, 'var GIFTS = ['), re.M)
+    badges = [[stat, int(goal) if goal.isdigit() else len(gifts), emoji, key, tier] for stat, goal, emoji, key, tier in
+              re.findall(r"^\s+\['(\w+)', (\d+|DuckModels\.gifts\.length), '([^']+)', '(\w+)', "
+                         r"'(?:[^'\\]|\\.)*', '(?:[^'\\]|\\.)*', '(bronze|silver|gold|diamond)'\]", badge_block, re.M)]
+    if len(badges) != achievements:
+        problems.append('popup.js: could read only %d of %d entries of ACHIEVEMENTS' % (len(badges), achievements))
     # the popup's trick buttons, in its order: [id, emoji]
     trick_block = block(popup_js, 'var TRICKS = [')
     tricks = re.findall(r"\['([a-z]+)', '[^']*', '([^']*)'\]", trick_block)
@@ -249,7 +259,10 @@ def main():
                 problems.append('trick %s has no name in _locales/%s' % (tid, loc))
     # the labels the cards read from the popup's strings: a renamed key must not ship as a blank
     wear = re.findall(r"\{ id: '([a-z]+)',\s+kind: '(?:hat|glasses)'", models_js)
-    for key in ['wear_' + w for w in wear] + SHARED_KEYS:
+    labels = ['wear_' + w for w in wear] + ['giftD_' + g for g in gifts] + SHARED_KEYS
+    for badge in badges:
+        labels += [badge[3], badge[3] + 'D']   # the name, and how to earn it
+    for key in labels:
         for loc in ('en', 'de'):
             if key not in shared[loc]:
                 problems.append('%s is missing in _locales/%s (the site shows it)' % (key, loc))
@@ -278,6 +291,7 @@ def main():
         'gifts': {'en': gifts_from('en'), 'de': gifts_from('de')},
         'stages': {'en': stages_from('en'), 'de': stages_from('de')},
         'tricks': tricks,
+        'badges': badges,
         'ext': shared,
         'en': {'dom': en_dom},
         'de': de
