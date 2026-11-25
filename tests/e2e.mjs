@@ -2463,7 +2463,7 @@ async function run() {
     await page.keyboard.press('Tab');
     assert.equal(await page.evaluate(() => document.activeElement.id), 'roamBtn', 'Tab goes into it');
     await page.evaluate(() => document.querySelector('#play > summary').focus());
-    await page.keyboard.press('Space');
+    await page.keyboard.press(' ');
     await until(async () => (await openFolds(page)).length === 0, 'the group to close', 1500);
     await page.keyboard.press('Tab');
     assert.equal(await page.evaluate(() => document.activeElement.parentNode.id), 'browsing', 'Tab passes what is closed');
