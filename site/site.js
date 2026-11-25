@@ -2,8 +2,8 @@
 /* The page runs the real extension engine: the duck that follows the visitor is
  * the shipped code, not a video. Everything else here is glue: language toggle,
  * store detection, the trick bar, the try-it buttons on the feature cards, the
- * model gallery, the changelog and a tiny procedural beat that the media-dance
- * feature can react to. */
+ * model gallery, the changelog, the folds that keep the page short on a phone
+ * and a tiny procedural beat that the media-dance feature can react to. */
 (function () {
   'use strict';
 
@@ -33,10 +33,19 @@
     nowSwimming: 'Swimming right now:',
     moreTricks: 'More tricks',
     fewerTricks: 'Fewer tricks',
+    moreDucks: 'Show all {n} ducks',
+    fewerDucks: 'Show fewer ducks',
+    moreIdeas: 'Show all {n} ideas',
+    fewerIdeas: 'Show fewer ideas',
+    olderReleases: 'Earlier versions ({n})',
     heroHintTouch: 'Psst, she’s already here. Tap anywhere and she comes over.',
     roamStop: '🏊 Follow me again',
     diveBack: '🫧 Come back up',
     wearing: 'Wearing: {what}',
+    giftNew: '✨ New in your collection: {what}',
+    giftAgain: '🎁 Another one: {what}',
+    giftUnknown: 'Not found yet',
+    focusAway: '🙈 She has stepped aside. Leave the field and she’s back.',
     another: 'Another duck',
     soundOn: 'Sound on',
     soundOff: 'Sound off',
@@ -135,6 +144,7 @@
     renderBeatBtn();
     renderTheme();
     renderMenuLabels();
+    renderPeeks();
     try { doc.dispatchEvent(new CustomEvent('cd:lang', { detail: lang })); } catch (e) { /* old browser */ }
   }
 
@@ -245,16 +255,68 @@
       return (names && names[id]) || '';
     };
     engine.setBrood(pv.brood.ages);
+    pv.days = DuckModels.countDay(null, DuckModels.dayKey(pv.date), 0);   // today counts: she is here
+    var counted = false;
+    engine.onStats = function () { counted = true; };
     try {
       var q = window.matchMedia('(prefers-reduced-motion: reduce)');
-      var onChange = function () { engine.apply({ reduceMotion: !!q.matches }); };
+      var onChange = function () { applyDuck({ reduceMotion: !!q.matches }); };
       if (q.addEventListener) q.addEventListener('change', onChange);
       else if (q.addListener) q.addListener(onChange);
     } catch (e) { /* stays on the boot value */ }
     setInterval(function () {
       engine.setMedia(beat.playing || mediaPlaying());
       renderDive();   // Esc may have sent her under, or brought her back
+      if (counted) { counted = false; renderBadges(); }
     }, 1000);
+    setupFocusMode();
+  }
+
+  // ── Focus mode: the rule of the extension's content script ────
+  // On a password field and a fullscreen video she steps aside, and reports back
+  // with "!". Only watched from outside: no key is looked at, least of all Esc.
+  var focusHold = false, focusTimer = 0;
+  function focusHoldNow() {
+    try {
+      var fe = doc.fullscreenElement || doc.webkitFullscreenElement;
+      if (fe) {
+        var tag = (fe.tagName || '').toUpperCase();
+        if (tag === 'VIDEO' || tag === 'IFRAME' || !!(fe.querySelector && fe.querySelector('video'))) return true;
+      }
+      var ae = doc.activeElement;
+      return !!(ae && (ae.tagName || '').toUpperCase() === 'INPUT' && String(ae.type || '').toLowerCase() === 'password');
+    } catch (e) { return false; }
+  }
+  function updateFocusHold() {
+    var hold = focusHoldNow();
+    if (hold !== focusHold) {
+      focusHold = hold;
+      if (hold) engine.stop(); else engine.start();
+      if (!hold && engine.duck && !engine.submerged) {
+        try { engine.duck.say('!', '#4a90d9'); } catch (e) { /* decoration */ }
+      }
+    }
+    renderFocus();
+  }
+  // a tick later: between two password fields the focus is on nothing for a moment
+  function scheduleFocusCheck() {
+    if (focusTimer) return;
+    focusTimer = setTimeout(function () { focusTimer = 0; updateFocusHold(); }, 0);
+  }
+  function setupFocusMode() {
+    ['fullscreenchange', 'webkitfullscreenchange', 'focusin', 'focusout'].forEach(function (type) {
+      doc.addEventListener(type, scheduleFocusCheck);
+    });
+    updateFocusHold();   // the focus may be in such a field already
+  }
+  // A new setting starts the engine: while she has stepped aside it must not
+  function applyDuck(patch) {
+    engine.apply(patch);
+    if (focusHold) engine.stop();
+  }
+  function renderFocus() {
+    var box = $('#focusState'), field = $('#focusField');
+    if (box) setText(box, focusHold && doc.activeElement === field ? T('focusAway') : '');
   }
   function modelName(id) {
     var n = NAMES[lang] && NAMES[lang][id];
@@ -270,7 +332,7 @@
     c.appendChild(el('b', '', modelName(engine.modelId)));
   }
   function pickModel(id) {
-    engine.apply({ model: id });
+    applyDuck({ model: id });
     renderCurrent();
     renderFamily();   // the ducklings take after her
     renderDive();     // and a new duck comes up if the old one was under
@@ -330,7 +392,7 @@
     snd.type = 'button';
     snd.onclick = function () {
       soundOn = !soundOn;
-      engine.apply({ sound: soundOn });
+      applyDuck({ sound: soundOn });
       store('cd-sound', soundOn ? '1' : '0');
       renderTricks();
     };
@@ -348,7 +410,9 @@
   var pv = {
     brood: { ages: [2, 16, 6, 11, 2, 16, 6, 11] },   // each a day or two short of the next step
     days: null,
-    date: new Date()
+    date: new Date(),
+    gifts: { total: 0, counts: {}, lastKind: '', isNew: false },
+    shownGift: ''   // the one the shelf tells about
   };
   // The next day she is met on a page (gap 2: a day was missed in between):
   // the same rules as in the extension, on a calendar that only exists here.
@@ -367,7 +431,89 @@
     engine.setBrood(pv.brood.ages, grown.news);
     renderFamily();
     renderStreak();
+    renderBadges();
     renderDive();
+  }
+  // A gift by the extension's own draw (what is missing counts double), into a
+  // collection that only exists here. Asked for, so she brings it right away.
+  function bringGift() {
+    var g = pv.gifts, id = DuckModels.rollGift(Math.random, g.counts);
+    g.isNew = !g.counts[id];
+    g.counts[id] = (g.counts[id] || 0) + 1;
+    g.total += 1;
+    g.lastKind = pv.shownGift = id;
+    if (engine.drag) engine.endDrag(true);
+    if (engine.submerged) engine.surface();
+    engine.startGiftRun({ id: id, isNew: g.isNew });
+    renderGifts();
+    renderBadges();
+    renderDive();
+  }
+  // The shelf, the way the popup shows it: found ones in full, the others as an outline
+  function renderGifts() {
+    var box = $('#gifts'), g = pv.gifts, found = 0;
+    if (!box) return;
+    if (!engine || !window.DuckRender || !DATA.ext) { $('#collection').hidden = true; return; }
+    DuckModels.gifts.forEach(function (gift, i) {
+      var n = g.counts[gift.id] || 0, b = box.children[i];
+      if (n) found++;
+      if (!b) {
+        b = el('button');
+        b.type = 'button';
+        var c = el('canvas'), W = 60, H = 44, dpr = Math.min(2, window.devicePixelRatio || 1);
+        c.width = W * dpr; c.height = H * dpr;
+        var x = c.getContext('2d');
+        x.setTransform(dpr, 0, 0, dpr, 0, 0);
+        DuckRender.gift(x, gift.id, W / 2, H / 2, 15, 1);
+        b.appendChild(c);
+        b.appendChild(el('span'));
+        b.appendChild(el('i'));
+        b.onclick = function () { pv.shownGift = gift.id; renderGifts(); };
+        box.appendChild(b);
+      }
+      b.className = 'g ' + gift.tier + (n ? '' : ' locked') + (g.lastKind === gift.id ? ' on' : '');
+      b.disabled = !n;
+      setText(b.childNodes[1], n ? engine.giftLabel(gift.id) : '???');
+      setText(b.childNodes[2], n > 1 ? '×' + n : '');
+      if (n) b.removeAttribute('aria-label'); else b.setAttribute('aria-label', T('giftUnknown'));
+    });
+    setText($('#giftCount'), found + '/' + DuckModels.gifts.length);
+    setText($('#giftDesc'), pv.shownGift ? engine.giftLabel(pv.shownGift) + ': ' + X('giftD_' + pv.shownGift) : '');
+    setText($('#giftNews'), g.lastKind ? T(g.isNew ? 'giftNew' : 'giftAgain').replace('{what}', engine.giftLabel(g.lastKind)) : '');
+  }
+  // The popup's badges, counted live: what the engine has seen on this page, the
+  // pretend days, the collection and the ducklings that have left
+  var BADGES = DATA.badges || [];
+  function renderBadges() {
+    var box = $('#badgeList'), earned = 0, stats = {};
+    if (!box) return;
+    if (!engine || !BADGES.length || !DATA.ext) { $('#badges').hidden = true; return; }
+    [engine.stats, DuckModels.giftStats(pv.gifts), DuckModels.dayStats(pv.days), { fledged: pv.brood.fledged || 0 }].forEach(function (from) {
+      for (var k in from) stats[k] = from[k];
+    });
+    BADGES.forEach(function (a, i) {
+      var val = stats[a[0]] || 0, done = val >= a[1], d = box.children[i];
+      if (done) earned++;
+      if (!d) {
+        d = el('details', 'ach ' + a[4]);
+        d.setAttribute('name', 'badge');   // one explanation at a time, as in the popup
+        var s = el('summary');
+        s.appendChild(el('span', 'em', a[2])).setAttribute('aria-hidden', 'true');
+        s.appendChild(el('span', 'tx'));
+        s.appendChild(el('span', 'pr'));
+        d.appendChild(s);
+        var p = d.appendChild(el('p'));
+        p.appendChild(el('b'));
+        p.appendChild(el('span'));
+        box.appendChild(d);
+      }
+      d.classList.toggle('done', done);
+      setText($('.tx', d), X(a[3]));
+      setText($('.pr', d), done ? '✓' : Math.min(val, a[1]) + '/' + a[1]);
+      setText($('p b', d), X('tier' + a[4].charAt(0).toUpperCase() + a[4].slice(1)) + ' · ');
+      setText($('p span', d), X(a[3] + 'D'));
+    });
+    setText($('#badgeCount'), earned + '/' + BADGES.length);
   }
   // The ducklings that are out, each at her stage, the way the popup shows them.
   // Only what changed is rewritten: the box is a live region, and a screen
@@ -409,7 +555,6 @@
   function renderStreak() {
     var box = $('#streak');
     if (!box || !engine || !DATA.ext) return;
-    if (!pv.days) pv.days = DuckModels.countDay(null, DuckModels.dayKey(pv.date), 0);   // today counts: she is here
     var d = pv.days;
     box.textContent = '';
     box.appendChild(el('b', '', '🔥 ' + d.streak));
@@ -417,6 +562,25 @@
     box.appendChild(el('span', '', X(d.streak === 1 ? 'daysRowOne' : 'daysRowMany')));
     box.appendChild(doc.createTextNode(' '));
     box.appendChild(el('small', '', X('daysBest') + d.best + ' · ' + d.total + ' ' + X(d.total === 1 ? 'daysTotalOne' : 'daysTotalMany')));
+  }
+  // A few of the popup's settings, for this visit: its words, its ranges
+  function renderTune() {
+    var box = $('#settings');
+    if (!box) return;
+    if (!engine || !DATA.ext) { box.hidden = true; return; }
+    $$('[data-tune]', box).forEach(function (input) {
+      var key = input.getAttribute('data-tune'), v = engine.cfg[key];
+      input.value = v;
+      setText($('label[for="' + input.id + '"]', box), X(input.getAttribute('data-label')));
+      setText($('output[for="' + input.id + '"]', box), key === 'ducklings' ? String(v) : v.toFixed(1) + '×');
+    });
+  }
+  function tune(input) {
+    var patch = {};
+    patch[input.getAttribute('data-tune')] = Number(input.value);
+    applyDuck(patch);
+    renderTune();
+    renderFamily();   // more ducklings, or fewer
   }
   function renderRoam() {
     var b = $('#roamBtn');
@@ -438,7 +602,7 @@
     DuckModels.wardrobe.forEach(function (w) { if (w.kind === kind) ids.push(w.id); });
     var key = kind === 'hat' ? 'hat' : 'glasses', patch = {};
     patch[key] = ids[(ids.indexOf(engine.cfg[key] || '') + 1) % ids.length];
-    engine.apply(patch);
+    applyDuck(patch);
     renderWearing();
     renderDive();   // she comes up to show it
   }
@@ -451,24 +615,31 @@
   function renderTry() {
     renderRoam();
     renderDive();
+    renderFocus();
     renderWearing();
     renderFamily();
     renderStreak();
+    renderGifts();
+    renderBadges();
+    renderTune();
   }
   function setupTry() {
+    var field = $('#focusField');
+    if (field) field.addEventListener('blur', function () { field.value = ''; });   // whatever it was, it stays nowhere
     if (!engine) {
       // the engine did not load: a button that does nothing is worse than a grey one
       $$('.feat .row button').forEach(function (b) { if (b.id !== 'beatBtn') b.disabled = true; });
       return;
     }
     function on(id, fn) { var b = doc.getElementById(id); if (b) b.onclick = fn; }
-    on('roamBtn', function () { engine.apply({ follow: !engine.cfg.follow }); renderRoam(); });
+    on('roamBtn', function () { applyDuck({ follow: !engine.cfg.follow }); renderRoam(); });
     on('diveBtn', function () { engine.trigger('hide'); renderDive(); });
-    on('giftBtn', function () { engine.trigger('gift'); renderDive(); });
+    on('giftBtn', bringGift);
     on('leafBtn', function () { engine.trigger('leaf'); renderDive(); });
     on('birdsBtn', function () { engine.trigger('birds'); renderDive(); });
     on('hatBtn', function () { nextWear('hat'); });
     on('glassesBtn', function () { nextWear('glasses'); });
+    $$('[data-tune]').forEach(function (input) { input.oninput = function () { tune(input); }; });
     $$('[data-day]').forEach(function (b) {
       b.onclick = function () { passDay(Number(b.getAttribute('data-day')) || 1); };
     });
@@ -573,6 +744,8 @@
     var box = $('#timeline');
     if (!box || !releases) return;
     box.innerHTML = '';
+    // on a phone the newest entry's notes and everything before it fold away
+    var older = fold('older-releases', T('olderReleases').replace('{n}', releases.length - 1));
     releases.forEach(function (r, i) {
       var art = el('article', 'release');
       var h = el('h3', '', 'v' + r.version + ' · ' + (r.title[lang] || r.title.en));
@@ -591,16 +764,18 @@
       art.appendChild(meta);
       var ul = el('ul');
       (r.items[lang] || r.items.en).forEach(function (s) { ul.appendChild(el('li', '', s)); });
-      if (i < 2) {
-        art.appendChild(ul);
-      } else {
-        var det = el('details');
-        det.appendChild(el('summary', '', T('whatsNew')));
-        det.appendChild(ul);
-        art.appendChild(det);
+      var notes = null;
+      if (i === 0) {
+        notes = fold('latest-notes', T('whatsNew'));
+      } else if (i > 1) {
+        notes = el('details');
+        notes.appendChild(el('summary', '', T('whatsNew')));
       }
-      box.appendChild(art);
+      if (notes) notes.appendChild(ul);
+      art.appendChild(notes || ul);
+      (i === 0 ? box : older).appendChild(art);
     });
+    if (releases.length > 1) box.appendChild(older);
   }
 
   // ── Numbers from the build (data.js) ──────────────────────────
@@ -729,6 +904,128 @@
     renderBeatBtn();
   }
 
+  // ── Folds: closed on a phone, open everywhere else ────────────
+  // theme.js decides what a phone is (html.compact) and opens them before the
+  // first paint where they belong open. Here the page remembers, for this visit,
+  // what somebody opened or closed, on each kind of screen: a phone turned on its
+  // side or a window pulled wide doesn't lose it.
+  var compactQ = window.CD_COMPACT || null;
+  var foldState = { compact: {}, wide: {} };
+  function isCompact() { return !!(compactQ && compactQ.matches); }
+  function foldOpen(id) {
+    var s = foldState[isCompact() ? 'compact' : 'wide'][id];
+    return s === undefined ? !isCompact() : s;
+  }
+  function setFold(d, open) {
+    if (d.hasAttribute('data-fold')) foldState[isCompact() ? 'compact' : 'wide'][d.id] = open;
+    d.open = open;
+  }
+  function applyFolds() {
+    $$('details[data-fold]').forEach(function (d) { d.open = foldOpen(d.id); });
+    renderPeeks();
+  }
+  // a fold built by the page itself (the changelog); on a wide screen it shows no handle
+  function fold(id, label) {
+    var d = el('details', 'quiet');
+    d.id = id;
+    d.setAttribute('data-fold', '');
+    d.open = foldOpen(id);
+    d.appendChild(el('summary', '', label));
+    return d;
+  }
+  // Lists cut short on a phone (the ducks, the ideas): the first few, and a
+  // button for the rest. On a wide screen the list is whole and the button gone.
+  function isHeading(e) { return /^H[1-6]$/.test(e.tagName); }
+  function peekButton(list) { return $('.peek-btn[aria-controls="' + list.id + '"]'); }
+  function renderPeeks() {
+    $$('[data-peek]').forEach(function (list) {
+      var b = peekButton(list), max = Number(list.getAttribute('data-peek')), n = 0;
+      if (!b) return;
+      Array.prototype.forEach.call(list.children, function (e) {
+        e.classList.toggle('beyond', n >= max);   // a heading goes with what stands below it
+        if (!isHeading(e)) n++;
+      });
+      var all = !!foldState.compact[list.id];
+      list.classList.toggle('all', all);
+      b.hidden = n <= max;
+      b.setAttribute('aria-expanded', all ? 'true' : 'false');
+      setText(b, T(b.getAttribute(all ? 'data-fewer' : 'data-more')).replace('{n}', n));
+    });
+  }
+  function navHeight() { var n = $('.nav'); return n ? n.offsetHeight : 0; }
+  function togglePeek(list) {
+    var all = !foldState.compact[list.id];
+    var first = $('.beyond:not(h3)', list);
+    foldState.compact[list.id] = all;
+    renderPeeks();
+    if (all) {
+      // on to the first one that was hidden: that is where the keyboard goes next
+      var f = first && (first.tabIndex >= 0 ? first : $('button, a[href]', first));
+      if (f) f.focus({ preventScroll: true });
+    } else if (list.getBoundingClientRect().top < navHeight()) {
+      peekButton(list).scrollIntoView({ block: 'center', behavior: 'instant' });   // what was below the list came up
+    }
+  }
+  // Whatever a link points at gets opened: the fold itself, every fold around it,
+  // and the one a section is about (data-opens).
+  function reveal(target) {
+    for (var e = target; e && e.nodeType === 1; e = e.parentNode) {
+      if (e.tagName === 'DETAILS' && !e.open) setFold(e, true);
+    }
+    var id = target.hasAttribute('data-peek') ? target.id : target.getAttribute('data-opens');
+    if (!id || !isCompact()) return;
+    foldState.compact[id] = true;   // also for one that isn't there yet: the changelog may still be on its way
+    applyFolds();
+  }
+  function hashTarget(hash) {
+    var id = '';
+    try { id = decodeURIComponent(String(hash || '').replace(/^#/, '')); } catch (e) { /* not one of ours */ }
+    return id ? doc.getElementById(id) : null;
+  }
+  function openHash(behavior) {
+    var t = hashTarget(location.hash);
+    if (!t) return;
+    reveal(t);
+    t.scrollIntoView({ behavior: behavior });
+  }
+  function setupFolds() {
+    if (!$('details[data-fold]')) return;
+    applyFolds();
+    if (compactQ && compactQ.addEventListener) compactQ.addEventListener('change', applyFolds);
+    else if (compactQ && compactQ.addListener) compactQ.addListener(applyFolds);
+    // toggle doesn't bubble. It comes a moment after the change, so a fold that
+    // applyFolds() opened only reports what it already is.
+    doc.addEventListener('toggle', function (ev) {
+      var d = ev.target;
+      if (!d.hasAttribute || !d.hasAttribute('data-fold')) return;
+      foldState[isCompact() ? 'compact' : 'wide'][d.id] = d.open;
+      // closed by its handle at the top of the screen, from far down in it: stay with it
+      if (!d.open && d.getBoundingClientRect().top < navHeight() - 1) d.scrollIntoView({ behavior: 'instant' });
+    }, true);
+    $$('[data-peek]').forEach(function (list) {
+      var b = peekButton(list);
+      if (b) b.onclick = function () { togglePeek(list); };
+      // the ideas arrive later, and come again with every vote
+      if (window.MutationObserver) new MutationObserver(renderPeeks).observe(list, { childList: true });
+    });
+    // before the browser scrolls to it: what is folded away has no place to scroll to
+    doc.addEventListener('click', function (ev) {
+      if (ev.button || ev.ctrlKey || ev.metaKey || ev.shiftKey || ev.altKey) return;
+      var a = ev.target.closest && ev.target.closest('a[href^="#"]');
+      var t = a && hashTarget(a.getAttribute('href'));
+      if (t) reveal(t);
+    });
+    window.addEventListener('hashchange', function () { openHash('auto'); });
+  }
+  // A link from elsewhere. A reload or the way back keep the place they had.
+  function openFirstHash() {
+    var nav = null;
+    try { nav = performance.getEntriesByType('navigation')[0]; } catch (e) { /* old browser */ }
+    if (!nav || nav.type === 'navigate') { openHash('instant'); return; }
+    var t = hashTarget(location.hash);
+    if (t) reveal(t);
+  }
+
   // ── Menu (hamburger), active section, back to top ─────────────
   var menuOpen = false;
   function setMenu(open) {
@@ -786,6 +1083,7 @@
 
   // ── Boot ──────────────────────────────────────────────────────
   function init() {
+    setupFolds();
     setupMenu();
     setupScrollSpy();
     setupToTop();
@@ -803,6 +1101,7 @@
     if (tb) tb.onclick = toggleTheme;
     var bb = $('#beatBtn');
     if (bb) bb.onclick = toggleBeat;
+    openFirstHash();
     try {
       var mq = window.matchMedia('(prefers-color-scheme: dark)');
       if (mq.addEventListener) mq.addEventListener('change', renderTheme);

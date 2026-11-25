@@ -66,7 +66,8 @@ audio file must be CC0/public domain and documented in `audio/SOURCES.md`.
 
 - `node tests/unit.mjs`: catalog, season logic, the day counter (streak, gaps, month and
   year ends, clock changes, time zones), ducklings' growth, migration from 1.9.0, locale
-  parity, numbers in the copy
+  parity, numbers in the copy. Needs no npm install; `.github/workflows/unit-tests.yml`
+  runs it on push and pull request
 - `node tests/e2e.mjs chrome|firefox [filter]`: the zip from `dist/` plus `tests/bridge.js`
   in real browsers (build first). The `site:` tests drive the website from `_site/`
   (`python3 tools/site_build.py` first), served with the policy from `site/_headers`.
@@ -111,11 +112,27 @@ The page's duck has what the extension's has, because she is the same code. The
 hero carries the popup's trick buttons and the feature cards have try-it buttons
 (free roam, dive, gift, leaf, birds, wardrobe, a day later). Each only asks the
 engine for what the popup or a day in the extension would. The build reads the
-trick list from `popup/popup.js` and the labels the site shares with the popup
-(tricks, wardrobe, day counter, family) from `_locales/` into `data.js`, so they
-have no second copy in `site/`. The family and the day counter on the cards are a
-preview on a calendar of their own (`passDay()` in `site/site.js`, on
-`DuckModels.countDay` and `growBrood`): the site stores nothing for them.
+trick and badge lists from `popup/popup.js` and the labels the site shares with
+the popup (tricks, wardrobe, day counter, family, gifts, badges, the sliders)
+from `_locales/` into `data.js`, so they have no second copy in `site/`. The
+family, the day counter, the collection and the badges on the cards are a preview
+on a calendar of their own (`passDay()`, `bringGift()`, `renderBadges()` in
+`site/site.js`, on `DuckModels.countDay`, `growBrood`, `rollGift`): the site
+stores nothing for them, nor for the sliders.
+
+Focus mode follows the rule of `src/content.js` (`focusHoldNow()`; change both).
+`engine.apply()` starts the engine, so settings go through `applyDuck()`, which
+keeps her away while she has stepped aside.
+
+On a phone the start page is folded up. `site/theme.js` decides before the first
+paint what a phone is (`html.compact`, the only place with that media query) and
+opens the folds on wide screens while the page is still being read; `site.js`
+keeps what was opened per kind of screen, for the visit. A fold is a native
+`<details data-fold id=…>` (closed on phones, open elsewhere; `class="quiet"` has
+no handle on wide screens), a list cut short has `data-peek="<n>"` and a
+`.peek-btn`. The feature cards sit in four groups (`.group`); texts stay in the
+markup, never injected on opening. A link opens what it points at and every fold
+around it; `data-opens` on a section names the list a link to it opens as well.
 
 For search engines the start page exists twice: `/` (English, x-default) and
 `/de/`, which the build pre-renders from `index.html` + `de.json`, linked by

@@ -117,7 +117,22 @@
       </div>
       <p class="hint" id="browserNote"></p>
       <p class="hint" data-i18n="heroHint">Psst, she's already here. Move your mouse.</p>
-      <div class="tricks" id="tricks"></div>
+      <details class="quiet" id="her-tricks" data-fold>
+        <summary class="btn btn-ghost" data-i18n="foldTricks">🎪 Try her tricks</summary>
+        <div class="tricks" id="tricks"></div>
+        <details class="tune" id="settings">
+          <summary class="btn btn-ghost btn-mini" data-i18n="tuneFold">🎚️ Size, speed, ducklings</summary>
+          <div class="tune-box">
+            <label for="tuneSize"></label><output for="tuneSize"></output>
+            <input id="tuneSize" type="range" min="0.5" max="2.2" step="0.05" data-tune="size" data-label="lblSize">
+            <label for="tuneSpeed"></label><output for="tuneSpeed"></output>
+            <input id="tuneSpeed" type="range" min="0.4" max="2.2" step="0.05" data-tune="speed" data-label="lblSpeed">
+            <label for="tuneBabies"></label><output for="tuneBabies"></output>
+            <input id="tuneBabies" type="range" min="0" max="6" step="1" data-tune="ducklings" data-label="lblDucklings">
+            <p class="hint" data-i18n="tuneNote">For this visit only. The popup has these and many more.</p>
+          </div>
+        </details>
+      </details>
     </div>
     <div class="pond" aria-hidden="true">
       <div class="wave w3"><svg viewBox="0 0 2880 170" preserveAspectRatio="none"><path fill="currentColor" d="M0 70 C90 30 270 110 360 70 C450 30 630 110 720 70 C810 30 990 110 1080 70 C1170 30 1350 110 1440 70 C1530 30 1710 110 1800 70 C1890 30 2070 110 2160 70 C2250 30 2430 110 2520 70 C2610 30 2790 110 2880 70 L2880 170 L0 170 Z"/></svg></div>
@@ -137,165 +152,216 @@
           <h2 class="title" data-i18n="featTitle">Small duck, big repertoire.</h2>
           <p class="sub" data-i18n="featSub">Everything below happens on this page too, with the real engine. The dashed cards are for trying out.</p>
         </div>
-        <div class="features">
-          <article class="feat try">
-            <span class="tag" data-i18n="tryTag">Try it</span>
-            <div class="ico" aria-hidden="true">🏊</div>
-            <h3 data-i18n="f1h">Following</h3>
-            <p data-i18n="f1p">The farther away your cursor, the faster she paddles, wake and bow wave included. She turns into her swimming direction and sprints when she falls behind. Or switch off “Follows the cursor” in the popup and she roams the page on her own.</p>
-            <div class="row">
-              <button class="btn btn-ghost btn-mini" id="roamBtn" type="button" data-i18n="tryRoam">🧭 Let her roam</button>
-            </div>
-          </article>
-          <article class="feat">
-            <div class="ico" aria-hidden="true">🫶</div>
-            <h3 data-i18n="f2h">Petting</h3>
-            <p data-i18n="f2p">Let her catch up, then wiggle the cursor over her: squinty happy eyes, blushing cheeks, hearts. A full petting bar earns a happy quack.</p>
-          </article>
-          <article class="feat try">
-            <span class="tag" data-i18n="tryTag">Try it</span>
-            <div class="ico" aria-hidden="true">🍞</div>
-            <h3 data-i18n="f3h">Feeding</h3>
-            <p data-i18n="f3p">Double-click anywhere on this page to toss bread crumbs into the water. She swims over and picks them up one by one, and the ducklings join in. Just don't overfeed her.</p>
-          </article>
-          <article class="feat try">
-            <span class="tag" data-i18n="tryTag">Try it</span>
-            <div class="ico" aria-hidden="true">📝</div>
-            <h3 data-i18n="f4h">Reading along</h3>
-            <p data-i18n="f4p">Type into a text field and she watches the field instead of the cursor, and won't doze off. She only knows that you type, never what.</p>
-            <textarea rows="3" data-i18n-ph="f4ph" placeholder="Type anything here. She'll look over, promise."></textarea>
-          </article>
-          <article class="feat try">
-            <span class="tag" data-i18n="tryTag">Try it</span>
-            <div class="ico" aria-hidden="true">🍪</div>
-            <h3 data-i18n="f5h">Selection snack</h3>
-            <p data-i18n="f5p">Select text near her and she nibbles at the edge of the selection. She sees where the text is, never what it says.</p>
-            <p class="selectme" data-i18n="f5sel">Go on, select this sentence with your mouse while she's close by. Nom.</p>
-          </article>
-          <article class="feat try">
-            <span class="tag" data-i18n="tryTag">Try it</span>
-            <div class="ico" aria-hidden="true">🎵</div>
-            <h3 data-i18n="f6h">Music &amp; video</h3>
-            <p data-i18n="f6p">When a video or a song with sound plays on the page, she dances along and the ducklings bob to the beat. Every now and then a disco ball drops in and the whole family goes wild.</p>
-            <div class="row">
-              <button class="btn btn-ghost btn-mini" id="beatBtn" type="button">🎶 Play a beat</button>
-              <span class="hint" data-i18n="f6note">Two bars of chiptune, generated right here.</span>
-            </div>
-          </article>
-          <article class="feat try">
-            <span class="tag" data-i18n="tryTag">Try it</span>
-            <div class="ico" aria-hidden="true">🤏</div>
-            <h3 data-i18n="f15h">By the scruff</h3>
-            <p data-i18n="f15p">Hold the mouse button on her and drag: she quacks in outrage, flaps and kicks, and once you let go she paddles back to exactly where she was. On touchscreens, long-press and drag. Off the duck, the page works as usual.</p>
-          </article>
-          <article class="feat try">
-            <span class="tag" data-i18n="tryTag">Try it</span>
-            <div class="ico" aria-hidden="true">🤫</div>
-            <h3 data-i18n="f16h">Dive with Esc</h3>
-            <p data-i18n="f16p">Press Esc while she's near your cursor and the whole family dives out of sight. Esc again brings them back. Dialogs, fullscreen and text fields keep their Esc key, and the popup can switch this off.</p>
-            <div class="row">
-              <button class="btn btn-ghost btn-mini" id="diveBtn" type="button" data-i18n="tryDive">🤫 Dive</button>
-              <span class="hint" data-i18n="f16note">No Esc key on a touchscreen? This button does the same.</span>
-            </div>
-          </article>
-          <article class="feat try">
-            <span class="tag" data-i18n="tryTag">Try it</span>
-            <div class="ico" aria-hidden="true">🎁</div>
-            <h3 data-i18n="f17h">A daily gift</h3>
-            <p data-i18n="f17p">On your first page of the day she dives and comes up with a little present: a pebble, a shell, a snail, and very rarely a pearl or a golden egg. The popup keeps your collection, on your device only.</p>
-            <div class="row">
-              <button class="btn btn-ghost btn-mini" id="giftBtn" type="button" data-i18n="tryGift">🎁 Bring me one</button>
-              <span class="hint" data-i18n="f17note">Just to look at: this page keeps no collection.</span>
-            </div>
-          </article>
-          <article class="feat try">
-            <span class="tag" data-i18n="tryTag">Try it</span>
-            <div class="ico" aria-hidden="true">🍂</div>
-            <h3 data-i18n="f18h">Drifting leaves</h3>
-            <p data-i18n="f18p">From September to November an autumn leaf drifts across the water now and then. She gives it a nudge, or dozes off with it on her head.</p>
-            <div class="row">
-              <button class="btn btn-ghost btn-mini" id="leafBtn" type="button" data-i18n="tryLeaf">🍂 Send a leaf</button>
-            </div>
-          </article>
-          <article class="feat try">
-            <span class="tag" data-i18n="tryTag">Try it</span>
-            <div class="ico" aria-hidden="true">🕊️</div>
-            <h3 data-i18n="f19h">Autumn migration</h3>
-            <p data-i18n="f19p">From September to November a small V of birds crosses the top of the page now and then. She looks up and calls after them, and the ducklings look up with her. Rare by design, and never on their own under “reduce motion”.</p>
-            <div class="row">
-              <button class="btn btn-ghost btn-mini" id="birdsBtn" type="button" data-i18n="tryBirds">🕊️ Send the birds</button>
-            </div>
-          </article>
-          <article class="feat try">
-            <span class="tag" data-i18n="tryTag">Try it</span>
-            <div class="ico" aria-hidden="true">🐣</div>
-            <h3 data-i18n="f20h">Ducklings that grow up</h3>
-            <p data-i18n="f20p">The ducklings grow with the days you spend together: fluffball, duckling, half-grown, nearly fledged. After 18 days one of them is grown up and flies off into the world, and a new fluffball hatches from an egg in her place.</p>
-            <div class="family" id="family" role="status"></div>
-            <div class="row">
-              <button class="btn btn-ghost btn-mini" data-day="1" type="button" data-i18n="tryDay">☀️ One day later</button>
-              <span class="hint" data-i18n="f20note">Every press is one more day together, for the ducklings on this page.</span>
-            </div>
-          </article>
-          <article class="feat try">
-            <span class="tag" data-i18n="tryTag">Try it</span>
-            <div class="ico" aria-hidden="true">🔥</div>
-            <h3 data-i18n="f21h">Days together</h3>
-            <p data-i18n="f21p">The popup counts how many days in a row you have spent with the ducks, with your record and the total beside it. A missed day ends the run, never the record. Counted on your device only.</p>
-            <p class="streak" id="streak" role="status"></p>
-            <div class="row">
-              <button class="btn btn-ghost btn-mini" data-day="1" type="button" data-i18n="tryDay">☀️ One day later</button>
-              <button class="btn btn-ghost btn-mini" data-day="2" type="button" data-i18n="trySkip">💤 Miss a day</button>
-            </div>
-            <p class="hint" data-i18n="f21note">A pretend calendar for trying out: nothing is stored, and a reload starts it over.</p>
-          </article>
-          <article class="feat">
-            <div class="ico" aria-hidden="true">😴</div>
-            <h3 data-i18n="f7h">Napping</h3>
-            <p data-i18n="f7p">After a while of quiet she tucks her head into her feathers. Zzz. When you're back she wakes up with a “!”. At night she gets sleepy sooner and dreams in little stars.</p>
-          </article>
-          <article class="feat">
-            <div class="ico" aria-hidden="true">🐟</div>
-            <h3 data-i18n="f8h">Fish hunt</h3>
-            <p data-i18n="f8p">Every now and then a fish shadow passes below the surface. She spots it, chases it, snaps, and doesn't always get it. The popup counts her catches.</p>
-          </article>
-          <article class="feat">
-            <div class="ico" aria-hidden="true">💕</div>
-            <h3 data-i18n="f9h">Visitors &amp; shore leave</h3>
-            <p data-i18n="f9p">Every few minutes a wild duck swims by for a quack duet and a synchronized little dance. Now and then she climbs out of the water and waddles a proud circle across the page.</p>
-          </article>
-          <article class="feat">
-            <div class="ico" aria-hidden="true">🐥</div>
-            <h3 data-i18n="f10h">Ducklings</h3>
-            <p data-i18n="f10p">Up to six ducklings paddle in a row behind her, with their own little animations. When mama gets sleepy she tucks them into a nest first.</p>
-          </article>
-          <article class="feat try">
-            <span class="tag" data-i18n="tryTag">Try it</span>
-            <div class="ico" aria-hidden="true">🎩</div>
-            <h3 data-i18n="f11h">Wardrobe</h3>
-            <p data-i18n="f11p">16 hats and 6 pairs of glasses for any model, each unlocked by an achievement: top hat, crown, halo, leaf wreath, headphones, sunglasses, monocle and more.</p>
-            <div class="row">
-              <button class="btn btn-ghost btn-mini" id="hatBtn" type="button" data-i18n="tryHat">🎩 Next hat</button>
-              <button class="btn btn-ghost btn-mini" id="glassesBtn" type="button" data-i18n="tryGlasses">🕶️ Next glasses</button>
-              <span class="hint" id="wearing" role="status"></span>
-            </div>
-          </article>
-          <article class="feat">
-            <div class="ico" aria-hidden="true">🏆</div>
-            <h3 data-i18n="f12h">Achievements</h3>
-            <p data-i18n="f12p">76 badges in bronze, silver, gold and diamond, from petting fan through “Identity crisis” to the 30-day “Regular”. Every badge tells you how to earn it.</p>
-          </article>
-          <article class="feat">
-            <div class="ico" aria-hidden="true">🙈</div>
-            <h3 data-i18n="f13h">Focus mode &amp; calm mode</h3>
-            <p data-i18n="f13p">On password fields and fullscreen videos she steps aside. With “reduce motion” enabled in your system she skips pirouettes, dancing and the disco ball.</p>
-          </article>
-          <article class="feat">
-            <div class="ico" aria-hidden="true">📱</div>
-            <h3 data-i18n="f14h">Touch</h3>
-            <p data-i18n="f14p">On touchscreens she follows your finger. Tap her to quack, double-tap to flap, double-tap the water to feed.</p>
-          </article>
-        </div>
+        <details class="group" id="play" data-fold>
+          <summary>
+            <span class="g-ico" aria-hidden="true">🫶</span>
+            <h3 data-i18n="gPlayH">Playing with her</h3>
+            <span class="g-sub" data-i18n="gPlayS">Following, petting, feeding, dragging, dressing up, touch</span>
+          </summary>
+          <div class="features">
+            <article class="feat try">
+              <span class="tag" data-i18n="tryTag">Try it</span>
+              <div class="ico" aria-hidden="true">🏊</div>
+              <h4 data-i18n="f1h">Following</h4>
+              <p data-i18n="f1p">The farther away your cursor, the faster she paddles, wake and bow wave included. She turns into her swimming direction and sprints when she falls behind. Or switch off “Follows the cursor” in the popup and she roams the page on her own.</p>
+              <div class="row">
+                <button class="btn btn-ghost btn-mini" id="roamBtn" type="button" data-i18n="tryRoam">🧭 Let her roam</button>
+              </div>
+            </article>
+            <article class="feat">
+              <div class="ico" aria-hidden="true">🫶</div>
+              <h4 data-i18n="f2h">Petting</h4>
+              <p data-i18n="f2p">Let her catch up, then wiggle the cursor over her: squinty happy eyes, blushing cheeks, hearts. A full petting bar earns a happy quack.</p>
+            </article>
+            <article class="feat try">
+              <span class="tag" data-i18n="tryTag">Try it</span>
+              <div class="ico" aria-hidden="true">🍞</div>
+              <h4 data-i18n="f3h">Feeding</h4>
+              <p data-i18n="f3p">Double-click anywhere on this page to toss bread crumbs into the water. She swims over and picks them up one by one, and the ducklings join in. Just don't overfeed her.</p>
+            </article>
+            <article class="feat try">
+              <span class="tag" data-i18n="tryTag">Try it</span>
+              <div class="ico" aria-hidden="true">🤏</div>
+              <h4 data-i18n="f15h">By the scruff</h4>
+              <p data-i18n="f15p">Hold the mouse button on her and drag: she quacks in outrage, flaps and kicks, and once you let go she paddles back to exactly where she was. On touchscreens, long-press and drag. Off the duck, the page works as usual.</p>
+            </article>
+            <article class="feat try">
+              <span class="tag" data-i18n="tryTag">Try it</span>
+              <div class="ico" aria-hidden="true">🎩</div>
+              <h4 data-i18n="f11h">Wardrobe</h4>
+              <p data-i18n="f11p">16 hats and 6 pairs of glasses for any model, each unlocked by an achievement: top hat, crown, halo, leaf wreath, headphones, sunglasses, monocle and more.</p>
+              <div class="row">
+                <button class="btn btn-ghost btn-mini" id="hatBtn" type="button" data-i18n="tryHat">🎩 Next hat</button>
+                <button class="btn btn-ghost btn-mini" id="glassesBtn" type="button" data-i18n="tryGlasses">🕶️ Next glasses</button>
+                <span class="hint" id="wearing" role="status"></span>
+              </div>
+            </article>
+            <article class="feat">
+              <div class="ico" aria-hidden="true">📱</div>
+              <h4 data-i18n="f14h">Touch</h4>
+              <p data-i18n="f14p">On touchscreens she follows your finger. Tap her to quack, double-tap to flap, double-tap the water to feed.</p>
+            </article>
+          </div>
+        </details>
+        <details class="group" id="browsing" data-fold>
+          <summary>
+            <span class="g-ico" aria-hidden="true">💻</span>
+            <h3 data-i18n="gBrowseH">While you browse</h3>
+            <span class="g-sub" data-i18n="gBrowseS">Reading along, snacks, music, naps, Esc, focus mode</span>
+          </summary>
+          <div class="features">
+            <article class="feat try">
+              <span class="tag" data-i18n="tryTag">Try it</span>
+              <div class="ico" aria-hidden="true">📝</div>
+              <h4 data-i18n="f4h">Reading along</h4>
+              <p data-i18n="f4p">Type into a text field and she watches the field instead of the cursor, and won't doze off. She only knows that you type, never what.</p>
+              <textarea rows="3" data-i18n-ph="f4ph" placeholder="Type anything here. She'll look over, promise."></textarea>
+            </article>
+            <article class="feat try">
+              <span class="tag" data-i18n="tryTag">Try it</span>
+              <div class="ico" aria-hidden="true">🍪</div>
+              <h4 data-i18n="f5h">Selection snack</h4>
+              <p data-i18n="f5p">Select text near her and she nibbles at the edge of the selection. She sees where the text is, never what it says.</p>
+              <p class="selectme" data-i18n="f5sel">Go on, select this sentence with your mouse while she's close by. Nom.</p>
+            </article>
+            <article class="feat try">
+              <span class="tag" data-i18n="tryTag">Try it</span>
+              <div class="ico" aria-hidden="true">🎵</div>
+              <h4 data-i18n="f6h">Music &amp; video</h4>
+              <p data-i18n="f6p">When a video or a song with sound plays on the page, she dances along and the ducklings bob to the beat. Every now and then a disco ball drops in and the whole family goes wild.</p>
+              <div class="row">
+                <button class="btn btn-ghost btn-mini" id="beatBtn" type="button">🎶 Play a beat</button>
+                <span class="hint" data-i18n="f6note">Two bars of chiptune, generated right here.</span>
+              </div>
+            </article>
+            <article class="feat">
+              <div class="ico" aria-hidden="true">😴</div>
+              <h4 data-i18n="f7h">Napping</h4>
+              <p data-i18n="f7p">After a while of quiet she tucks her head into her feathers. Zzz. When you're back she wakes up with a “!”. At night she gets sleepy sooner and dreams in little stars.</p>
+            </article>
+            <article class="feat try">
+              <span class="tag" data-i18n="tryTag">Try it</span>
+              <div class="ico" aria-hidden="true">🤫</div>
+              <h4 data-i18n="f16h">Dive with Esc</h4>
+              <p data-i18n="f16p">Press Esc while she's near your cursor and the whole family dives out of sight. Esc again brings them back. Dialogs, fullscreen and text fields keep their Esc key, and the popup can switch this off.</p>
+              <div class="row">
+                <button class="btn btn-ghost btn-mini" id="diveBtn" type="button" data-i18n="tryDive">🤫 Dive</button>
+                <span class="hint" data-i18n="f16note">No Esc key on a touchscreen? This button does the same.</span>
+              </div>
+            </article>
+            <article class="feat try" id="focus-mode">
+              <span class="tag" data-i18n="tryTag">Try it</span>
+              <div class="ico" aria-hidden="true">🙈</div>
+              <h4 data-i18n="f13h">Focus mode &amp; calm mode</h4>
+              <p data-i18n="f13p">On password fields and fullscreen videos she steps aside, and reports back with a “!”. With “reduce motion” enabled in your system she skips pirouettes, dancing and the disco ball.</p>
+              <label class="field-label" for="focusField" data-i18n="focusLabel">A pretend password</label>
+              <input class="field" id="focusField" type="password" autocomplete="off" spellcheck="false" data-1p-ignore data-lpignore="true" data-bwignore aria-describedby="focusNote" data-i18n-ph="focusPh" placeholder="Click in here and she’s gone.">
+              <p class="hint state" id="focusState" role="status"></p>
+              <p class="hint" id="focusNote" data-i18n="f13note">Please not a real one. Nothing in this field is read or sent, and it empties itself when you leave it.</p>
+            </article>
+          </div>
+        </details>
+        <details class="group" id="pond-life" data-fold>
+          <summary>
+            <span class="g-ico" aria-hidden="true">🪷</span>
+            <h3 data-i18n="gPondH">Life on the pond</h3>
+            <span class="g-sub" data-i18n="gPondS">Ducklings that grow up, fish, visitors, leaves, birds</span>
+          </summary>
+          <div class="features">
+            <article class="feat">
+              <div class="ico" aria-hidden="true">🐥</div>
+              <h4 data-i18n="f10h">Ducklings</h4>
+              <p data-i18n="f10p">Up to six ducklings paddle in a row behind her, with their own little animations. When mama gets sleepy she tucks them into a nest first.</p>
+            </article>
+            <article class="feat try">
+              <span class="tag" data-i18n="tryTag">Try it</span>
+              <div class="ico" aria-hidden="true">🐣</div>
+              <h4 data-i18n="f20h">Ducklings that grow up</h4>
+              <p data-i18n="f20p">The ducklings grow with the days you spend together: fluffball, duckling, half-grown, nearly fledged. After 18 days one of them is grown up and flies off into the world, and a new fluffball hatches from an egg in her place.</p>
+              <div class="family" id="family" role="status"></div>
+              <div class="row">
+                <button class="btn btn-ghost btn-mini" data-day="1" type="button" data-i18n="tryDay">☀️ One day later</button>
+                <span class="hint" data-i18n="f20note">Every press is one more day together, for the ducklings on this page.</span>
+              </div>
+            </article>
+            <article class="feat">
+              <div class="ico" aria-hidden="true">🐟</div>
+              <h4 data-i18n="f8h">Fish hunt</h4>
+              <p data-i18n="f8p">Every now and then a fish shadow passes below the surface. She spots it, chases it, snaps, and doesn't always get it. The popup counts her catches.</p>
+            </article>
+            <article class="feat">
+              <div class="ico" aria-hidden="true">💕</div>
+              <h4 data-i18n="f9h">Visitors &amp; shore leave</h4>
+              <p data-i18n="f9p">Every few minutes a wild duck swims by for a quack duet and a synchronized little dance. Now and then she climbs out of the water and waddles a proud circle across the page.</p>
+            </article>
+            <article class="feat try">
+              <span class="tag" data-i18n="tryTag">Try it</span>
+              <div class="ico" aria-hidden="true">🍂</div>
+              <h4 data-i18n="f18h">Drifting leaves</h4>
+              <p data-i18n="f18p">From September to November an autumn leaf drifts across the water now and then. She gives it a nudge, or dozes off with it on her head.</p>
+              <div class="row">
+                <button class="btn btn-ghost btn-mini" id="leafBtn" type="button" data-i18n="tryLeaf">🍂 Send a leaf</button>
+              </div>
+            </article>
+            <article class="feat try">
+              <span class="tag" data-i18n="tryTag">Try it</span>
+              <div class="ico" aria-hidden="true">🕊️</div>
+              <h4 data-i18n="f19h">Autumn migration</h4>
+              <p data-i18n="f19p">From September to November a small V of birds crosses the top of the page now and then. She looks up and calls after them, and the ducklings look up with her. Rare by design, and never on their own under “reduce motion”.</p>
+              <div class="row">
+                <button class="btn btn-ghost btn-mini" id="birdsBtn" type="button" data-i18n="tryBirds">🕊️ Send the birds</button>
+              </div>
+            </article>
+          </div>
+        </details>
+        <details class="group" id="day-by-day" data-fold>
+          <summary>
+            <span class="g-ico" aria-hidden="true">📅</span>
+            <h3 data-i18n="gDaysH">Day by day</h3>
+            <span class="g-sub" data-i18n="gDaysS">Days together, the daily gift and your collection, badges</span>
+          </summary>
+          <div class="features">
+            <article class="feat try">
+              <span class="tag" data-i18n="tryTag">Try it</span>
+              <div class="ico" aria-hidden="true">🔥</div>
+              <h4 data-i18n="f21h">Days together</h4>
+              <p data-i18n="f21p">The popup counts how many days in a row you have spent with the ducks, with your record and the total beside it. A missed day ends the run, never the record. Counted on your device only.</p>
+              <p class="streak" id="streak" role="status"></p>
+              <div class="row">
+                <button class="btn btn-ghost btn-mini" data-day="1" type="button" data-i18n="tryDay">☀️ One day later</button>
+                <button class="btn btn-ghost btn-mini" data-day="2" type="button" data-i18n="trySkip">💤 Miss a day</button>
+              </div>
+              <p class="hint" data-i18n="f21note">A pretend calendar for trying out: nothing is stored, and a reload starts it over.</p>
+            </article>
+            <article class="feat try">
+              <span class="tag" data-i18n="tryTag">Try it</span>
+              <div class="ico" aria-hidden="true">🎁</div>
+              <h4 data-i18n="f17h">A daily gift</h4>
+              <p data-i18n="f17p">On your first page of the day she dives and comes up with a little present: a pebble, a shell, a snail, and very rarely a pearl or a golden egg. The popup keeps your collection, on your device only.</p>
+              <div class="row">
+                <button class="btn btn-ghost btn-mini" id="giftBtn" type="button" data-i18n="tryGift">🎁 Bring me one</button>
+              </div>
+              <p class="hint state" id="giftNews" role="status"></p>
+              <details class="shelf" id="collection">
+                <summary><span data-i18n="shelfGifts">Your collection</span> <b class="cnt" id="giftCount"></b></summary>
+                <div class="gifts" id="gifts"></div>
+                <p class="hint" id="giftDesc" role="status"></p>
+              </details>
+              <p class="hint" data-i18n="f17note">Here every press brings one. Nothing is stored: a reload empties the collection.</p>
+            </article>
+            <article class="feat try">
+              <span class="tag" data-i18n="tryTag">Try it</span>
+              <div class="ico" aria-hidden="true">🏆</div>
+              <h4 data-i18n="f12h">Achievements</h4>
+              <p data-i18n="f12p">76 badges in bronze, silver, gold and diamond, from petting fan through “Identity crisis” to the 30-day “Regular”. Every badge tells you how to earn it.</p>
+              <details class="shelf" id="badges">
+                <summary><span data-i18n="shelfBadges">All badges</span> <b class="cnt" id="badgeCount"></b></summary>
+                <div class="badges" id="badgeList"></div>
+              </details>
+              <p class="hint" data-i18n="f12note">Counted live while you play on this page, days and gifts included. Nothing is stored: a reload starts over.</p>
+            </article>
+          </div>
+        </details>
       </div>
     </section>
 
@@ -310,14 +376,15 @@
       </div>
     </section>
 
-    <section class="section" id="ducks">
+    <section class="section" id="ducks" data-opens="gallery">
       <div class="wrap">
         <div class="section-head">
           <p class="kicker" data-i18n="flockKicker">The flock</p>
           <h2 class="title" data-i18n="flockTitle">39 ducks, drawn live.</h2>
           <p class="sub" data-i18n="flockSub">Real ducks, fantasy ducks and five seasonal guests. Click one and she changes right here on the page.</p>
         </div>
-        <div class="gallery" id="gallery"></div>
+        <div class="gallery" id="gallery" data-peek="6"></div>
+        <button class="btn btn-ghost peek-btn" type="button" aria-controls="gallery" aria-expanded="false" data-more="moreDucks" data-fewer="fewerDucks" hidden></button>
         <div class="legend">
           <span><i class="dot rare"></i><span data-i18n="legendRare">rare</span></span>
           <span><i class="dot epic"></i><span data-i18n="legendEpic">epic</span></span>
@@ -327,7 +394,7 @@
       </div>
     </section>
 
-    <section class="section" id="changelog">
+    <section class="section" id="changelog" data-opens="older-releases">
       <div class="wrap">
         <div class="section-head">
           <p class="kicker" data-i18n="logKicker">Changelog</p>
@@ -340,7 +407,7 @@
       </div>
     </section>
 
-    <section class="section" id="pond">
+    <section class="section" id="pond" data-opens="pads">
       <div class="wrap">
         <div class="section-head">
           <p class="kicker" data-i18n="pondKicker">Wishing pond</p>
@@ -378,7 +445,8 @@
         <div id="tsBox" hidden></div>
         <p class="pond-msg" id="pondMsg" role="status"></p>
         <p class="hint" id="pondLoading" data-i18n="pondLoading">Fishing for ideas…</p>
-        <div class="pads" id="pads"></div>
+        <div class="pads" id="pads" data-peek="3"></div>
+        <button class="btn btn-ghost peek-btn" type="button" aria-controls="pads" aria-expanded="false" data-more="moreIdeas" data-fewer="fewerIdeas" hidden></button>
         <p class="hint" id="pondEmpty" hidden data-i18n="pondEmpty">The pond is quiet. Throw the first idea in.</p>
       </div>
     </section>
@@ -410,27 +478,27 @@
           <h2 class="title" data-i18n="faqTitle">Frequently quacked questions.</h2>
         </div>
         <div class="faq">
-          <details>
+          <details id="faq-speed">
             <summary data-i18n="q1">Does she slow down my browser?</summary>
             <p data-i18n="a1">No. She draws on her own canvas layer, detached from the page layout, pauses in background tabs and adapts her resolution on very busy pages.</p>
           </details>
-          <details>
+          <details id="faq-in-the-way">
             <summary data-i18n="q2">She's in the way on one site.</summary>
             <p data-i18n="a2">Open the popup and choose “Pause on this site”. Alt+Shift+D toggles her everywhere, and the distance slider keeps her off the text you're reading.</p>
           </details>
-          <details>
+          <details id="faq-asleep">
             <summary data-i18n="q3">Why is she asleep?</summary>
             <p data-i18n="a3">After a while without cursor movement she naps, anywhere from 5 to 60 seconds, adjustable in the popup. Move the mouse, scroll hard or play some music and she's back.</p>
           </details>
-          <details>
+          <details id="faq-typing">
             <summary data-i18n="q4">Does she see what I type?</summary>
             <p data-i18n="a4">Never. A key press is just an activity signal, a selection is just a rectangle on screen, and password fields hide her entirely.</p>
           </details>
-          <details>
+          <details id="faq-safari">
             <summary data-i18n="q5">What about Safari?</summary>
             <p data-i18n="a5">Not yet. She lives in Chrome, Firefox and Edge, and in Chromium browsers like Brave, Opera or Vivaldi via the Chrome Web Store.</p>
           </details>
-          <details>
+          <details id="faq-ideas">
             <summary data-i18n="q6">Can I suggest a feature?</summary>
             <p data-i18n="a6">Please do. Toss it into the wishing pond right here on this site, or open an issue on GitHub.</p>
           </details>

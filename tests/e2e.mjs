@@ -2020,6 +2020,13 @@ async function run() {
   const text = (page, sel) => page.evaluate((q) => { const e = document.querySelector(q); return e ? e.textContent.replace(/\s+/g, ' ').trim() : null; }, sel);
   const sideways = (page) => page.evaluate(() => { const el = document.scrollingElement; return el.scrollWidth - el.clientWidth; });
   const stored = (page) => page.evaluate(() => JSON.stringify([Object.keys(localStorage).sort(), Object.keys(sessionStorage).sort()]));
+  const kept = async (page) => (await stored(page)).replace('"cd-lang"', '');   // the language somebody picked may stay
+  const PHONE = FIREFOX ? { width: 390, height: 844 } : { width: 390, height: 844, isMobile: true, hasTouch: true };
+  // Which folds are open, by id; what of a list is on screen.
+  const openFolds = (page) => page.evaluate(() => [...document.querySelectorAll('details[data-fold]')].filter((d) => d.open).map((d) => d.id));
+  // (not by its box: Chromium lays out what is inside a closed fold as well)
+  const shown = (page, sel) => page.evaluate((q) => [...document.querySelectorAll(q)].filter((e) => e.checkVisibility()).length, sel);
+  const openAll = (page) => page.evaluate(() => document.querySelectorAll('details').forEach((d) => { d.open = true; }));
 
   await test('site: counts, new cards and the tricks run on the real engine', async () => {
     const page = await sitePage('/');
@@ -2147,7 +2154,7 @@ async function run() {
     await press(page, '#giftBtn');
     assert.equal(await page.evaluate(() => window.__duck.duck.state), 'gift');
     await until(() => page.evaluate(() => !!window.__duck.giftObj), 'the gift', 6000);
-    assert.equal(await stored(page), before, 'a gift to look at: nothing is kept');
+    assert.equal(await stored(page), before, 'nothing is kept beyond the visit');
     // hidden with Esc, a button brings her back up for it
     await press(page, '#diveBtn');
     assert.equal(await page.evaluate(() => window.__duck.submerged), true);
@@ -2260,6 +2267,7 @@ async function run() {
     assert.equal(dead.length, 11);
     assert.deepEqual(dead.filter((b) => b[1] !== (b[0] !== 'beatBtn')), [], 'all greyed out but the beat');
     assert.deepEqual([await text(page, '#streak'), await page.evaluate(() => document.querySelectorAll('#family .kid').length)], ['', 0], 'no counter without her');
+    assert.equal(await shown(page, '.shelf, .tune'), 0, 'and no empty shelves');
     assert.deepEqual(page.errors, []);
     await close(page);
     page = await sitePage('/?lang=en', { block: /\/data\.js/ });
@@ -2272,6 +2280,9 @@ async function run() {
     await press(page, '[data-day="1"]');
     assert.deepEqual([await text(page, '#streak'), await page.evaluate(() => document.querySelectorAll('#family .kid').length)], ['', 0]);
     assert.deepEqual(await page.evaluate(() => window.__duck.broodAges.slice(0, 2)), [3, 17]);
+    assert.equal(await shown(page, '.shelf'), 0, 'no shelves without their words');
+    await press(page, '#giftBtn');
+    assert.equal(await page.evaluate(() => window.__duck.duck.state), 'gift', 'she brings one all the same');
     assert.deepEqual(page.errors, []);
   }, { chromeOnly: true, why: 'requests are only intercepted in Chromium here' });
 
@@ -2357,6 +2368,8 @@ async function run() {
         const buttons = [...document.querySelectorAll('#tricks button, .feat .row button')]
           .filter((b) => !/Another duck|Sound o/.test(b.textContent) && b.id !== 'beatBtn');
         buttons[Math.floor(rnd() * buttons.length)].click();
+        // in between somebody clicks into the password field, or out of it
+        if (i % 9 === 4) { const f = document.getElementById('focusField'); if (document.activeElement === f) f.blur(); else f.focus(); }
         e.pointerIdle = 0;
         try { e.simulate(0.2 + rnd() * 1.2); } catch (err) { bad.push(i + ': ' + err); break; }
         const ages = e.broodAges.slice(0, e.babies.length);
@@ -2372,10 +2385,13 @@ async function run() {
         shown: e.babies.map((b) => b.stage).join(), ages: e.broodAges.slice(0, e.babies.length).map((a) => DuckModels.stageOf(a)).join(),
         hidden: e.babies.filter((b) => b.vanish).length + (e.duck.vanish ? 1 : 0), submerged: e.submerged,
         kids: document.querySelectorAll('#family .kid').length, babies: e.babies.length,
-        streak: document.getElementById('streak').textContent
+        streak: document.getElementById('streak').textContent,
+        shelf: document.querySelectorAll('#gifts .g:not(.locked)').length + '/14' === document.getElementById('giftCount').textContent,
+        badges: document.querySelectorAll('#badgeList .done').length + '/76' === document.getElementById('badgeCount').textContent
       };
     });
     assert.deepEqual(r.bad, []);
+    assert.deepEqual([r.shelf, r.badges], [true, true], 'the counts match the shelves');
     assert.deepEqual([r.queue, r.fledge, r.eggs, r.flock, r.sky, r.hidden, r.submerged], [0, false, 0, false, 0, 0, false], JSON.stringify(r));
     assert.equal(r.shown, r.ages, 'every duckling looks her age: ' + JSON.stringify(r));
     assert.equal(r.kids, r.babies);
@@ -2399,9 +2415,11 @@ async function run() {
   });
 
   await test('site: on a phone nothing sticks out sideways and every new button is within reach', async () => {
-    const page = await sitePage('/?lang=en', { viewport: FIREFOX ? { width: 390, height: 844 } : { width: 390, height: 844, isMobile: true, hasTouch: true } });
+    const page = await sitePage('/?lang=en', { viewport: PHONE });
     await quiet(page);
     assert.equal(await sideways(page), 0);
+    await openAll(page);
+    await press(page, '[aria-controls="gallery"]');
     await press(page, '#moreTricks');
     await press(page, '#hatBtn');
     await press(page, '#glassesBtn');
@@ -2409,24 +2427,577 @@ async function run() {
     await press(page, '#birdsBtn');
     await until(() => page.evaluate(() => document.querySelectorAll('[data-cursor-duck-sky]').length === 1), 'the birds', 2000);
     assert.equal(await sideways(page), 0, 'with everything open');
-    const out = await page.evaluate(() => [...document.querySelectorAll('#tricks button, .feat .row > *, #family .kid, #streak')]
+    const reach = '#tricks button, .feat .row > *, #family .kid, #streak, summary, .peek-btn, .tile, .release';
+    const out = await page.evaluate((q) => [...document.querySelectorAll(q)]
       .filter((e) => { const r = e.getBoundingClientRect(); return r.width > 0 && (r.left < 0 || r.right > innerWidth); })
-      .map((e) => e.textContent.trim().slice(0, 24)));
+      .map((e) => e.textContent.trim().slice(0, 24)), reach);
     assert.deepEqual(out, []);
+    assert.equal(await shown(page, '.feat .row button'), 11, 'with the groups open, every button is on the page');
     // the birds fit the narrow sky
     const sky = await page.evaluate(() => { const r = document.querySelector('[data-cursor-duck-sky]').getBoundingClientRect(); return [Math.round(r.width), Math.round(r.height)]; });
     assert.ok(sky[0] <= 220 && sky[1] <= 150, 'a small layer: ' + sky);
     await clean(page);
   });
 
+  await test('site: folds: a phone starts with the short page, and everything is still on it', async () => {
+    const page = await sitePage('/?lang=en', { viewport: PHONE });
+    await until(() => page.evaluate(() => !!document.getElementById('older-releases')), 'the duck log', 3000);
+    assert.deepEqual(await openFolds(page), [], 'everything closed');
+    const height = await page.evaluate(() => document.documentElement.scrollHeight);
+    assert.ok(height < 6000, 'the page is short: ' + height);
+    // the words are in the page all the same, for search engines and find-in-page
+    const there = await page.evaluate(() => ({
+      groups: [...document.querySelectorAll('.group')].map((g) => g.id + ':' + g.querySelectorAll('.feat').length),
+      cards: [...document.querySelectorAll('.feat h4[data-i18n]')].filter((h) => h.textContent.trim()).length,
+      words: document.getElementById('features').textContent.includes('a new fluffball hatches from an egg'),
+      tiles: document.querySelectorAll('#gallery .tile').length, releases: document.querySelectorAll('.release').length
+    }));
+    assert.deepEqual(there.groups, ['play:6', 'browsing:6', 'pond-life:6', 'day-by-day:3']);
+    assert.deepEqual([there.cards, there.words, there.tiles], [21, true, 39], JSON.stringify(there));
+    assert.deepEqual([await shown(page, '.feat'), await shown(page, '#tricks button'), await shown(page, '#gallery .tile'), await shown(page, '.release')], [0, 0, 6, 1]);
+    // by keyboard: the handles are ordinary stops, Enter opens, Space closes
+    await page.evaluate(() => document.querySelector('#play > summary').focus());
+    await page.keyboard.press('Enter');
+    await until(async () => (await openFolds(page)).join() === 'play', 'the group to open', 1500);
+    assert.equal(await shown(page, '.feat'), 6);
+    await page.keyboard.press('Tab');
+    assert.equal(await page.evaluate(() => document.activeElement.id), 'roamBtn', 'Tab goes into it');
+    await page.evaluate(() => document.querySelector('#play > summary').focus());
+    await page.keyboard.press(' ');
+    await until(async () => (await openFolds(page)).length === 0, 'the group to close', 1500);
+    await page.keyboard.press('Tab');
+    assert.equal(await page.evaluate(() => document.activeElement.parentNode.id), 'browsing', 'Tab passes what is closed');
+    assert.equal(await sideways(page), 0);
+    await clean(page);
+  });
+
+  await test('site: folds: the ducks and the ideas show a few, a button shows the rest', async () => {
+    const page = await sitePage('/?lang=en', { viewport: PHONE });
+    const btn = '[aria-controls="gallery"]';
+    const state = () => page.evaluate((q) => { const b = document.querySelector(q); return [b.textContent, b.getAttribute('aria-expanded')]; }, btn);
+    assert.deepEqual(await state(), ['Show all 39 ducks', 'false']);
+    await page.evaluate((q) => document.querySelector(q).focus(), btn);
+    await page.keyboard.press('Enter');
+    assert.deepEqual(await state(), ['Show fewer ducks', 'true']);
+    assert.equal(await shown(page, '#gallery .tile'), 39);
+    assert.equal(await page.evaluate(() => [...document.querySelectorAll('#gallery .tile')].indexOf(document.activeElement)), 6, 'the keyboard goes on with the first new duck');
+    // the rest is the real thing: pick one
+    await page.evaluate(() => [...document.querySelectorAll('#gallery .tile')].pop().click());
+    assert.equal(await page.evaluate(() => window.__duck.modelId), await page.evaluate(() => DuckModels.list[38].id));
+    await press(page, btn);
+    assert.deepEqual([await state(), await shown(page, '#gallery .tile')], [['Show all 39 ducks', 'false'], 6]);
+    // the ideas arrive later (there is no board behind this server: five by hand, two of them built)
+    assert.equal(await shown(page, '[aria-controls="pads"]'), 0, 'no button without ideas');
+    const ideas = (n) => page.evaluate((k) => {
+      const box = document.getElementById('pads');
+      box.textContent = '';
+      for (let i = 0; i < k; i++) {
+        if (i === 3) box.appendChild(document.createElement('h3')).textContent = 'Already built';
+        const p = box.appendChild(document.createElement('article'));
+        p.className = 'pad';
+        p.appendChild(document.createElement('button')).textContent = 'crumb ' + i;
+      }
+    }, n);
+    await ideas(5);
+    await until(async () => (await shown(page, '[aria-controls="pads"]')) === 1, 'the button', 1500);
+    assert.deepEqual([await text(page, '[aria-controls="pads"]'), await shown(page, '#pads .pad'), await shown(page, '#pads h3')], ['Show all 5 ideas', 3, 0], 'a heading goes with what it stands above');
+    await press(page, '[aria-controls="pads"]');
+    assert.deepEqual([await text(page, '[aria-controls="pads"]'), await shown(page, '#pads .pad'), await shown(page, '#pads h3')], ['Show fewer ideas', 5, 1]);
+    assert.equal(await page.evaluate(() => document.activeElement.textContent), 'crumb 3');
+    await ideas(5);   // a vote: the board is drawn again
+    await sleep(60);
+    assert.equal(await shown(page, '#pads .pad'), 5, 'still all of them');
+    await ideas(2);
+    await until(async () => (await shown(page, '[aria-controls="pads"]')) === 0, 'two need no button', 1500);
+    await clean(page);
+  });
+
+  await test('site: folds: a link opens what it points at, on arrival, from the menu and a second time', async () => {
+    let page = await sitePage('/?lang=en#pond-life', { viewport: PHONE });
+    const topOf = (sel) => page.evaluate((q) => Math.round(document.querySelector(q).getBoundingClientRect().top), sel);
+    assert.deepEqual(await openFolds(page), ['pond-life']);
+    await until(async () => { const y = await topOf('#pond-life'); return y >= 55 && y < 130; }, 'the group right below the bar', 2500);
+    // the menu: a section and the one list it is about
+    await press(page, '#menuBtn');
+    await press(page, '#siteNav a[href="#ducks"]');
+    assert.equal(await shown(page, '#gallery .tile'), 39);
+    assert.equal(await text(page, '[aria-controls="gallery"]'), 'Show fewer ducks');
+    await press(page, '#siteNav a[href="#changelog"]');
+    await until(async () => (await openFolds(page)).includes('older-releases'), 'the earlier versions', 2000);
+    assert.equal(await shown(page, '.release'), await page.evaluate(() => document.querySelectorAll('.release').length));
+    // closed again, the same link opens it again (the address doesn't change this time)
+    await page.evaluate(() => { document.getElementById('older-releases').open = false; });
+    await until(async () => !(await openFolds(page)).includes('older-releases'), 'closed', 1500);
+    await sleep(80);
+    await press(page, '#siteNav a[href="#changelog"]');
+    assert.ok((await openFolds(page)).includes('older-releases'));
+    // the address bar: a question, and a card inside a closed group
+    await page.evaluate(() => { location.hash = '#faq-safari'; });
+    await until(() => page.evaluate(() => document.getElementById('faq-safari').open), 'the question', 1500);
+    await page.evaluate(() => { location.hash = '#focus-mode'; });
+    await until(() => page.evaluate(() => document.getElementById('browsing').open), 'the group around the card', 1500);
+    await until(async () => { const y = await topOf('#focus-mode'); return y > 60 && y < 420; }, 'the card in view', 4000);
+    assert.equal(await page.evaluate(() => document.getElementById('play').open), false, 'the others stay closed');
+    // nowhere, and nonsense: nothing happens
+    await page.evaluate(() => { location.hash = '#nowhere'; });
+    await page.evaluate(() => { location.hash = '#%E0%A4%A'; });
+    await sleep(120);
+    await clean(page);
+    await close(page);
+    // the changelog arrives after the page: a link to it waits for that
+    page = await sitePage('/de/#changelog', { viewport: PHONE });
+    await until(async () => (await openFolds(page)).includes('older-releases'), 'the earlier versions on arrival', 3000);
+    assert.equal(await page.evaluate(() => location.hash), '#changelog', 'the address keeps its target');
+    await clean(page);
+  });
+
+  await test('site: folds: what a link points at lands in view, not under the bar or the group’s handle', async () => {
+    const ids = ['her-tricks', 'settings', 'play', 'browsing', 'pond-life', 'day-by-day', 'focus-mode', 'collection', 'badges', 'gallery', 'older-releases', 'faq-speed', 'faq-safari'];
+    for (const viewport of [PHONE, { width: 1100, height: 720 }]) {
+      const page = await sitePage('/de/', { viewport });   // German: the longer handles
+      await until(() => page.evaluate(() => !!document.getElementById('older-releases')), 'the duck log', 3000);
+      await page.evaluate(() => { document.documentElement.style.scrollBehavior = 'auto'; });
+      const off = [];
+      for (const id of ids) {
+        await page.evaluate((i) => { window.scrollTo(0, 0); location.hash = '#' + i; }, id);
+        await sleep(160);
+        const r = await page.evaluate((i) => {
+          const t = document.getElementById(i), own = t.tagName === 'DETAILS' ? t.querySelector('summary') : null;
+          const head = own && own.checkVisibility() ? own : t;
+          const g = t.closest('.group'), h = g && g !== t ? g.querySelector('summary') : null;
+          const covered = Math.max(document.querySelector('.nav').getBoundingClientRect().bottom,
+            h && getComputedStyle(h).position === 'sticky' ? h.getBoundingClientRect().bottom : 0);
+          return { top: Math.round(head.getBoundingClientRect().top), covered: Math.round(covered), h: innerHeight };
+        }, id);
+        if (!(r.top >= r.covered - 1 && r.top < r.h - 40)) off.push(id + ' ' + JSON.stringify(r));
+      }
+      assert.deepEqual(off, [], viewport.width + ' px wide');
+      await clean(page);
+      await close(page);
+    }
+  });
+
+  await test('site: folds: in German too, and a language switch leaves open what is open', async () => {
+    const page = await sitePage('/de/#day-by-day', { viewport: PHONE });
+    await until(() => page.evaluate(() => !!document.getElementById('older-releases')), 'the duck log', 3000);
+    assert.deepEqual(await openFolds(page), ['day-by-day']);
+    const n = await page.evaluate(() => document.querySelectorAll('.release').length - 1);
+    assert.deepEqual(await page.evaluate(() => [...document.querySelectorAll('.group h3, #her-tricks > summary, #older-releases > summary, .peek-btn:not([hidden])')].map((e) => e.textContent)),
+      ['🎪 Ihre Kunststücke', 'Mit ihr spielen', 'Während du surfst', 'Leben auf dem Teich', 'Tag für Tag', 'Alle 39 Enten zeigen', `Frühere Versionen (${n})`]);
+    await page.evaluate(() => { document.getElementById('older-releases').open = true; });
+    await press(page, '[aria-controls="gallery"]');
+    await sleep(80);
+    await press(page, '#langBtn');
+    assert.deepEqual(await openFolds(page), ['day-by-day', 'older-releases'], 'the rebuilt log is open again');
+    assert.deepEqual([await text(page, '#play h3'), await text(page, '#older-releases > summary'), await text(page, '[aria-controls="gallery"]')],
+      ['Playing with her', `Earlier versions (${n})`, 'Show fewer ducks']);
+    assert.equal(await sideways(page), 0);
+    await clean(page);
+  });
+
+  await test('site: folds: wide screens see everything, and each kind of screen keeps what was opened on it', async () => {
+    const page = await sitePage('/?lang=en');
+    await until(() => page.evaluate(() => !!document.getElementById('older-releases')), 'the duck log', 3000);
+    const all = await page.evaluate(() => [...document.querySelectorAll('details[data-fold]')].map((d) => d.id));
+    assert.deepEqual(all, ['her-tricks', 'play', 'browsing', 'pond-life', 'day-by-day', 'latest-notes', 'older-releases']);
+    assert.deepEqual(await openFolds(page), all);
+    assert.deepEqual([await shown(page, '.feat'), await shown(page, '#gallery .tile'), await shown(page, '.peek-btn'), await shown(page, '.quiet > summary')], [21, 39, 0, 0]);
+    // a group can be closed here as well
+    await press(page, '#play > summary');
+    await until(async () => !(await openFolds(page)).includes('play'), 'closed', 1500);
+    await sleep(80);
+    // the window becomes a phone: folded, and what is opened there belongs there
+    await page.setViewport({ width: 390, height: 844 });
+    await until(async () => (await openFolds(page)).length === 0, 'the short page', 3000);
+    assert.deepEqual([await shown(page, '#gallery .tile'), await shown(page, '.peek-btn')], [6, 1]);
+    await press(page, '#pond-life > summary');
+    await until(async () => (await openFolds(page)).join() === 'pond-life', 'one group', 1500);
+    await sleep(80);
+    await page.setViewport({ width: 1100, height: 720 });
+    await until(async () => (await openFolds(page)).length === all.length - 1, 'the wide page', 3000);
+    assert.ok(!(await openFolds(page)).includes('play'), 'as it was left');
+    await page.setViewport({ width: 390, height: 844 });
+    await until(async () => (await openFolds(page)).join() === 'pond-life', 'and back to the phone', 3000);
+    await clean(page);
+  });
+
+  await test('site: folds: the open group’s handle stays in reach, and closing it keeps the place', async () => {
+    const page = await sitePage('/?lang=en#browsing', { viewport: PHONE });
+    const rect = (sel) => page.evaluate((q) => { const r = document.querySelector(q).getBoundingClientRect(); return { top: Math.round(r.top), bottom: Math.round(r.bottom) }; }, sel);
+    // deep inside the group the handle is still on screen, below the bar
+    await page.evaluate(() => document.querySelector('#diveBtn').scrollIntoView({ block: 'end', behavior: 'instant' }));
+    const bar = await rect('.nav'), handle = await rect('#browsing > summary');
+    assert.ok((await rect('#browsing')).top < -200, 'far down in it');
+    assert.ok(handle.top >= bar.bottom - 1 && handle.top < bar.bottom + 20, JSON.stringify([bar, handle]));
+    await press(page, '#browsing > summary');
+    await until(async () => { const r = await rect('#browsing > summary'); return r.top >= bar.bottom - 1 && r.bottom < 844; }, 'the closed group still on screen', 2000);
+    await clean(page);
+  });
+
+  await test('site: folds: without the page script a wide screen opens them, a phone’s still work by hand', async () => {
+    let page = await sitePage('/?lang=en', { block: /\/site\.js/ });
+    assert.deepEqual(await openFolds(page), ['her-tricks', 'play', 'browsing', 'pond-life', 'day-by-day'], 'theme.js, while the page is read');
+    assert.equal(await shown(page, '.feat'), 21);
+    await close(page);
+    page = await sitePage('/?lang=en', { viewport: PHONE, block: /\/site\.js/ });
+    assert.deepEqual(await openFolds(page), []);
+    await press(page, '#play > summary');
+    assert.deepEqual([await openFolds(page), await shown(page, '.feat')], [['play'], 6]);
+  }, { chromeOnly: true, why: 'requests are only intercepted in Chromium here' });
+
+  // Focus mode on the page: is she away, and what has she said since.
+  const away = (page) => page.evaluate(() => window.__duck.halted === true && window.__duck.running === false &&
+    window.__duck.host.style.getPropertyValue('display') === 'none');
+  const back = (page) => page.evaluate(() => window.__duck.running === true && window.__duck.host.style.getPropertyValue('display') === 'block');
+  const listen = (page) => page.evaluate(() => {
+    const d = window.__duck.duck, say = d.say;
+    if (!window.__said) d.say = function (t) { window.__said.push(t); return say.apply(this, arguments); };
+    window.__said = [];
+  });
+  const said = (page) => page.evaluate(() => window.__said.filter((t) => t === '!').length);
+
+  await test('site: focus mode: she steps aside for the password field on the card, and reports back with “!”', async () => {
+    const page = await sitePage('/?lang=en');
+    await quiet(page);
+    await listen(page);
+    const before = await kept(page);
+    await page.evaluate(() => document.getElementById('focusField').scrollIntoView({ block: 'center', behavior: 'instant' }));
+    await sleep(200);
+    assert.deepEqual([await text(page, '#focusState'), await back(page)], ['', true]);
+    const at = await page.evaluate(() => { const r = document.getElementById('focusField').getBoundingClientRect(); return { x: r.x + 60, y: r.y + r.height / 2 }; });
+    await page.mouse.click(at.x, at.y);
+    await until(() => away(page), 'her to step aside', 1500);
+    assert.equal(await text(page, '#focusState'), '🙈 She has stepped aside. Leave the field and she’s back.');
+    await page.keyboard.type('not a real one');
+    assert.equal(await page.evaluate(() => document.getElementById('focusField').value), 'not a real one', 'the field is an ordinary field');
+    // whatever else changes meanwhile, she stays away: a new duck, a hat, the language, the system's motion setting
+    await page.evaluate(() => [...document.querySelectorAll('#gallery .tile')][2].click());
+    await press(page, '#hatBtn');
+    await press(page, '#roamBtn');
+    await press(page, '#roamBtn');
+    await press(page, '#langBtn');
+    assert.equal(await text(page, '#focusState'), '🙈 Sie ist abgetreten. Verlass das Feld, und sie ist wieder da.');
+    await page.mouse.move(at.x + 200, at.y + 120, { steps: 5 });
+    await sleep(200);
+    assert.equal(await away(page), true, 'still away');
+    assert.equal(await page.evaluate(() => window.__duck.cfg.hat), 'cap', 'and the settings arrived');
+    await press(page, '#langBtn');
+    await listen(page);
+    await page.keyboard.press('Tab');
+    await until(() => back(page), 'her back', 1500);
+    assert.deepEqual([await said(page), await text(page, '#focusState')], [1, '']);
+    assert.equal(await page.evaluate(() => document.getElementById('focusField').value), '', 'the field has emptied itself');
+    assert.equal(await kept(page), before, 'nothing is stored but the language that was picked');
+    await clean(page);
+  });
+
+  await test('site: focus mode: the moderators’ login counts too, and from field to field she doesn’t pop up', async () => {
+    const page = await sitePage('/?lang=en&admin');
+    await until(() => away(page), 'her away on arrival: the login has the focus', 2000);
+    assert.equal(await page.evaluate(() => document.activeElement.id), 'adminTokenInput');
+    assert.equal(await text(page, '#focusState'), '', 'the card speaks of its own field only');
+    await listen(page);
+    await page.evaluate(() => {
+      window.__starts = 0;
+      const start = window.__duck.start;
+      window.__duck.start = function () { window.__starts++; return start.apply(this, arguments); };
+    });
+    await page.evaluate(() => document.getElementById('focusField').focus());
+    await sleep(150);
+    await page.evaluate(() => document.getElementById('adminTokenInput').focus());
+    await sleep(150);
+    assert.deepEqual([await away(page), await said(page), await page.evaluate(() => window.__starts)], [true, 0, 0]);
+    // an ordinary text field is no reason to go
+    await page.evaluate(() => document.querySelector('#browsing textarea').focus());
+    await until(() => back(page), 'her back', 1500);
+    assert.equal(await said(page), 1);
+    await clean(page);
+  });
+
+  await test('site: focus mode: a fullscreen video sends her away, a fullscreen picture doesn’t', async () => {
+    const page = await sitePage('/?lang=en');
+    await quiet(page);
+    await page.evaluate(() => {
+      // a picture, a player around a video, the video itself, an embedded player's frame
+      for (const [id, outer, inner] of [['fsPlain', 'div', 'p'], ['fsPlayer', 'div', 'video'], ['fsVideo', 'video', ''], ['fsFrame', 'iframe', '']]) {
+        const box = document.body.appendChild(document.createElement(outer));
+        box.id = id;
+        if (inner) box.appendChild(document.createElement(inner));
+        const b = document.body.appendChild(document.createElement('button'));
+        b.id = id + 'Btn';
+        b.textContent = id;
+        b.addEventListener('click', () => box.requestFullscreen());
+      }
+    });
+    await listen(page);
+    const full = async (id) => {
+      await page.evaluate((i) => document.getElementById(i).scrollIntoView({ block: 'center', behavior: 'instant' }), id + 'Btn');
+      await sleep(150);
+      const at = await page.evaluate((i) => { const r = document.getElementById(i).getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; }, id + 'Btn');
+      await page.mouse.click(at.x, at.y);
+      await until(() => page.evaluate(() => !!document.fullscreenElement), 'fullscreen', 2500);
+    };
+    const leave = async () => {
+      await page.evaluate(() => document.exitFullscreen());
+      await until(() => page.evaluate(() => !document.fullscreenElement), 'leaving fullscreen', 2500);
+    };
+    await full('fsPlain');
+    await sleep(200);
+    assert.equal(await away(page), false);
+    await leave();
+    for (const id of ['fsPlayer', 'fsVideo', 'fsFrame']) {
+      await listen(page);
+      await full(id);
+      await until(() => away(page), 'her to step aside for ' + id, 1500);
+      await leave();
+      await until(() => back(page), 'her back after ' + id, 1500);
+      assert.equal(await said(page), 1, id);
+    }
+    await clean(page);
+  });
+
+  await test('site: focus mode: under water she stays under water, without a word', async () => {
+    const page = await sitePage('/?lang=en');
+    await quiet(page);
+    await page.mouse.move(560, 330);
+    await sleep(300);
+    await press(page, '#diveBtn');
+    await until(() => page.evaluate(() => window.__duck._parked), 'the family under water', 5000);
+    await listen(page);
+    await page.evaluate(() => document.getElementById('focusField').focus());
+    await until(() => page.evaluate(() => window.__duck.halted), 'focus mode', 1500);
+    await page.evaluate(() => document.getElementById('focusField').blur());
+    await until(() => page.evaluate(() => !window.__duck.halted), 'focus mode to end', 1500);
+    assert.deepEqual(await page.evaluate(() => [window.__duck.submerged, window.__duck.host.style.getPropertyValue('display')]), [true, 'none']);
+    assert.deepEqual([await said(page), await text(page, '#diveBtn')], [0, '🫧 Come back up']);
+    await press(page, '#diveBtn');
+    await until(() => back(page), 'her back up', 2000);
+    await clean(page);
+  });
+
+  // The popup's own words, from the locale files the build reads.
+  const msgs = (loc) => JSON.parse(fs.readFileSync(path.join(ROOT, '_locales', loc, 'messages.json'), 'utf8'));
+  // The next gift is the first (0) or the last (1) of the catalog.
+  const bring = (page, at) => page.evaluate((r) => {
+    const rnd = Math.random;
+    Math.random = () => r;
+    try { document.getElementById('giftBtn').click(); } finally { Math.random = rnd; }
+    const run = window.__duck.duck.giftRun;
+    return [run.id, run.isNew];
+  }, at ? 0.999999 : 0);
+
+  await test('site: collection: a press brings a gift and keeps it on the shelf, for this visit only', async () => {
+    const page = await sitePage('/?lang=en');
+    await quiet(page);
+    await page.mouse.move(560, 330);
+    const before = await kept(page), en = msgs('en'), de = msgs('de');
+    assert.equal(await page.evaluate(() => document.getElementById('collection').open), false, 'closed until asked for, on a wide screen too');
+    assert.deepEqual([await text(page, '#giftCount'), await text(page, '#giftNews'), await text(page, '#giftDesc')], ['0/14', '', '']);
+    const tile = (i) => page.evaluate((k) => {
+      const b = document.querySelectorAll('#gifts .g')[k];
+      return [b.textContent, b.disabled, b.classList.contains('locked'), b.getAttribute('aria-label')];
+    }, i);
+    assert.equal(await page.evaluate(() => document.querySelectorAll('#gifts .g').length), 14);
+    assert.deepEqual(await tile(0), ['???', true, true, 'Not found yet']);
+    // the extension's own draw, with what is already there (the missing ones count double)
+    await page.evaluate(() => {
+      const roll = DuckModels.rollGift;
+      window.__rolls = [];
+      DuckModels.rollGift = (rnd, counts) => { window.__rolls.push(JSON.stringify(counts)); return roll(rnd, counts); };
+    });
+    assert.deepEqual(await bring(page, 0), ['pebble', true]);
+    assert.deepEqual([await tile(0), await text(page, '#giftCount')], [['Pebble', false, false, null], '1/14']);
+    assert.equal(await text(page, '#giftNews'), '✨ New in your collection: Pebble');
+    assert.deepEqual(await bring(page, 0), ['pebble', false]);
+    assert.deepEqual([await tile(0), await text(page, '#giftNews')], [['Pebble×2', false, false, null], '🎁 Another one: Pebble']);
+    assert.deepEqual(await bring(page, 1), ['goldegg', true]);
+    assert.deepEqual(await page.evaluate(() => window.__rolls), ['{}', '{"pebble":1}', '{"pebble":2}']);
+    assert.equal(await text(page, '#giftCount'), '2/14');
+    // she really brings it
+    await until(() => page.evaluate(() => window.__duck.giftObj && window.__duck.giftObj.id === 'goldegg'), 'the golden egg on the water', 8000);
+    // opened by keyboard; the shelf tells about the last one, and about the one that is pressed
+    await page.evaluate(() => document.querySelector('#collection > summary').focus());
+    await page.keyboard.press('Enter');
+    await until(() => page.evaluate(() => document.getElementById('collection').open), 'the shelf', 1500);
+    assert.equal(await text(page, '#giftDesc'), 'Golden egg: ' + en.giftD_goldegg.message);
+    await page.keyboard.press('Tab');
+    assert.equal(await page.evaluate(() => document.activeElement.textContent), 'Pebble×2', 'the first found one is the next stop');
+    await page.keyboard.press('Enter');
+    assert.equal(await text(page, '#giftDesc'), 'Pebble: ' + en.giftD_pebble.message);
+    // in German it is the same shelf
+    await press(page, '#langBtn');
+    assert.deepEqual([(await tile(0))[0], await text(page, '#giftDesc'), await text(page, '#giftNews'), (await tile(1))[3]],
+      [de.gift_pebble.message + '×2', de.gift_pebble.message + ': ' + de.giftD_pebble.message, '✨ Neu in deiner Sammlung: ' + de.gift_goldegg.message, 'Noch nicht gefunden']);
+    await press(page, '#langBtn');
+    // from under water she comes up for it
+    await press(page, '#diveBtn');
+    assert.deepEqual(await bring(page, 0), ['pebble', false]);
+    assert.deepEqual([await page.evaluate(() => window.__duck.submerged), await text(page, '#diveBtn')], [false, '🤫 Dive']);
+    assert.equal(await kept(page), before, 'nothing of it is stored');
+    await page.evaluate(() => location.reload());
+    await until(() => page.evaluate(() => !!window.__duck && document.getElementById('giftCount').textContent === '0/14').catch(() => false), 'an empty shelf after a reload', 4000);
+    await clean(page);
+  });
+
+  await test('site: badges: the popup’s list, counted live while somebody plays, for this visit only', async () => {
+    const page = await sitePage('/?lang=en');
+    await quiet(page);
+    const before = await kept(page), en = msgs('en'), de = msgs('de');
+    // every badge of the popup, in its order, with its goal
+    const popup = fs.readFileSync(path.join(ROOT, 'popup', 'popup.js'), 'utf8');
+    const keys = [...popup.matchAll(/^\s+\['\w+', (\d+|DuckModels\.gifts\.length), '[^']+', '(ach\w+)'/gm)].map((m) => [m[2], m[1].startsWith('Duck') ? 14 : Number(m[1])]);
+    assert.equal(keys.length, 76);
+    assert.equal(await page.evaluate(() => document.getElementById('badges').open), false, 'closed until asked for');
+    const list = () => page.evaluate(() => [...document.querySelectorAll('#badgeList .ach')].map((d) => [d.querySelector('.tx').textContent, d.querySelector('.pr').textContent, d.classList.contains('done')]));
+    const l = await list();
+    assert.deepEqual(l.map((b) => b[0]), keys.map((k) => en[k[0]].message));
+    assert.deepEqual(l.filter((b) => b[1].split('/')[0] !== '0').map((b) => b[0] + ' ' + b[1]),
+      ['achStreak7', 'achStreak', 'achDays100'].map((k) => en[k].message + ' 1/' + keys.find((x) => x[0] === k)[1]), 'today together counts already');
+    assert.equal(await text(page, '#badgeCount'), '0/76');
+    const badge = async (key) => (await list())[keys.findIndex((k) => k[0] === key)].slice(1);
+    // the pretend calendar: a week, and a duckling that leaves on the way
+    for (let i = 0; i < 6; i++) await press(page, '#streak + .row [data-day="1"]');
+    assert.deepEqual([await badge('achStreak7'), await badge('achStreak'), await badge('achFledge')], [['✓', true], ['7/30', false], ['✓', true]]);
+    // a missed day ends the run, never a badge
+    await press(page, '#streak + .row [data-day="2"]');
+    assert.deepEqual(await badge('achStreak7'), ['✓', true]);
+    // the collection
+    await bring(page, 0);
+    await bring(page, 1);
+    assert.deepEqual([await badge('achGift1'), await badge('achGift2'), await badge('achGift3')], [['✓', true], ['2/7', false], ['✓', true]]);
+    assert.equal(await text(page, '#badgeCount'), '4/76');
+    // what the engine counts on this page
+    await press(page, '#diveBtn');
+    await press(page, '#diveBtn');
+    await until(async () => (await badge('achHide'))[0] === '1/10', 'the dive to count', 2500);
+    await page.evaluate(() => { window.__duck.stats.pets = 10; window.__duck.saveStats(); });
+    await until(async () => (await badge('achPets1'))[1], 'petting fan', 2500);
+    assert.equal(await text(page, '#badgeCount'), '5/76');
+    // one explanation at a time, with the tier in words, and the list scrolls in itself
+    await page.evaluate(() => { document.getElementById('badges').open = true; });
+    await page.evaluate(() => document.querySelector('#badgeList summary').focus());
+    await page.keyboard.press('Enter');
+    await until(() => page.evaluate(() => document.querySelector('#badgeList .ach').open), 'the explanation', 1500);
+    assert.equal(await text(page, '#badgeList .ach p'), en.tierBronze.message + ' · ' + en.achPets1D.message.replace(/\s+/g, ' '));
+    await page.evaluate(() => document.querySelectorAll('#badgeList summary')[1].click());
+    await until(() => page.evaluate(() => [...document.querySelectorAll('#badgeList .ach')].filter((d) => d.open).length === 1), 'only one open', 1500);
+    const box = await page.evaluate(() => { const b = document.getElementById('badgeList'); return [b.clientHeight, b.scrollHeight, b.scrollWidth - b.clientWidth]; });
+    assert.ok(box[0] <= 320 && box[1] > 1500 && box[2] === 0, JSON.stringify(box));
+    await press(page, '#langBtn');
+    assert.deepEqual((await list()).map((b) => b[0]), keys.map((k) => de[k[0]].message));
+    assert.deepEqual([await text(page, '#badges > summary'), await badge('achPets1')], ['Alle Abzeichen 5/76', ['✓', true]]);
+    assert.equal(await kept(page), before, 'nothing of it is stored');
+    await page.evaluate(() => location.reload());
+    await until(() => page.evaluate(() => !!window.__duck && document.getElementById('badgeCount').textContent === '0/76').catch(() => false), 'a fresh start after a reload', 4000);
+    await clean(page);
+  });
+
+  await test('site: settings: size, speed and ducklings for this visit, and the family on the card follows', async () => {
+    const page = await sitePage('/?lang=en');
+    await quiet(page);
+    const before = await kept(page);
+    assert.equal(await page.evaluate(() => document.getElementById('settings').open), false, 'closed until asked for');
+    const panel = () => page.evaluate(() => [...document.querySelectorAll('.tune-box label')].map((l) => l.textContent + ' ' + document.querySelector('output[for="' + l.htmlFor + '"]').textContent));
+    assert.deepEqual(await panel(), ['Size 1.1×', 'Speed 1.0×', 'Ducklings 2']);
+    await press(page, '#settings > summary');
+    // by keyboard, the way a slider is moved
+    await page.evaluate(() => document.getElementById('tuneBabies').focus());
+    for (let i = 0; i < 9; i++) await page.keyboard.press('ArrowRight');
+    assert.deepEqual([await panel(), await page.evaluate(() => [window.__duck.cfg.ducklings, window.__duck.babies.length])], [['Size 1.1×', 'Speed 1.0×', 'Ducklings 6'], [6, 6]]);
+    assert.equal(await page.evaluate(() => document.querySelectorAll('#family .kid').length), 6, 'six of them on the card');
+    await page.keyboard.press('Home');
+    assert.deepEqual(await page.evaluate(() => [window.__duck.babies.length, document.querySelectorAll('#family .kid').length]), [0, 0]);
+    await page.evaluate(() => document.getElementById('tuneSize').focus());
+    await page.keyboard.press('End');
+    assert.equal(await page.evaluate(() => window.__duck.cfg.size), 2.2);
+    await page.evaluate(() => document.getElementById('tuneSpeed').focus());
+    await page.keyboard.press('Home');
+    assert.equal(await page.evaluate(() => window.__duck.cfg.speed), 0.4);
+    await press(page, '#langBtn');
+    assert.deepEqual(await panel(), ['Größe 2.2×', 'Tempo 0.4×', 'Küken 0']);
+    assert.equal(await kept(page), before, 'nothing of it is stored');
+    await clean(page);
+    await close(page);
+    // on a phone it waits inside the tricks, and fits
+    const phone = await sitePage('/?lang=en#settings', { viewport: PHONE });
+    assert.deepEqual([await openFolds(phone), await shown(phone, '.tune-box')], [['her-tricks'], 1], 'the link opens both');
+    const out = await phone.evaluate(() => [...document.querySelectorAll('.tune-box, .tune-box *')]
+      .filter((e) => { const r = e.getBoundingClientRect(); return r.left < 0 || r.right > innerWidth; }).length);
+    assert.deepEqual([out, await sideways(phone)], [0, 0]);
+    await clean(phone);
+  });
+
+  await test('site: folds: a link to the collection or the badges opens the shelf and the group it is in', async () => {
+    let page = await sitePage('/de/#badges', { viewport: PHONE });
+    const open = () => page.evaluate(() => ['day-by-day', 'collection', 'badges', 'play'].map((id) => document.getElementById(id).open));
+    assert.deepEqual(await open(), [true, false, true, false]);
+    await until(() => page.evaluate(() => { const y = document.getElementById('badges').getBoundingClientRect().top; return y > 60 && y < 500; }), 'the badges in view', 3000);
+    assert.equal(await sideways(page), 0);
+    await page.evaluate(() => { location.hash = '#collection'; });
+    await until(async () => (await open())[1], 'the collection', 1500);
+    assert.equal(await sideways(page), 0);
+    const out = await page.evaluate(() => [...document.querySelectorAll('.g, .ach, .shelf > summary, .field')]
+      .filter((e) => { const r = e.getBoundingClientRect(); return r.left < 0 || r.right > innerWidth; }).length);
+    assert.equal(out, 0);
+    await clean(page);
+  });
+
+  await test('site: Esc is never taken away from the page: not by a fold, the password field or the menu', async () => {
+    const page = await sitePage('/?lang=en', { viewport: { width: 800, height: 720 } });
+    await quiet(page);
+    await page.mouse.move(400, 300);
+    await page.evaluate(() => {
+      window.__esc = [];
+      window.addEventListener('keydown', (e) => { if (e.key === 'Escape') window.__esc.push(e.defaultPrevented); });   // the last stop of the bubble phase
+    });
+    for (const focus of ['#focusField', '#play > summary', '#collection > summary, #day-by-day > summary', '#faq-safari > summary', '#langBtn']) {
+      await page.evaluate((q) => document.querySelector(q).focus(), focus);
+      await sleep(60);
+      const was = await page.evaluate(() => window.__esc.length);
+      await page.keyboard.press('Escape');
+      assert.deepEqual(await page.evaluate((n) => window.__esc.slice(n), was), [false], focus);
+      assert.equal(await page.evaluate((q) => document.activeElement === document.querySelector(q), focus), true, focus + ' keeps the focus');
+      if (focus === '#focusField') {
+        assert.deepEqual(await page.evaluate(() => [window.__duck.submerged, window.__duck.halted]), [false, true], 'in the field Esc is the field’s');
+      }
+    }
+    await press(page, '#menuBtn');
+    const was = await page.evaluate(() => window.__esc.length);
+    await page.keyboard.press('Escape');
+    assert.deepEqual(await page.evaluate((n) => window.__esc.slice(n), was), [false], 'the menu closes without keeping the key');
+    await clean(page);
+  });
+
+  await test('site: focus mode: by touch, in the folded page', async () => {
+    const page = await sitePage('/?lang=en#focus-mode', { viewport: PHONE });
+    await quiet(page);
+    await until(() => page.evaluate(() => document.getElementById('browsing').open), 'the group around the card', 2000);
+    await page.evaluate(() => document.getElementById('focusField').scrollIntoView({ block: 'center', behavior: 'instant' }));
+    await sleep(300);
+    const at = await page.evaluate(() => { const r = document.getElementById('focusField').getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; });
+    await page.touchscreen.tap(at.x, at.y);
+    await until(() => away(page), 'her to step aside', 1500);
+    await page.evaluate(() => document.activeElement.blur());   // the keyboard's "done"
+    await until(() => back(page), 'her back', 1500);
+    assert.equal(await sideways(page), 0);
+    await clean(page);
+  }, { chromeOnly: true, why: 'touch input is only emulated in Chromium here' });
+
   await test('site: touch: the hint talks about tapping, a tap presses the buttons, a long press drags her', async () => {
     const page = await sitePage('/?lang=en', { viewport: { width: 390, height: 844, isMobile: true, hasTouch: true } });
     await quiet(page);
     assert.match(await text(page, '[data-i18n="heroHint"]'), /Tap anywhere/);
+    const middle = async (sel) => {
+      await page.evaluate((q) => document.querySelector(q).scrollIntoView({ block: 'center', behavior: 'instant' }), sel);
+      await sleep(300);
+      return page.evaluate((q) => { const r = document.querySelector(q).getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; }, sel);
+    };
+    // a tap opens the group the card is in
+    const handle = await middle('#browsing > summary');
+    await page.touchscreen.tap(handle.x, handle.y);
+    await until(() => page.evaluate(() => document.getElementById('browsing').open), 'the group to open', 1500);
     // a tap on a card button, at its place on the page
-    await page.evaluate(() => document.getElementById('diveBtn').scrollIntoView({ block: 'center', behavior: 'instant' }));
-    await sleep(300);
-    const at = await page.evaluate(() => { const r = document.getElementById('diveBtn').getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; });
+    const at = await middle('#diveBtn');
     await page.touchscreen.tap(at.x, at.y);
     await until(() => page.evaluate(() => window.__duck.submerged), 'a tap on Dive', 1500);
     await page.touchscreen.tap(at.x, at.y);
